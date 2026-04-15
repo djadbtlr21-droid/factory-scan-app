@@ -4,11 +4,15 @@ export default async function handler(req, res) {
   try {
     const report = req.query && req.query.report;
     if (!report) return res.status(400).json({ error: 'Missing report' });
-    const page = (req.query && req.query.page) || '1';
-    const perPage = (req.query && req.query.per_page) || '100';
+
+    // Zoho Creator v2.1 pagination: from (1-based) + limit (max 200).
+    // Legacy page/per_page are rejected with {code:1060,"Invalid request parameter found - page"}.
+    const from = (req.query && req.query.from) || '1';
+    const limitRaw = parseInt((req.query && req.query.limit) || '200', 10);
+    const limit = String(Math.max(1, Math.min(isNaN(limitRaw) ? 200 : limitRaw, 200)));
 
     const token = await getAccessToken();
-    const url = `${zohoBase()}/report/${encodeURIComponent(report)}?page=${encodeURIComponent(page)}&per_page=${encodeURIComponent(perPage)}`;
+    const url = `${zohoBase()}/report/${encodeURIComponent(report)}?from=${encodeURIComponent(from)}&limit=${encodeURIComponent(limit)}`;
     const zres = await fetch(url, {
       headers: { Authorization: `Zoho-oauthtoken ${token}`, Accept: 'application/json' }
     });
