@@ -72,6 +72,14 @@ export async function getAccessToken() {
 
   cachedToken = body.access_token;
   cachedExp = now + 50 * 60 * 1000;
+  lastMeta = {
+    tokenUrl,
+    scope: body.scope || null,
+    api_domain: body.api_domain || null,
+    token_type: body.token_type || null,
+    expires_in: body.expires_in || null,
+    refreshed_at: new Date(now).toISOString()
+  };
   return cachedToken;
 }
 
@@ -79,8 +87,19 @@ export function zohoBase() {
   const domain = (process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com').replace(/\/+$/, '');
   const account = process.env.ZOHO_ACCOUNT || 'jeramoda';
   const app = process.env.ZOHO_APP || 'eom';
-  return `${domain}/creator/v2.1/data/${account}/${app}`;
+  const version = (process.env.ZOHO_API_VERSION || 'v2.1').replace(/^\/+|\/+$/g, '');
+  return `${domain}/creator/${version}/data/${account}/${app}`;
 }
+
+export function zohoApiVersion() {
+  return (process.env.ZOHO_API_VERSION || 'v2.1').replace(/^\/+|\/+$/g, '');
+}
+
+export function lastTokenMeta() {
+  return lastMeta;
+}
+
+let lastMeta = null;
 
 export async function readJson(req) {
   if (req.body && typeof req.body === 'object') return req.body;
