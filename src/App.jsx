@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import jsQR from 'jsqr';
 import { getRecords, submitRecord, updateRecord } from './api.js';
 
@@ -94,11 +95,17 @@ function CameraOverlay({ onResult, onCancel }) {
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const scanningRef = useRef(true);
+  // Hold the latest callbacks in a ref so the mount effect can stay deps=[]
+  // and the camera never tears down on unrelated parent re-renders.
+  const cbRef = useRef({ onResult, onCancel });
+  cbRef.current.onResult = onResult;
+  cbRef.current.onCancel = onCancel;
 
   useEffect(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     let raf;
+    let firedResult = false;
 
     function tick() {
       if (!scanningRef.current) return;
@@ -109,10 +116,11 @@ function CameraOverlay({ onResult, onCancel }) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
-        if (code) {
+        if (code && !firedResult) {
+          firedResult = true;
           scanningRef.current = false;
           stop();
-          onResult(code.data);
+          cbRef.current.onResult(code.data);
           return;
         }
       }
@@ -121,25 +129,30 @@ function CameraOverlay({ onResult, onCancel }) {
 
     function stop() {
       scanningRef.current = false;
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
       if (raf) cancelAnimationFrame(raf);
     }
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       .then((s) => {
+        if (!scanningRef.current) { s.getTracks().forEach((t) => t.stop()); return; }
         streamRef.current = s;
         video.srcObject = s;
-        video.play();
+        const p = video.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
         raf = requestAnimationFrame(tick);
       })
       .catch((err) => {
         stop();
         alert('无法访问摄像头: ' + err.message);
-        onCancel();
+        cbRef.current.onCancel();
       });
 
     return () => { stop(); };
-  }, [onResult, onCancel]);
+  }, []);
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: '#000', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -230,8 +243,8 @@ export default function App() {
   }
 
   function onQR(qrText) {
-    setCameraOpen(false);
     const text = (qrText || '').trim();
+    console.log('[scan] QR detected, len=' + text.length);
     let moNumber = '', skuVal = '', factoryVal = '';
     text.split(/[|\n\r]+/).forEach((part) => {
       part = part.trim();
@@ -245,16 +258,31 @@ export default function App() {
     });
     if (!moNumber) {
       if (/^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
-      else { alert('未能识别订单号\n\n扫描内容: ' + text); return; }
+      else {
+        console.warn('[scan] unrecognized QR payload', text);
+        setCameraOpen(false);
+        alert('未能识别订单号\n\n扫描内容: ' + text);
+        return;
+      }
     }
-    setLoadingMsg('正在读取订单信息...');
-    setScreen('loading');
+    console.log('[scan] MO=' + moNumber + ' SKU=' + skuVal + ' FACTORY=' + factoryVal);
+
+    // Commit the camera-close + loading-screen transition synchronously so
+    // the loading screen actually paints BEFORE the network call begins.
+    flushSync(() => {
+      setCameraOpen(false);
+      setLoadingMsg('正在读取订单信息...');
+      setScreen('loading');
+    });
+
     fetchMOData(moNumber, skuVal, factoryVal);
   }
 
   async function fetchMOData(moNumber, sku, factory) {
+    console.log('[scan] fetchMOData start mo=' + moNumber);
     try {
       const res = await getRecords(MO_REPORT);
+      console.log('[scan] fetchMOData got ' + (res && res.data ? res.data.length : 0) + ' records, code=' + (res && res.code));
       const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
       const found = list.find((r) => r['MO_Number'] === moNumber);
       if (!found) {
