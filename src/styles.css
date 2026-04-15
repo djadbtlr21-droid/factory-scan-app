@@ -90,6 +90,16 @@ body{font-family:'Manrope','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Ping
   line-height:2;text-align:center;
 }
 
+.btn-upload-qr{
+  background:linear-gradient(135deg,#D4B976,#C9A84C);
+  color:#4A3510;border:none;padding:16px 0;
+  border-radius:var(--radius-xs);font-size:13px;font-weight:700;
+  letter-spacing:3px;text-transform:uppercase;
+  width:100%;max-width:260px;cursor:pointer;font-family:inherit;
+  transition:var(--transition);box-shadow:0 2px 8px rgba(201,168,76,.2);
+}
+.btn-upload-qr:active{transform:scale(.98);box-shadow:0 1px 4px rgba(201,168,76,.15)}
+
 .card{
   background:#fff;border-radius:var(--radius);padding:18px;
   margin-bottom:0;box-shadow:var(--shadow-sm);border:1px solid rgba(0,0,0,.03);

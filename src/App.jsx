@@ -166,6 +166,7 @@ export default function App() {
   const [logsShown, setLogsShown] = useState(false);
   const [modalIdx, setModalIdx] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [fCompleted, setFCompleted] = useState('');
   const [fIncomplete, setFIncomplete] = useState('');
@@ -196,6 +197,36 @@ export default function App() {
 
   function startScan() {
     setCameraOpen(true);
+  }
+
+  function openUpload() {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  }
+
+  function handleFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+      URL.revokeObjectURL(img.src);
+      if (code && code.data) {
+        onQR(code.data);
+      } else {
+        alert('无法识别二维码，请重试\nQR 코드를 인식할 수 없습니다');
+      }
+    };
+    img.onerror = () => { alert('图片加载失败'); URL.revokeObjectURL(img.src); };
+    img.src = URL.createObjectURL(file);
   }
 
   function onQR(qrText) {
@@ -381,6 +412,14 @@ export default function App() {
             <p>请将二维码对准框内</p>
           </div>
           <button className="btn-scan-start" onClick={startScan}>SCAN START / 开始扫码</button>
+          <button className="btn-upload-qr" onClick={openUpload}>QR UPLOAD / 上传二维码</button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
           <div className="scan-hint-wrap">
             <p>카메라가 자동으로 QR을 인식합니다</p>
             <p>摄像头将自动识别二维码</p>
