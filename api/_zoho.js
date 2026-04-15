@@ -1,13 +1,32 @@
 let cachedToken = null;
 let cachedExp = 0;
 
+function accountsDomain() {
+  const explicit = process.env.ZOHO_ACCOUNTS_DOMAIN;
+  if (explicit) return explicit.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
+  const api = (process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com')
+    .replace(/^https?:\/\//, '')
+    .replace(/\/+$/, '');
+  const m = api.match(/zohoapis\.(.+)$/i);
+  const tld = m ? m[1] : 'com';
+  return 'accounts.zoho.' + tld;
+}
+
 export async function getAccessToken() {
   const now = Date.now();
   if (cachedToken && now < cachedExp) return cachedToken;
 
   const { ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN } = process.env;
   if (!ZOHO_CLIENT_ID || !ZOHO_CLIENT_SECRET || !ZOHO_REFRESH_TOKEN) {
-    throw new Error('Missing Zoho OAuth env vars');
+    const err = new Error('Missing Zoho OAuth env vars');
+    err.status = 500;
+    err.upstream = {
+      ZOHO_CLIENT_ID: !!ZOHO_CLIENT_ID,
+      ZOHO_CLIENT_SECRET: !!ZOHO_CLIENT_SECRET,
+      ZOHO_REFRESH_TOKEN: !!ZOHO_REFRESH_TOKEN
+    };
+    throw err;
   }
 
   const params = new URLSearchParams({
@@ -17,10 +36,15 @@ export async function getAccessToken() {
     grant_type: 'refresh_token'
   });
 
-  const tokenUrl = 'https://accounts.zoho.com/oauth/v2/token';
+  const host = accountsDomain();
+  const tokenUrl = 'https://' + host + '/oauth/v2/token';
+
   const res = await fetch(tokenUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json'
+    },
     body: params.toString()
   });
 
@@ -28,16 +52,21 @@ export async function getAccessToken() {
   let body = null;
   try { body = rawText ? JSON.parse(rawText) : null; } catch { body = { raw: rawText }; }
 
-  console.log('[zoho oauth] status=' + res.status, {
+  console.log('[zoho oauth]', {
+    tokenUrl,
+    httpStatus: res.status,
     clientIdTail: ZOHO_CLIENT_ID.slice(-6),
     refreshTail: ZOHO_REFRESH_TOKEN.slice(-6),
     body
   });
 
-  if (!res.ok || !body || !body.access_token) {
-    const err = new Error('Zoho token refresh failed (HTTP ' + res.status + ')');
+  // Zoho returns HTTP 200 with {error:"..."} on credential problems,
+  // and HTTP 4xx/5xx on transport problems. Treat both as failure.
+  if (!res.ok || !body || body.error || !body.access_token) {
+    const err = new Error('Zoho token refresh failed: ' + (body && body.error ? body.error : 'HTTP ' + res.status));
     err.status = res.status;
     err.upstream = body;
+    err.tokenUrl = tokenUrl;
     throw err;
   }
 
@@ -47,7 +76,7 @@ export async function getAccessToken() {
 }
 
 export function zohoBase() {
-  const domain = process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com';
+  const domain = (process.env.ZOHO_API_DOMAIN || 'https://www.zohoapis.com').replace(/\/+$/, '');
   const account = process.env.ZOHO_ACCOUNT || 'jeramoda';
   const app = process.env.ZOHO_APP || 'eom';
   return `${domain}/creator/v2.1/data/${account}/${app}`;
