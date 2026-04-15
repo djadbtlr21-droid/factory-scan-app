@@ -640,7 +640,18 @@ export default function App() {
       if (map.dateEnd)   updateData[map.dateEnd]   = todayStr;
       if (map.qty)       updateData[map.qty]       = form.completedQty;
     }
-    try { await updateRecord(MO_REPORT, moRecordId, updateData); } catch { /* MO update is best-effort */ }
+    // MO update is best-effort: the log save above is the source of truth.
+    // Log failures to DevTools so scope/credential issues are visible
+    // without blocking the success screen.
+    try {
+      await updateRecord(MO_REPORT, moRecordId, updateData);
+    } catch (updErr) {
+      console.warn('[submit] MO update failed (log was saved)', {
+        fields: Object.keys(updateData),
+        status: updErr && updErr.status,
+        body: updErr && updErr.body
+      });
+    }
 
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');

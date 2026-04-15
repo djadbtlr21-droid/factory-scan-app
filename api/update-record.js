@@ -14,17 +14,39 @@ export default async function handler(req, res) {
 
     const token = await getAccessToken();
     const url = `${zohoBase()}/report/${encodeURIComponent(report)}/${encodeURIComponent(id)}`;
+
+    console.log('[update-record] PATCH', { url, fields: Object.keys(data || {}) });
+
     const zres = await fetch(url, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
         Authorization: `Zoho-oauthtoken ${token}`
       },
       body: JSON.stringify({ data })
     });
-    const body = await zres.json().catch(() => ({}));
-    res.status(zres.status).json(body);
+    const raw = await zres.text();
+    let body = null;
+    try { body = raw ? JSON.parse(raw) : null; } catch { body = { raw }; }
+
+    if (!zres.ok || (body && body.code && body.code !== 3000)) {
+      console.error('[update-record] upstream failure', {
+        status: zres.status,
+        url,
+        sentFields: Object.keys(data || {}),
+        upstream: body
+      });
+      return res.status(zres.status || 500).json({
+        error: 'Zoho API ' + zres.status,
+        url,
+        sentFields: Object.keys(data || {}),
+        upstream: body
+      });
+    }
+    res.status(200).json(body);
   } catch (err) {
-    res.status(500).json({ error: err.message || String(err) });
+    console.error('[update-record] error', err);
+    res.status(500).json({ error: err.message || String(err), upstream: err.upstream || null, tokenUrl: err.tokenUrl || null });
   }
 }
