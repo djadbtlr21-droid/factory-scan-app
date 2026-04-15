@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import jsQR from 'jsqr';
 import { getRecords, submitRecord, updateRecord } from './api.js';
@@ -16,13 +16,14 @@ const PROCESS_MAP = {
 };
 
 const PROCS = [
-  { key: 'Cutting / 재단 / 裁剪',        cn: '裁剪',     icon: '✂️', sub: 'Cutting' },
-  { key: 'Sewing / 봉제 / 缝制',         cn: '缝制',     icon: '🧵', sub: 'Sewing' },
-  { key: 'Packing / 포장 / 包装',        cn: '包装',     icon: '📦', sub: 'Packing' },
+  { key: 'Cutting / 재단 / 裁剪',         cn: '裁剪',     icon: '✂️', sub: 'Cutting' },
+  { key: 'Sewing / 봉제 / 缝制',          cn: '缝制',     icon: '🧵', sub: 'Sewing' },
+  { key: 'Packing / 포장 / 包装',         cn: '包装',     icon: '📦', sub: 'Packing' },
   { key: 'Completed / 생산완료 / 生产完成', cn: '生产完成', icon: '✅', sub: 'Completed' },
-  { key: 'Shipped / 출고완료 / 已出货',   cn: '出货',     icon: '🚚', sub: 'Shipped', full: true }
+  { key: 'Shipped / 출고완료 / 已出货',    cn: '出货',     icon: '🚚', sub: 'Shipped', full: true }
 ];
 
+// ─── Helpers ──────────────────────────────────────────────────────────
 function parsePlanNotes(planNotes) {
   if (!planNotes) return [];
   const lines = planNotes.split(/\n|\r\n|\r/);
@@ -90,13 +91,12 @@ function getTodayStr() {
     + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
 }
 
+// ─── Camera overlay (full-screen, mounted only when active) ───────────
 function CameraOverlay({ onResult, onCancel }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const scanningRef = useRef(true);
-  // Hold the latest callbacks in a ref so the mount effect can stay deps=[]
-  // and the camera never tears down on unrelated parent re-renders.
   const cbRef = useRef({ onResult, onCancel });
   cbRef.current.onResult = onResult;
   cbRef.current.onCancel = onCancel;
@@ -167,155 +167,318 @@ function CameraOverlay({ onResult, onCancel }) {
   );
 }
 
+// ─── Screens (each min-h:100vh w:100% via existing #screen-* CSS) ─────
+const ScanScreen = memo(function ScanScreen({ onScan, onUpload }) {
+  return (
+    <div className="screen active" id="screen-scan">
+      <div className="scan-wordmark">IKU Production System</div>
+      <div className="scan-frame-wrap">
+        <div className="sc-corner sc-tl"></div>
+        <div className="sc-corner sc-tr"></div>
+        <div className="sc-corner sc-bl"></div>
+        <div className="sc-corner sc-br"></div>
+        <div className="sc-inner"><div className="sc-dot"></div></div>
+        <div className="sc-line"></div>
+      </div>
+      <div className="scan-label-wrap">
+        <p>QR코드를 프레임 안에 맞춰주세요</p>
+        <p>请将二维码对准框内</p>
+      </div>
+      <button className="btn-scan-start" onClick={onScan}>SCAN START / 开始扫码</button>
+      <button className="btn-upload-qr" onClick={onUpload}>QR UPLOAD / 上传二维码</button>
+      <div className="scan-hint-wrap">
+        <p>카메라가 자동으로 QR을 인식합니다</p>
+        <p>摄像头将自动识别二维码</p>
+      </div>
+    </div>
+  );
+});
+
+const LoadingScreen = memo(function LoadingScreen({ message }) {
+  return (
+    <div className="screen active" id="screen-loading">
+      <div className="loading-wrap">
+        <div className="spinner"></div>
+        <p>{message}</p>
+      </div>
+    </div>
+  );
+});
+
+const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsShown, selectedKey, onSelectProcess, onBack, onOpenLog }) {
+  const notesRows = useMemo(() => parsePlanNotes(moData && moData.plan_notes), [moData]);
+  const orderQty = moData && moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-';
+
+  return (
+    <div className="screen active" id="screen-info" style={{ background: 'var(--surface2)', minHeight: '100vh', width: '100%', padding: 16 }}>
+      <button className="back-link" onClick={onBack}>← 重新扫码</button>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="card-title">订单信息确认</div>
+        <div className="info-row"><span className="info-label">订单号 (MO)</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
+        <div className="info-row"><span className="info-label">品号 (SKU)</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
+        <div className="info-row"><span className="info-label">工厂</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
+        <div className="info-row"><span className="info-label">订单数量</span><span className="info-value">{orderQty}</span></div>
+        <div className="info-row"><span className="info-label">当前状态</span><span className="status-pill">{(moData && moData.current_status) || '-'}</span></div>
+      </div>
+
+      {notesRows.length > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card-title">订单明细 / 주문내용</div>
+          <NotesTable planNotes={moData.plan_notes} />
+        </div>
+      )}
+
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="process-title">请选择当前工序</div>
+        <div className="process-grid">
+          {PROCS.map((p) => (
+            <div
+              key={p.key}
+              className={'proc-btn' + (p.full ? ' proc-full' : '') + (selectedKey === p.key ? ' selected' : '')}
+              onClick={() => onSelectProcess(p.key, p.cn)}
+            >
+              <span className="proc-icon">{p.icon}</span>
+              <div className="proc-name">{p.cn}</div>
+              <div className="proc-sub">{p.sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {logsShown && (
+        <div className="card" id="log-section">
+          <div className="card-title">工序记录 / 공정기록</div>
+          <div id="log-list">
+            {logsLoading ? (
+              <div className="log-loading"><div className="log-spinner"></div>加载中...</div>
+            ) : logs.length === 0 ? (
+              <div className="log-empty">暂无工序记录</div>
+            ) : logs.map((r, i) => {
+              const process = r['Process'] || '-';
+              const completed = parseInt(r['Completed_Qty']) || 0;
+              const defect = parseInt(r['Defect_Qty']) || 0;
+              let worker = r['Worker'] || r['Worker_Name'] || r['Responsible'] || '';
+              if (typeof worker === 'object') worker = worker.display_value || '';
+              worker = String(worker).trim() || '未填写';
+              const date = formatDate(r['Log_Date'] || r['Log_DateTime'] || r['Created_Time'] || '');
+              const notes = r['Notes'] || '';
+              return (
+                <div key={i} className="log-item" onClick={() => onOpenLog(r)} style={{ cursor: 'pointer' }}>
+                  <div>
+                    <div className="log-process"><span className="log-dot"></span>{process}</div>
+                    <div className="log-meta">负责人: {worker}{notes ? ' · ' + notes : ''}</div>
+                  </div>
+                  <div>
+                    <div className="log-qty">完成 {completed.toLocaleString()}件</div>
+                    {defect > 0 && <div className="log-defect">▲ 불량 {defect}件</div>}
+                    <div className="log-date">{date}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+const InputScreen = memo(function InputScreen({ moData, process, onSubmit, onBack }) {
+  const [completed, setCompleted] = useState('');
+  const [incomplete, setIncomplete] = useState('');
+  const [defect, setDefect] = useState('');
+  const [bag, setBag] = useState('');
+  const [worker, setWorker] = useState('');
+  const [notes, setNotes] = useState('');
+  const [err, setErr] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const showBag = process.key.indexOf('Packing') >= 0 || process.key.indexOf('Shipped') >= 0;
+  const orderQty = moData && moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-';
+
+  async function handleSubmit() {
+    const completedQty = parseInt(completed) || 0;
+    const incompleteQty = parseInt(incomplete) || 0;
+    const defectQty = parseInt(defect) || 0;
+    const bagQty = parseInt(bag) || 0;
+    const w = worker.trim();
+    const n = notes.trim();
+    if (completedQty <= 0) { setErr('请输入完成数量'); return; }
+    if (!w) { setErr('请输入负责人姓名（必填）'); return; }
+    setErr('');
+    setSubmitting(true);
+    try {
+      await onSubmit({ completedQty, incompleteQty, defectQty, bagQty, worker: w, notes: n });
+    } catch (e) {
+      setErr(e.message || JSON.stringify(e));
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="screen active" id="screen-input" style={{ minHeight: '100vh', width: '100%' }}>
+      <div className="input-hero">
+        <div className="input-hero-row">
+          <button className="back-link" onClick={onBack} style={{ fontSize: 18, marginBottom: 0 }}>←</button>
+          <div>
+            <div className="input-hero-proc">{process.cn || 'CUTTING'}</div>
+            <div className="input-hero-mo">{process.cn ? process.cn + ' · ' + ((moData && moData.mo_number) || '-') : '-'}</div>
+          </div>
+        </div>
+        <div className="input-progress">
+          <div className="input-progress-bar active"></div>
+          <div className="input-progress-bar active"></div>
+          <div className="input-progress-bar active"></div>
+          <div className="input-progress-bar inactive"></div>
+        </div>
+      </div>
+
+      <div className="card" style={{ margin: '12px 16px', marginBottom: 12 }}>
+        <div className="card-title">订单确认</div>
+        <div className="info-row"><span className="info-label">订单号</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
+        <div className="info-row"><span className="info-label">SKU</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
+        <div className="info-row"><span className="info-label">工序</span><span className="info-value" style={{ color: '#1E3A8A' }}>{process.key ? process.cn + ' (' + process.key + ')' : '-'}</span></div>
+        <div className="info-row"><span className="info-label">订单数量 (参考)</span><span className="info-value" style={{ color: '#7C3AED' }}>{orderQty}</span></div>
+        <div><NotesTable planNotes={moData && moData.plan_notes} /></div>
+      </div>
+
+      <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+        <div className="qty-card">
+          <div className="qty-card-label">完成 *</div>
+          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={completed} onChange={(e) => setCompleted(e.target.value)} />
+        </div>
+        <div className="qty-card muted">
+          <div className="qty-card-label">未完成</div>
+          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={incomplete} onChange={(e) => setIncomplete(e.target.value)} />
+        </div>
+        <div className="qty-card danger">
+          <div className="qty-card-label">不良</div>
+          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={defect} onChange={(e) => setDefect(e.target.value)} />
+        </div>
+        {showBag && (
+          <div className="qty-card muted">
+            <div className="qty-card-label">麻袋数量</div>
+            <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={bag} onChange={(e) => setBag(e.target.value)} />
+          </div>
+        )}
+        <div className="field-card">
+          <div className="field-card-label">负责人 / 담당자 *</div>
+          <input className="input-field text-field" type="text" placeholder="이름을 입력하세요" value={worker} onChange={(e) => setWorker(e.target.value)} />
+        </div>
+        <div className="field-card">
+          <div className="field-card-label">备注 / 메모</div>
+          <input className="input-field text-field" type="text" placeholder="선택사항" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+      </div>
+
+      <div>{err && <div className="err-box">{err}</div>}</div>
+      <div className="btn-row" style={{ marginTop: 12, paddingBottom: 24 }}>
+        <button className="btn-back" onClick={onBack}>← 返回</button>
+        <button className="btn-submit" disabled={submitting} onClick={handleSubmit}>{submitting ? '提交中...' : '确认提交 →'}</button>
+      </div>
+    </div>
+  );
+});
+
+const ResultRow = memo(function ResultRow({ label, value, accent, danger, mute }) {
+  const valColor = danger ? 'var(--danger)' : (accent ? '#6B4D12' : 'var(--text)');
+  return (
+    <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)', borderLeft: accent ? '3px solid var(--accent)' : undefined }}>
+      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: accent ? 12 : 13, fontWeight: mute ? 500 : 700, color: mute ? 'var(--text2)' : valColor }}>{value}</span>
+    </div>
+  );
+});
+
+const SuccessScreen = memo(function SuccessScreen({ result, onNextProcess, onNewScan }) {
+  if (!result) return null;
+  return (
+    <div className="screen active" id="screen-success" style={{ minHeight: '100vh', width: '100%' }}>
+      <div style={{ background: 'var(--dark)', padding: '14px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundImage: 'radial-gradient(ellipse at 30% 50%,rgba(212,185,118,.06) 0%,transparent 60%)' }}>
+        <span style={{ fontFamily: "'Bebas Neue',cursive", letterSpacing: 4, fontSize: 12, color: 'var(--gold)' }}>SAVED</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: 1 }}>{result.mo}</span>
+      </div>
+      <div style={{ background: 'var(--surface2)', minHeight: 'calc(100vh - 48px)', paddingBottom: 32 }}>
+        <div className="success-banner">
+          <div className="success-icon">
+            <svg viewBox="0 0 22 22" fill="none" width="22" height="22"><polyline points="4,11 9,16 18,6" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div className="success-title">저장 완료 · 提交成功</div>
+            <div style={{ fontSize: 10, color: 'var(--text4)', letterSpacing: 1, marginTop: 6, fontWeight: 500 }}>공정 기록이 저장되었습니다</div>
+          </div>
+        </div>
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <ResultRow label="공정"      value={result.processCN + ' · ' + result.process} accent />
+          <ResultRow label="완성수량"  value={result.completed.toLocaleString() + ' 件'} />
+          {result.incomplete > 0 && <ResultRow label="미완성수량" value={result.incomplete.toLocaleString() + ' 件'} />}
+          {result.defect > 0     && <ResultRow label="불량수량"  value={result.defect.toLocaleString() + ' 件'} danger />}
+          <ResultRow label="담당자"    value={result.worker} />
+          <ResultRow label="기록시간"  value={result.time} mute />
+          {result.notes && <ResultRow label="메모" value={result.notes} mute />}
+        </div>
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+          <button onClick={onNextProcess} style={{ padding: 16, border: 'none', background: 'linear-gradient(135deg,#D4B976,#C9A84C)', color: '#4A3510', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', width: '100%', boxShadow: '0 2px 8px rgba(201,168,76,.2)' }}>下一工序 / 다음 공정</button>
+          <button onClick={onNewScan} style={{ padding: 16, border: 'none', background: 'var(--dark2)', color: 'var(--gold)', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', width: '100%', transition: 'var(--transition)' }}>← NEW SCAN / 새 스캔</button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const LogModal = memo(function LogModal({ log, onClose }) {
+  const process    = log['Process'] || '-';
+  const completed  = log['Completed_Qty'] || '0';
+  const incomplete = log['Incomplete_Qty'] || '0';
+  const defect     = log['Defect_Qty'] || '0';
+  let worker = log['Worker'];
+  worker = worker && typeof worker === 'object' ? worker.display_value : String(worker || '');
+  worker = worker.trim() || '未填写';
+  const date = formatDate(log['Log_Date'] || log['Log_DateTime'] || '');
+  const notes = log['Notes'] || '-';
+  return (
+    <div
+      style={{ display: 'flex', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', zIndex: 9999, justifyContent: 'center', alignItems: 'center' }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: '#fff', borderRadius: 16, width: '92%', maxWidth: 420, padding: 22, position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,.2)', animation: 'fadeIn .25s ease' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', letterSpacing: '-.3px' }}>工序记录 상세</span>
+          <span onClick={onClose} style={{ cursor: 'pointer', fontSize: 18, color: 'var(--text4)', padding: '4px 8px', borderRadius: 6 }}>✕</span>
+        </div>
+        <div className="modal-row"><span className="modal-label">工序</span><span className="modal-value">{process}</span></div>
+        <div className="modal-row"><span className="modal-label">完成数量</span><span className="modal-value">{completed} 件</span></div>
+        <div className="modal-row"><span className="modal-label">未完成数量</span><span className="modal-value">{incomplete} 件</span></div>
+        <div className="modal-row"><span className="modal-label">不良数量</span><span className="modal-value">{defect} 件</span></div>
+        <div className="modal-row"><span className="modal-label">负责人</span><span className="modal-value">{worker}</span></div>
+        <div className="modal-row"><span className="modal-label">记录时间</span><span className="modal-value">{date}</span></div>
+        <div className="modal-row"><span className="modal-label">备注</span><span className="modal-value">{notes}</span></div>
+      </div>
+    </div>
+  );
+});
+
+// ─── App: orchestration only ──────────────────────────────────────────
 export default function App() {
-  const [screen, setScreen] = useState('scan');
-  const [loadingMsg, setLoadingMsg] = useState('正在读取订单信息...');
-  const [moData, setMoData] = useState({});
+  const [currentScreen, setCurrentScreen] = useState('scan');
+  const [moData, setMoData] = useState(null);
   const [moRecordId, setMoRecordId] = useState('');
-  const [selectedProcess, setSelectedProcess] = useState('');
-  const [selectedProcessCN, setSelectedProcessCN] = useState('');
+  const [selectedProcess, setSelectedProcess] = useState({ key: '', cn: '' });
   const [logs, setLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsShown, setLogsShown] = useState(false);
-  const [modalIdx, setModalIdx] = useState(null);
+  const [loadingMsg, setLoadingMsg] = useState('正在读取订单信息...');
+  const [submitResult, setSubmitResult] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [modalLog, setModalLog] = useState(null);
   const fileInputRef = useRef(null);
 
-  const [fCompleted, setFCompleted] = useState('');
-  const [fIncomplete, setFIncomplete] = useState('');
-  const [fDefect, setFDefect] = useState('');
-  const [fBag, setFBag] = useState('');
-  const [fWorker, setFWorker] = useState('');
-  const [fNotes, setFNotes] = useState('');
-  const [submitErr, setSubmitErr] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => { window.scrollTo(0, 0); }, [currentScreen]);
 
-  const [successSnapshot, setSuccessSnapshot] = useState(null);
-
-  useEffect(() => { window.scrollTo(0, 0); }, [screen]);
-
-  function resetFormFields() {
-    setFCompleted(''); setFIncomplete(''); setFDefect('');
-    setFBag(''); setFWorker(''); setFNotes('');
-    setSubmitErr('');
-  }
-
-  function goToScan() {
-    setMoData({}); setMoRecordId('');
-    setSelectedProcess(''); setSelectedProcessCN('');
-    setLogs([]); setLogsShown(false);
-    resetFormFields();
-    setScreen('scan');
-  }
-
-  function startScan() {
-    setCameraOpen(true);
-  }
-
-  function openUpload() {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
-    }
-  }
-
-  function handleFileChange(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
-      URL.revokeObjectURL(img.src);
-      if (code && code.data) {
-        onQR(code.data);
-      } else {
-        alert('无法识别二维码，请重试\nQR 코드를 인식할 수 없습니다');
-      }
-    };
-    img.onerror = () => { alert('图片加载失败'); URL.revokeObjectURL(img.src); };
-    img.src = URL.createObjectURL(file);
-  }
-
-  function onQR(qrText) {
-    const text = (qrText || '').trim();
-    console.log('[scan] QR detected, len=' + text.length);
-    let moNumber = '', skuVal = '', factoryVal = '';
-    text.split(/[|\n\r]+/).forEach((part) => {
-      part = part.trim();
-      const idx = part.indexOf(':');
-      if (idx < 0) return;
-      const key = part.substring(0, idx).trim().toUpperCase();
-      const val = part.substring(idx + 1).trim();
-      if (key === 'MO') moNumber = val;
-      else if (key === 'SKU') skuVal = val;
-      else if (key === 'FACTORY') factoryVal = val;
-    });
-    if (!moNumber) {
-      if (/^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
-      else {
-        console.warn('[scan] unrecognized QR payload', text);
-        setCameraOpen(false);
-        alert('未能识别订单号\n\n扫描内容: ' + text);
-        return;
-      }
-    }
-    console.log('[scan] MO=' + moNumber + ' SKU=' + skuVal + ' FACTORY=' + factoryVal);
-
-    // Commit the camera-close + loading-screen transition synchronously so
-    // the loading screen actually paints BEFORE the network call begins.
-    flushSync(() => {
-      setCameraOpen(false);
-      setLoadingMsg('正在读取订单信息...');
-      setScreen('loading');
-    });
-
-    fetchMOData(moNumber, skuVal, factoryVal);
-  }
-
-  async function fetchMOData(moNumber, sku, factory) {
-    console.log('[scan] fetchMOData start mo=' + moNumber);
-    try {
-      const res = await getRecords(MO_REPORT);
-      console.log('[scan] fetchMOData got ' + (res && res.data ? res.data.length : 0) + ' records, code=' + (res && res.code));
-      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
-      const found = list.find((r) => r['MO_Number'] === moNumber);
-      if (!found) {
-        setScreen('scan');
-        alert('未找到订单号: ' + moNumber + '\n请确认后重新扫描');
-        return;
-      }
-      const r = found;
-      let skuStr = sku || '-';
-      const skuRaw = r['Style_SKU'];
-      if (skuRaw) {
-        if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || skuRaw.Style_SKU || skuStr;
-        else if (skuRaw !== '-') skuStr = skuRaw;
-      }
-      const next = {
-        mo_number: r['MO_Number'] || moNumber,
-        sku: skuStr,
-        factory: factory || '-',
-        order_qty: parseInt(r['Plan_Total_Quantity']) || 0,
-        current_status: r['Production_Status'] || '-',
-        plan_notes: r['Plan_Notes'] || ''
-      };
-      setMoData(next);
-      setMoRecordId(r['ID']);
-      setScreen('info');
-      setTimeout(() => fetchLogs(next.mo_number), 300);
-    } catch (err) {
-      setScreen('scan');
-      alert('数据读取失败，请重试\n' + (err && err.message || JSON.stringify(err)));
-    }
-  }
-
-  async function fetchLogs(moNumber) {
+  const fetchLogs = useCallback(async (moNumber) => {
     setLogsShown(true);
     setLogsLoading(true);
     try {
@@ -341,370 +504,220 @@ export default function App() {
     } finally {
       setLogsLoading(false);
     }
-  }
+  }, []);
 
-  function selectProcess(procKey, procCN) {
-    setSelectedProcess(procKey);
-    setSelectedProcessCN(procCN);
-    resetFormFields();
-    setTimeout(() => setScreen('input'), 150);
-  }
-
-  async function submitData() {
-    const completedQty = parseInt(fCompleted) || 0;
-    const defectQty = parseInt(fDefect) || 0;
-    const incompleteQty = parseInt(fIncomplete) || 0;
-    const bagQty = parseInt(fBag) || 0;
-    const worker = fWorker.trim();
-    const notes = fNotes.trim();
-    const todayStr = getTodayStr();
-    if (completedQty <= 0) { setSubmitErr('请输入完成数量'); return; }
-    if (!worker) { setSubmitErr('请输入负责人姓名（必填）'); return; }
-    setSubmitErr('');
-    setSubmitting(true);
-    const logData = {
-      'MO_Number': moData.mo_number,
-      'SKU': moData.sku,
-      'Factory': moData.factory,
-      'Process': selectedProcess,
-      'Completed_Qty': completedQty,
-      'Incomplete_Qty': incompleteQty,
-      'Defect_Qty': defectQty,
-      'Bag_Qty': bagQty,
-      'Worker': worker,
-      'Log_Date': todayStr,
-      'Notes': notes
-    };
+  const fetchMOData = useCallback(async (moNumber, sku, factory) => {
+    console.log('[scan] fetchMOData start mo=' + moNumber);
     try {
-      const res = await submitRecord(LOG_FORM, logData);
-      if (!res || res.code !== 3000) {
-        setSubmitErr('日志保存失败: ' + JSON.stringify(res));
-        setSubmitting(false);
+      const res = await getRecords(MO_REPORT);
+      console.log('[scan] fetchMOData got ' + (res && res.data ? res.data.length : 0) + ' records, code=' + (res && res.code));
+      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+      const found = list.find((r) => r['MO_Number'] === moNumber);
+      if (!found) {
+        setCurrentScreen('scan');
+        alert('未找到订单号: ' + moNumber + '\n请确认后重新扫描');
         return;
       }
-      const map = PROCESS_MAP[selectedProcess];
-      const updateData = { 'Production_Status': selectedProcess };
-      if (map) {
-        if (map.dateStart) updateData[map.dateStart] = todayStr;
-        if (map.dateEnd) updateData[map.dateEnd] = todayStr;
-        if (map.qty) updateData[map.qty] = completedQty;
+      const r = found;
+      let skuStr = sku || '-';
+      const skuRaw = r['Style_SKU'];
+      if (skuRaw) {
+        if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || skuRaw.Style_SKU || skuStr;
+        else if (skuRaw !== '-') skuStr = skuRaw;
       }
-      try { await updateRecord(MO_REPORT, moRecordId, updateData); } catch { /* ignore */ }
-      showSuccess(completedQty, incompleteQty, defectQty, worker, notes);
+      const next = {
+        mo_number: r['MO_Number'] || moNumber,
+        sku: skuStr,
+        factory: factory || '-',
+        order_qty: parseInt(r['Plan_Total_Quantity']) || 0,
+        current_status: r['Production_Status'] || '-',
+        plan_notes: r['Plan_Notes'] || ''
+      };
+      setMoData(next);
+      setMoRecordId(r['ID']);
+      setCurrentScreen('info');
+      setTimeout(() => fetchLogs(next.mo_number), 300);
     } catch (err) {
-      setSubmitErr('提交失败，请重试: ' + (err && err.message || JSON.stringify(err)));
-      setSubmitting(false);
+      setCurrentScreen('scan');
+      alert('数据读取失败，请重试\n' + (err && err.message || JSON.stringify(err)));
     }
-  }
+  }, [fetchLogs]);
 
-  function showSuccess(completedQty, incompleteQty, defectQty, worker, notes) {
+  const handleQR = useCallback((qrText) => {
+    const text = (qrText || '').trim();
+    console.log('[scan] QR detected, len=' + text.length);
+    let moNumber = '', skuVal = '', factoryVal = '';
+    text.split(/[|\n\r]+/).forEach((part) => {
+      part = part.trim();
+      const idx = part.indexOf(':');
+      if (idx < 0) return;
+      const key = part.substring(0, idx).trim().toUpperCase();
+      const val = part.substring(idx + 1).trim();
+      if (key === 'MO') moNumber = val;
+      else if (key === 'SKU') skuVal = val;
+      else if (key === 'FACTORY') factoryVal = val;
+    });
+    if (!moNumber) {
+      if (/^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
+      else {
+        console.warn('[scan] unrecognized QR payload', text);
+        setCameraOpen(false);
+        alert('未能识别订单号\n\n扫描内容: ' + text);
+        return;
+      }
+    }
+    console.log('[scan] MO=' + moNumber + ' SKU=' + skuVal + ' FACTORY=' + factoryVal);
+    flushSync(() => {
+      setCameraOpen(false);
+      setLoadingMsg('正在读取订单信息...');
+      setCurrentScreen('loading');
+    });
+    fetchMOData(moNumber, skuVal, factoryVal);
+  }, [fetchMOData]);
+
+  const handleScanRequest = useCallback(() => setCameraOpen(true), []);
+  const handleCameraCancel = useCallback(() => setCameraOpen(false), []);
+
+  const openUpload = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+      URL.revokeObjectURL(img.src);
+      if (code && code.data) {
+        handleQR(code.data);
+      } else {
+        alert('无法识别二维码，请重试\nQR 코드를 인식할 수 없습니다');
+      }
+    };
+    img.onerror = () => { alert('图片加载失败'); URL.revokeObjectURL(img.src); };
+    img.src = URL.createObjectURL(file);
+  }, [handleQR]);
+
+  const handleSelectProcess = useCallback((procKey, procCN) => {
+    setSelectedProcess({ key: procKey, cn: procCN });
+    setCurrentScreen('input');
+  }, []);
+
+  const handleSubmit = useCallback(async (form) => {
+    const todayStr = getTodayStr();
+    const logData = {
+      'MO_Number':      moData.mo_number,
+      'SKU':            moData.sku,
+      'Factory':        moData.factory,
+      'Process':        selectedProcess.key,
+      'Completed_Qty':  form.completedQty,
+      'Incomplete_Qty': form.incompleteQty,
+      'Defect_Qty':     form.defectQty,
+      'Bag_Qty':        form.bagQty,
+      'Worker':         form.worker,
+      'Log_Date':       todayStr,
+      'Notes':          form.notes
+    };
+    const res = await submitRecord(LOG_FORM, logData);
+    if (!res || res.code !== 3000) {
+      throw new Error('日志保存失败: ' + JSON.stringify(res));
+    }
+
+    const map = PROCESS_MAP[selectedProcess.key];
+    const updateData = { 'Production_Status': selectedProcess.key };
+    if (map) {
+      if (map.dateStart) updateData[map.dateStart] = todayStr;
+      if (map.dateEnd)   updateData[map.dateEnd]   = todayStr;
+      if (map.qty)       updateData[map.qty]       = form.completedQty;
+    }
+    try { await updateRecord(MO_REPORT, moRecordId, updateData); } catch { /* MO update is best-effort */ }
+
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     const timeStr = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate())
       + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes());
-    setSuccessSnapshot({
+    setSubmitResult({
       mo: moData.mo_number,
-      process: selectedProcess,
-      processCN: selectedProcessCN,
-      completed: completedQty,
-      incomplete: incompleteQty,
-      defect: defectQty,
-      worker: worker || '未填写',
-      notes,
+      process: selectedProcess.key,
+      processCN: selectedProcess.cn,
+      completed: form.completedQty,
+      incomplete: form.incompleteQty,
+      defect: form.defectQty,
+      worker: form.worker || '未填写',
+      notes: form.notes,
       time: timeStr
     });
-    setSubmitting(false);
-    setScreen('success');
-  }
+    setCurrentScreen('success');
+  }, [moData, moRecordId, selectedProcess]);
 
-  const showBag = selectedProcess.indexOf('Packing') >= 0 || selectedProcess.indexOf('Shipped') >= 0;
-  const notesRows = useMemo(() => parsePlanNotes(moData.plan_notes), [moData.plan_notes]);
-  const modalLog = (modalIdx != null) ? logs[modalIdx] : null;
+  const handleBackToInfo = useCallback(() => setCurrentScreen('info'), []);
+  const handleBackToScan = useCallback(() => {
+    setMoData(null); setMoRecordId('');
+    setSelectedProcess({ key: '', cn: '' });
+    setLogs([]); setLogsShown(false);
+    setSubmitResult(null);
+    setCurrentScreen('scan');
+  }, []);
+  const handleNextProcess = useCallback(() => {
+    setSelectedProcess({ key: '', cn: '' });
+    setSubmitResult(null);
+    setCurrentScreen('info');
+    if (moData && moData.mo_number) setTimeout(() => fetchLogs(moData.mo_number), 200);
+  }, [moData, fetchLogs]);
+  const handleCloseModal = useCallback(() => setModalLog(null), []);
 
   return (
     <>
-      <div className="container">
-        {/* SCAN */}
-        <div className={'screen' + (screen === 'scan' ? ' active' : '')} id="screen-scan">
-          <div className="scan-wordmark">IKU Production System</div>
-          <div className="scan-frame-wrap">
-            <div className="sc-corner sc-tl"></div>
-            <div className="sc-corner sc-tr"></div>
-            <div className="sc-corner sc-bl"></div>
-            <div className="sc-corner sc-br"></div>
-            <div className="sc-inner"><div className="sc-dot"></div></div>
-            <div className="sc-line"></div>
-          </div>
-          <div className="scan-label-wrap">
-            <p>QR코드를 프레임 안에 맞춰주세요</p>
-            <p>请将二维码对准框内</p>
-          </div>
-          <button className="btn-scan-start" onClick={startScan}>SCAN START / 开始扫码</button>
-          <button className="btn-upload-qr" onClick={openUpload}>QR UPLOAD / 上传二维码</button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleFileChange}
+      <div className="container" style={{ overflow: 'hidden' }}>
+        {currentScreen === 'scan'    && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} />}
+        {currentScreen === 'loading' && <LoadingScreen message={loadingMsg} />}
+        {currentScreen === 'info'    && (
+          <InfoScreen
+            moData={moData}
+            logs={logs}
+            logsLoading={logsLoading}
+            logsShown={logsShown}
+            selectedKey={selectedProcess.key}
+            onSelectProcess={handleSelectProcess}
+            onBack={handleBackToScan}
+            onOpenLog={setModalLog}
           />
-          <div className="scan-hint-wrap">
-            <p>카메라가 자동으로 QR을 인식합니다</p>
-            <p>摄像头将自动识别二维码</p>
-          </div>
-        </div>
-
-        {/* LOADING */}
-        <div className={'screen' + (screen === 'loading' ? ' active' : '')} id="screen-loading">
-          <div className="loading-wrap">
-            <div className="spinner"></div>
-            <p>{loadingMsg}</p>
-          </div>
-        </div>
-
-        {/* INFO */}
-        <div className={'screen' + (screen === 'info' ? ' active' : '')} id="screen-info" style={{ background: 'var(--surface2)', minHeight: '100vh', padding: 16 }}>
-          <button className="back-link" onClick={goToScan}>← 重新扫码</button>
-          <div className="card" style={{ marginBottom: 12 }}>
-            <div className="card-title">订单信息确认</div>
-            <div className="info-row"><span className="info-label">订单号 (MO)</span><span className="info-value">{moData.mo_number || '-'}</span></div>
-            <div className="info-row"><span className="info-label">品号 (SKU)</span><span className="info-value">{moData.sku || '-'}</span></div>
-            <div className="info-row"><span className="info-label">工厂</span><span className="info-value">{moData.factory || '-'}</span></div>
-            <div className="info-row"><span className="info-label">订单数量</span><span className="info-value">{moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-'}</span></div>
-            <div className="info-row"><span className="info-label">当前状态</span><span className="status-pill">{moData.current_status || '-'}</span></div>
-          </div>
-
-          {notesRows.length > 0 && (
-            <div className="card" style={{ marginBottom: 12 }}>
-              <div className="card-title">订单明细 / 주문내용</div>
-              <NotesTable planNotes={moData.plan_notes} />
-            </div>
-          )}
-
-          <div className="card" style={{ marginBottom: 12 }}>
-            <div className="process-title">请选择当前工序</div>
-            <div className="process-grid">
-              {PROCS.map((p) => (
-                <div
-                  key={p.key}
-                  className={'proc-btn' + (p.full ? ' proc-full' : '') + (selectedProcess === p.key ? ' selected' : '')}
-                  onClick={() => selectProcess(p.key, p.cn)}
-                >
-                  <span className="proc-icon">{p.icon}</span>
-                  <div className="proc-name">{p.cn}</div>
-                  <div className="proc-sub">{p.sub}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {logsShown && (
-            <div className="card" id="log-section">
-              <div className="card-title">工序记录 / 공정기록</div>
-              <div id="log-list">
-                {logsLoading ? (
-                  <div className="log-loading"><div className="log-spinner"></div>加载中...</div>
-                ) : logs.length === 0 ? (
-                  <div className="log-empty">暂无工序记录</div>
-                ) : logs.map((r, i) => {
-                  const process = r['Process'] || '-';
-                  const completed = parseInt(r['Completed_Qty']) || 0;
-                  const defect = parseInt(r['Defect_Qty']) || 0;
-                  let worker = r['Worker'] || r['Worker_Name'] || r['Responsible'] || '';
-                  if (typeof worker === 'object') worker = worker.display_value || '';
-                  worker = String(worker).trim() || '未填写';
-                  const date = formatDate(r['Log_Date'] || r['Log_DateTime'] || r['Created_Time'] || '');
-                  const notes = r['Notes'] || '';
-                  return (
-                    <div key={i} className="log-item" onClick={() => setModalIdx(i)} style={{ cursor: 'pointer' }}>
-                      <div>
-                        <div className="log-process"><span className="log-dot"></span>{process}</div>
-                        <div className="log-meta">负责人: {worker}{notes ? ' · ' + notes : ''}</div>
-                      </div>
-                      <div>
-                        <div className="log-qty">完成 {completed.toLocaleString()}件</div>
-                        {defect > 0 && <div className="log-defect">▲ 불량 {defect}件</div>}
-                        <div className="log-date">{date}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* INPUT */}
-        <div className={'screen' + (screen === 'input' ? ' active' : '')} id="screen-input">
-          <div className="input-hero">
-            <div className="input-hero-row">
-              <button className="back-link" onClick={() => setScreen('info')} style={{ fontSize: 18, marginBottom: 0 }}>←</button>
-              <div>
-                <div className="input-hero-proc">{selectedProcessCN || 'CUTTING'}</div>
-                <div className="input-hero-mo">{selectedProcessCN ? selectedProcessCN + ' · ' + (moData.mo_number || '-') : '-'}</div>
-              </div>
-            </div>
-            <div className="input-progress">
-              <div className="input-progress-bar active"></div>
-              <div className="input-progress-bar active"></div>
-              <div className="input-progress-bar active"></div>
-              <div className="input-progress-bar inactive"></div>
-            </div>
-          </div>
-
-          <div className="card" style={{ margin: '12px 16px', marginBottom: 12 }}>
-            <div className="card-title">订单确认</div>
-            <div className="info-row"><span className="info-label">订单号</span><span className="info-value">{moData.mo_number || '-'}</span></div>
-            <div className="info-row"><span className="info-label">SKU</span><span className="info-value">{moData.sku || '-'}</span></div>
-            <div className="info-row"><span className="info-label">工序</span><span className="info-value" style={{ color: '#1E3A8A' }}>{selectedProcess ? selectedProcessCN + ' (' + selectedProcess + ')' : '-'}</span></div>
-            <div className="info-row"><span className="info-label">订单数量 (参考)</span><span className="info-value" style={{ color: '#7C3AED' }}>{moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-'}</span></div>
-            <div id="c-subform"><NotesTable planNotes={moData.plan_notes} /></div>
-          </div>
-
-          <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-            <div className="qty-card">
-              <div className="qty-card-label">完成 *</div>
-              <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={fCompleted} onChange={(e) => setFCompleted(e.target.value)} />
-            </div>
-            <div className="qty-card muted">
-              <div className="qty-card-label">未完成</div>
-              <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={fIncomplete} onChange={(e) => setFIncomplete(e.target.value)} />
-            </div>
-            <div className="qty-card danger">
-              <div className="qty-card-label">不良</div>
-              <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={fDefect} onChange={(e) => setFDefect(e.target.value)} />
-            </div>
-            {showBag && (
-              <div className="qty-card muted" style={{ display: 'block' }}>
-                <div className="qty-card-label">麻袋数量</div>
-                <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={fBag} onChange={(e) => setFBag(e.target.value)} />
-              </div>
-            )}
-            <div className="field-card">
-              <div className="field-card-label">负责人 / 담당자 *</div>
-              <input className="input-field text-field" type="text" placeholder="이름을 입력하세요" value={fWorker} onChange={(e) => setFWorker(e.target.value)} />
-            </div>
-            <div className="field-card">
-              <div className="field-card-label">备注 / 메모</div>
-              <input className="input-field text-field" type="text" placeholder="선택사항" value={fNotes} onChange={(e) => setFNotes(e.target.value)} />
-            </div>
-          </div>
-
-          <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }} id="worker-area"></div>
-          <div id="submit-err">{submitErr && <div className="err-box">{submitErr}</div>}</div>
-          <div className="btn-row" style={{ marginTop: 12, paddingBottom: 24 }}>
-            <button className="btn-back" onClick={() => setScreen('info')}>← 返回</button>
-            <button className="btn-submit" disabled={submitting} onClick={submitData}>{submitting ? '提交中...' : '确认提交 →'}</button>
-          </div>
-        </div>
-
-        {/* SUCCESS */}
-        <div className={'screen' + (screen === 'success' ? ' active' : '')} id="screen-success">
-          <div style={{ background: 'var(--dark)', padding: '14px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundImage: 'radial-gradient(ellipse at 30% 50%,rgba(212,185,118,.06) 0%,transparent 60%)' }}>
-            <span style={{ fontFamily: "'Bebas Neue',cursive", letterSpacing: 4, fontSize: 12, color: 'var(--gold)' }}>SAVED</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', letterSpacing: 1 }}>{successSnapshot ? successSnapshot.mo : '-'}</span>
-          </div>
-          <div style={{ background: 'var(--surface2)', minHeight: 'calc(100vh - 48px)', paddingBottom: 32 }}>
-            <div className="success-banner">
-              <div className="success-icon">
-                <svg viewBox="0 0 22 22" fill="none" width="22" height="22"><polyline points="4,11 9,16 18,6" stroke="#C9A84C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div className="success-title">저장 완료 · 提交成功</div>
-                <div style={{ fontSize: 10, color: 'var(--text4)', letterSpacing: 1, marginTop: 6, fontWeight: 500 }}>공정 기록이 저장되었습니다</div>
-              </div>
-            </div>
-            <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {successSnapshot && <>
-                <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderLeft: '3px solid var(--accent)', boxShadow: 'var(--shadow-sm)' }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>공정</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#6B4D12' }}>{successSnapshot.processCN} · {successSnapshot.process}</span>
-                </div>
-                <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>완성수량</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{successSnapshot.completed.toLocaleString()} 件</span>
-                </div>
-                {successSnapshot.incomplete > 0 && (
-                  <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>미완성수량</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{successSnapshot.incomplete.toLocaleString()} 件</span>
-                  </div>
-                )}
-                {successSnapshot.defect > 0 && (
-                  <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>불량수량</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)' }}>{successSnapshot.defect.toLocaleString()} 件</span>
-                  </div>
-                )}
-                <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>담당자</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{successSnapshot.worker}</span>
-                </div>
-                <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>기록시간</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2)' }}>{successSnapshot.time}</span>
-                </div>
-                {successSnapshot.notes && (
-                  <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)' }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>메모</span>
-                    <span style={{ fontSize: 12, color: 'var(--text2)' }}>{successSnapshot.notes}</span>
-                  </div>
-                )}
-              </>}
-            </div>
-            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-              <button onClick={goToScan} style={{ padding: 16, border: 'none', background: 'var(--dark2)', color: 'var(--gold)', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', width: '100%', transition: 'var(--transition)' }}>← NEW SCAN / 새 스캔</button>
-            </div>
-          </div>
-        </div>
+        )}
+        {currentScreen === 'input'   && (
+          <InputScreen
+            moData={moData}
+            process={selectedProcess}
+            onSubmit={handleSubmit}
+            onBack={handleBackToInfo}
+          />
+        )}
+        {currentScreen === 'success' && (
+          <SuccessScreen
+            result={submitResult}
+            onNextProcess={handleNextProcess}
+            onNewScan={handleBackToScan}
+          />
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
       </div>
-
-      {/* LOG MODAL */}
-      {modalLog && (
-        <div
-          style={{ display: 'flex', position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', zIndex: 9999, justifyContent: 'center', alignItems: 'center' }}
-          onClick={() => setModalIdx(null)}
-        >
-          <div
-            style={{ background: '#fff', borderRadius: 16, width: '92%', maxWidth: 420, padding: 22, position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,.2)', animation: 'fadeIn .25s ease' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', letterSpacing: '-.3px' }}>工序记录 상세</span>
-              <span onClick={() => setModalIdx(null)} style={{ cursor: 'pointer', fontSize: 18, color: 'var(--text4)', padding: '4px 8px', borderRadius: 6, transition: 'var(--transition)' }}>✕</span>
-            </div>
-            <div>
-              {(() => {
-                const r = modalLog;
-                const process = r['Process'] || '-';
-                const completed = r['Completed_Qty'] || '0';
-                const incomplete = r['Incomplete_Qty'] || '0';
-                const defect = r['Defect_Qty'] || '0';
-                let worker = r['Worker'];
-                worker = worker && typeof worker === 'object' ? worker.display_value : String(worker || '');
-                worker = worker.trim() || '未填写';
-                const date = formatDate(r['Log_Date'] || r['Log_DateTime'] || '');
-                const notes = r['Notes'] || '-';
-                return (
-                  <>
-                    <div className="modal-row"><span className="modal-label">工序</span><span className="modal-value">{process}</span></div>
-                    <div className="modal-row"><span className="modal-label">完成数量</span><span className="modal-value">{completed} 件</span></div>
-                    <div className="modal-row"><span className="modal-label">未完成数量</span><span className="modal-value">{incomplete} 件</span></div>
-                    <div className="modal-row"><span className="modal-label">不良数量</span><span className="modal-value">{defect} 件</span></div>
-                    <div className="modal-row"><span className="modal-label">负责人</span><span className="modal-value">{worker}</span></div>
-                    <div className="modal-row"><span className="modal-label">记录时间</span><span className="modal-value">{date}</span></div>
-                    <div className="modal-row"><span className="modal-label">备注</span><span className="modal-value">{notes}</span></div>
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {cameraOpen && (
-        <CameraOverlay onResult={onQR} onCancel={() => setCameraOpen(false)} />
-      )}
+      {modalLog && <LogModal log={modalLog} onClose={handleCloseModal} />}
+      {cameraOpen && <CameraOverlay onResult={handleQR} onCancel={handleCameraCancel} />}
     </>
   );
 }
