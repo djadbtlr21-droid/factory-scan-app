@@ -10,11 +10,18 @@ export default async function handler(req, res) {
     const token = await getAccessToken();
     const url = `${zohoBase()}/report/${encodeURIComponent(report)}?page=${encodeURIComponent(page)}&per_page=${encodeURIComponent(perPage)}`;
     const zres = await fetch(url, {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` }
+      headers: { Authorization: `Zoho-oauthtoken ${token}`, Accept: 'application/json' }
     });
-    const body = await zres.json().catch(() => ({}));
-    res.status(zres.status).json(body);
+    const raw = await zres.text();
+    let body = null;
+    try { body = raw ? JSON.parse(raw) : null; } catch { body = { raw }; }
+    if (!zres.ok) {
+      console.error('[get-records] upstream', { status: zres.status, url, body });
+      return res.status(zres.status).json({ error: 'Zoho API ' + zres.status, url, upstream: body });
+    }
+    res.status(200).json(body);
   } catch (err) {
-    res.status(500).json({ error: err.message || String(err) });
+    console.error('[get-records] error', err);
+    res.status(500).json({ error: err.message || String(err), upstream: err.upstream || null, tokenUrl: err.tokenUrl || null });
   }
 }
