@@ -17,15 +17,28 @@ export async function getAccessToken() {
     grant_type: 'refresh_token'
   });
 
-  const res = await fetch('https://accounts.zoho.com/oauth/v2/token', {
+  const tokenUrl = 'https://accounts.zoho.com/oauth/v2/token';
+  const res = await fetch(tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString()
   });
 
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok || !body.access_token) {
-    throw new Error('Token refresh failed: ' + JSON.stringify(body));
+  const rawText = await res.text();
+  let body = null;
+  try { body = rawText ? JSON.parse(rawText) : null; } catch { body = { raw: rawText }; }
+
+  console.log('[zoho oauth] status=' + res.status, {
+    clientIdTail: ZOHO_CLIENT_ID.slice(-6),
+    refreshTail: ZOHO_REFRESH_TOKEN.slice(-6),
+    body
+  });
+
+  if (!res.ok || !body || !body.access_token) {
+    const err = new Error('Zoho token refresh failed (HTTP ' + res.status + ')');
+    err.status = res.status;
+    err.upstream = body;
+    throw err;
   }
 
   cachedToken = body.access_token;
