@@ -2,7 +2,16 @@ import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from '
 import { flushSync } from 'react-dom';
 import jsQR from 'jsqr';
 import { getRecords, submitRecord, updateRecord } from './api.js';
+import {
+  BRAND, INNER_PACK_SIZE, MASTER_BAG_SIZE, REPORTS, FORMS, QR_PREFIX,
+  PACK_STATUS_LABELS, BAG_STATUS_LABELS
+} from './config.js';
+import {
+  buildInnerPackQR, buildMasterBagQR, parseInnerPackQR, parseMasterBagQR,
+  detectQRType, generateQRDataURL, downloadQRPNG
+} from './qrUtils.js';
 
+// Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
 const LOG_FORM = 'Add_Production_Log';
 const LOG_REPORT = 'Production_Log_Report';
@@ -167,7 +176,7 @@ function CameraOverlay({ onResult, onCancel }) {
   );
 }
 
-// ─── Screens (each min-h:100vh w:100% via existing #screen-* CSS) ─────
+// ─── Existing Production Log screens ──────────────────────────────────
 const ScanScreen = memo(function ScanScreen({ onScan, onUpload }) {
   return (
     <div className="screen active" id="screen-scan">
@@ -461,9 +470,563 @@ const LogModal = memo(function LogModal({ log, onClose }) {
   );
 });
 
+// ─── NEW: Home Screen ─────────────────────────────────────────────────
+const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag }) {
+  const btnStyle = {
+    width: '100%',
+    padding: '24px 20px',
+    marginBottom: 16,
+    border: 'none',
+    borderRadius: 12,
+    fontSize: 16,
+    fontWeight: 700,
+    cursor: 'pointer',
+    textAlign: 'left',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    transition: 'transform 0.15s, box-shadow 0.15s',
+  };
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', padding: 20, background: 'var(--surface2)' }}>
+      <div style={{ textAlign: 'center', padding: '32px 0 40px' }}>
+        <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: 32, letterSpacing: 4, color: 'var(--dark)' }}>IKU</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', letterSpacing: 2, marginTop: 4 }}>PRODUCTION SYSTEM</div>
+        <div style={{ fontSize: 11, color: 'var(--text4)', marginTop: 4 }}>生产管理系统</div>
+      </div>
+      <button style={{ ...btnStyle, background: 'linear-gradient(135deg, #1E3A8A, #1E40AF)', color: '#fff' }} onClick={onSelectProductionLog}>
+        <span style={{ fontSize: 32 }}>🏭</span>
+        <div>
+          <div>生产进度扫码</div>
+          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Production Log Scan</div>
+        </div>
+      </button>
+      <button style={{ ...btnStyle, background: 'linear-gradient(135deg, #C9A84C, #B08E3A)', color: '#fff' }} onClick={onSelectInnerPack}>
+        <span style={{ fontSize: 32 }}>📦</span>
+        <div>
+          <div>中间包装</div>
+          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Inner Pack · 12 pcs</div>
+        </div>
+      </button>
+      <button style={{ ...btnStyle, background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', color: '#fff' }} onClick={onSelectMasterBag}>
+        <span style={{ fontSize: 32 }}>🎒</span>
+        <div>
+          <div>麻袋</div>
+          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Master Bag · 10 packs · 120 pcs</div>
+        </div>
+      </button>
+    </div>
+  );
+});
+
+// ─── NEW: Pack Menu Screen ────────────────────────────────────────────
+const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onScan, onBack }) {
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', padding: 20, background: 'var(--surface2)' }}>
+      <button className="back-link" onClick={onBack} style={{ marginBottom: 20 }}>← 返回 / 돌아가기</button>
+      <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
+        <div style={{ fontSize: 48 }}>📦</div>
+        <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>中间包装 / 중간 포장</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>12 pcs / pack</div>
+      </div>
+      <button onClick={onCreate} style={{
+        width: '100%', padding: '24px', marginBottom: 12, border: 'none', borderRadius: 12,
+        background: 'linear-gradient(135deg, #C9A84C, #B08E3A)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+      }}>
+        <span style={{ fontSize: 28 }}>➕</span>
+        <div style={{ textAlign: 'left' }}>
+          <div>生成新包装</div>
+          <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>Create New Inner Pack</div>
+        </div>
+      </button>
+      <button onClick={onScan} style={{
+        width: '100%', padding: '24px', border: 'none', borderRadius: 12,
+        background: '#fff', color: 'var(--text)', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+      }}>
+        <span style={{ fontSize: 28 }}>🔍</span>
+        <div style={{ textAlign: 'left' }}>
+          <div>扫码查询</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Scan to View Details</div>
+        </div>
+      </button>
+    </div>
+  );
+});
+
+// ─── NEW: Bag Menu Screen ─────────────────────────────────────────────
+const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onScan, onBack }) {
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', padding: 20, background: 'var(--surface2)' }}>
+      <button className="back-link" onClick={onBack} style={{ marginBottom: 20 }}>← 返回 / 돌아가기</button>
+      <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
+        <div style={{ fontSize: 48 }}>🎒</div>
+        <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>麻袋 / 마대</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>10 packs · 120 pcs / bag</div>
+      </div>
+      <button onClick={onCreate} style={{
+        width: '100%', padding: '24px', marginBottom: 12, border: 'none', borderRadius: 12,
+        background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+      }}>
+        <span style={{ fontSize: 28 }}>➕</span>
+        <div style={{ textAlign: 'left' }}>
+          <div>生成新麻袋</div>
+          <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>Create New Master Bag</div>
+        </div>
+      </button>
+      <button onClick={onScan} style={{
+        width: '100%', padding: '24px', border: 'none', borderRadius: 12,
+        background: '#fff', color: 'var(--text)', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+      }}>
+        <span style={{ fontSize: 28 }}>🔍</span>
+        <div style={{ textAlign: 'left' }}>
+          <div>扫码查询</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Scan to View Details</div>
+        </div>
+      </button>
+    </div>
+  );
+});
+
+// ─── NEW: Pack MO Select Screen ───────────────────────────────────────
+const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, onBack }) {
+  const [manualMO, setManualMO] = useState('');
+  const handleManualSubmit = () => {
+    const mo = manualMO.trim().toUpperCase();
+    if (!mo) { alert('请输入订单号'); return; }
+    onManual(mo);
+  };
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', padding: 20, background: 'var(--surface2)' }}>
+      <button className="back-link" onClick={onBack} style={{ marginBottom: 20 }}>← 返回</button>
+      <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
+        <div style={{ fontSize: 20, fontWeight: 800 }}>选择订单 / MO 선택</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>Which MO is this pack for?</div>
+      </div>
+      <button onClick={onScan} style={{
+        width: '100%', padding: '20px', marginBottom: 16, border: 'none', borderRadius: 12,
+        background: 'linear-gradient(135deg, #1E3A8A, #1E40AF)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer'
+      }}>📷 扫描 MO QR / QR 스캔</button>
+      <div style={{ textAlign: 'center', color: 'var(--text4)', fontSize: 12, margin: '16px 0' }}>— 或 / or —</div>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 8 }}>手动输入订单号 / 수동 입력</div>
+        <input
+          type="text"
+          value={manualMO}
+          onChange={(e) => setManualMO(e.target.value)}
+          placeholder="例: TS26-105"
+          style={{ width: '100%', padding: 12, border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, marginBottom: 10, boxSizing: 'border-box' }}
+        />
+        <button onClick={handleManualSubmit} style={{
+          width: '100%', padding: 12, border: 'none', borderRadius: 8,
+          background: 'var(--dark)', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer'
+        }}>确认 / 확인</button>
+      </div>
+    </div>
+  );
+});
+
+// ─── NEW: Pack Create Screen ──────────────────────────────────────────
+const PackCreateScreen = memo(function PackCreateScreen({
+  packMO, composition, setComposition, packSequence, worker, setWorker,
+  isRemainder, setIsRemainder, lastComposition, onSubmit, onBack, submitting
+}) {
+  const selectedCount = composition.filter(c => c.selected).length;
+
+  const applyStandard = () => {
+    setComposition(composition.map(c => ({ ...c, selected: true })));
+  };
+
+  const applyLastPack = () => {
+    if (!lastComposition) return;
+    const newComp = composition.map(c => {
+      const found = lastComposition.find(l => l.color === c.color && l.size === c.size);
+      return { ...c, selected: !!found };
+    });
+    setComposition(newComp);
+  };
+
+  const toggleItem = (idx) => {
+    const next = [...composition];
+    next[idx] = { ...next[idx], selected: !next[idx].selected };
+    setComposition(next);
+  };
+
+  const handleSubmit = () => {
+    if (selectedCount === 0) { alert('请选择包装组成'); return; }
+    if (!isRemainder && selectedCount !== INNER_PACK_SIZE) {
+      if (!window.confirm(`당 상 ${INNER_PACK_SIZE}개가 아닙니다 (${selectedCount}개). 계속? / Not ${INNER_PACK_SIZE} items (${selectedCount}). Continue?`)) return;
+    }
+    if (!worker.trim()) { alert('请输入担当者 / 담당자를 입력하세요'); return; }
+    onSubmit();
+  };
+
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
+      <div style={{ background: 'var(--dark)', padding: '14px 20px', color: '#fff' }}>
+        <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 14, cursor: 'pointer', marginBottom: 8 }}>← 返回</button>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: 'var(--gold)', marginBottom: 4 }}>INNER PACK #{packSequence}</div>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>{packMO.mo_number}</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{packMO.sku} · {packMO.factory}</div>
+      </div>
+
+      <div style={{ padding: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>包装组成 / 포장 구성</div>
+            <div style={{ fontSize: 12, color: 'var(--text3)' }}>{selectedCount} / {INNER_PACK_SIZE}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <button onClick={applyStandard} style={{ flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, background: 'var(--gold)', color: '#4A3510', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>标准配货 / Standard</button>
+            {lastComposition && (
+              <button onClick={applyLastPack} style={{ flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, background: '#F1F5F9', color: 'var(--text)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>上次相同 / Copy Last</button>
+            )}
+          </div>
+          <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+            {composition.length === 0 ? (
+              <div style={{ textAlign: 'center', color: 'var(--text4)', padding: 20, fontSize: 12 }}>
+                此订单没有标准配货信息 / Standard Assortment 없음
+              </div>
+            ) : (
+              composition.map((item, idx) => (
+                <div key={idx} onClick={() => toggleItem(idx)} style={{
+                  display: 'flex', alignItems: 'center', padding: '10px 4px',
+                  borderBottom: idx < composition.length - 1 ? '1px solid #F1F5F9' : 'none',
+                  cursor: 'pointer'
+                }}>
+                  <input type="checkbox" checked={!!item.selected} readOnly style={{ width: 18, height: 18, marginRight: 12 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{item.color}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>Size: {item.size}</div>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>x {item.qty || 1}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input type="checkbox" checked={isRemainder} onChange={(e) => setIsRemainder(e.target.checked)} style={{ width: 18, height: 18, marginRight: 10 }} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>剩余包装 / 자투리 포장</span>
+          </label>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 28, marginTop: 4 }}>末尾零头, 不是12件标准包装</div>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 6 }}>担当者 / 담당자 *</div>
+          <input type="text" value={worker} onChange={(e) => setWorker(e.target.value)}
+            placeholder="姓名 Name"
+            style={{ width: '100%', padding: 10, border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <button disabled={submitting} onClick={handleSubmit} style={{
+          width: '100%', padding: 18, border: 'none', borderRadius: 12,
+          background: submitting ? '#9CA3AF' : 'linear-gradient(135deg, #C9A84C, #B08E3A)',
+          color: '#fff', fontSize: 15, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer',
+          marginBottom: 20
+        }}>
+          {submitting ? '保存中...' : `✅ ${selectedCount}件 打包完成 / ${selectedCount}개 포장 완료`}
+        </button>
+      </div>
+    </div>
+  );
+});
+
+// ─── NEW: Pack Success Screen ─────────────────────────────────────────
+const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, onHome }) {
+  if (!pack) return null;
+  const handleDownload = () => {
+    const fname = `${pack.moNumber}_Pack_${pack.packSequence}.png`;
+    downloadQRPNG(pack.qrDataURL, fname);
+  };
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
+      <div style={{ background: 'var(--dark)', padding: '14px 20px', color: '#fff', textAlign: 'center' }}>
+        <div style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: 4, fontSize: 12, color: 'var(--gold)' }}>PACK CREATED</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{pack.moNumber} · Pack #{pack.packSequence}</div>
+      </div>
+      <div style={{ padding: 20 }}>
+        <div style={{ background: '#fff', borderRadius: 16, padding: 24, textAlign: 'center', marginBottom: 16 }}>
+          <img src={pack.qrDataURL} alt="QR" style={{ width: '100%', maxWidth: 320, margin: '0 auto', display: 'block' }} />
+          <div style={{ fontSize: 10, color: 'var(--text4)', marginTop: 12, fontFamily: 'monospace', wordBreak: 'break-all' }}>{pack.qrText}</div>
+        </div>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 8 }}>包装内容 / 포장 내용</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+            {pack.items.map((item, i) => (
+              <div key={i} style={{ background: '#F8FAFC', padding: '6px 8px', borderRadius: 6, fontSize: 11 }}>
+                <div style={{ fontWeight: 600 }}>{item.color}</div>
+                <div style={{ color: 'var(--text3)' }}>{item.size} · {item.qty}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #F1F5F9', fontSize: 12, color: 'var(--text2)' }}>
+            Total: <b>{pack.totalQty} 件</b>{pack.isRemainder ? ' · 剩余' : ''}
+          </div>
+        </div>
+        <button onClick={handleDownload} style={{
+          width: '100%', padding: 14, border: 'none', borderRadius: 10,
+          background: 'linear-gradient(135deg, #C9A84C, #B08E3A)', color: '#fff', fontSize: 14, fontWeight: 700,
+          cursor: 'pointer', marginBottom: 10
+        }}>📥 下载 QR 图片 / QR 다운로드</button>
+        <button onClick={onNextPack} style={{
+          width: '100%', padding: 14, border: 'none', borderRadius: 10,
+          background: 'var(--dark)', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 10
+        }}>➕ 继续下一包 / 다음 포장 (같은 MO)</button>
+        <button onClick={onHome} style={{
+          width: '100%', padding: 14, border: 'none', borderRadius: 10,
+          background: '#F1F5F9', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer'
+        }}>🏠 返回主页 / 홈으로</button>
+      </div>
+    </div>
+  );
+});
+
+// ─── NEW: Pack Detail Screen ──────────────────────────────────────────
+const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack }) {
+  if (!detail) return null;
+  const statusLabel = PACK_STATUS_LABELS[detail.pack_status] || detail.pack_status;
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
+      <div style={{ background: 'var(--dark)', padding: '14px 20px', color: '#fff' }}>
+        <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 14, cursor: 'pointer', marginBottom: 8 }}>← 返回</button>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: 'var(--gold)', marginBottom: 4 }}>INNER PACK DETAIL</div>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>{detail.mo_number} · Pack #{detail.pack_sequence}</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{detail.factory}</div>
+      </div>
+      <div style={{ padding: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>状态 / 상태</div>
+            <div style={{ padding: '4px 12px', borderRadius: 20, background: '#FEF3C7', color: '#92400E', fontSize: 11, fontWeight: 700 }}>{statusLabel}</div>
+          </div>
+          {[
+            ['Pack UUID', detail.uuid],
+            ['Brand', detail.brand],
+            ['Worker / 담당자', detail.worker],
+            ['Total Qty', String(detail.total_qty) + ' 件'],
+            ['Is Remainder', detail.is_remainder ? '是 / 예' : '否 / 아니오'],
+            ['Assigned To Bag', detail.assigned_to_bag || '-'],
+            ['Created Time', detail.created_time || '-'],
+          ].map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
+              <span style={{ color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
+              <span style={{
+                color: 'var(--text)', fontFamily: label === 'Pack UUID' ? 'monospace' : 'inherit',
+                fontSize: label === 'Pack UUID' ? 10 : 12, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all'
+              }}>{value}</span>
+            </div>
+          ))}
+        </div>
+        {detail.items && detail.items.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>包装内容 / 포장 내용</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+              {detail.items.map((item, i) => (
+                <div key={i} style={{ background: '#F8FAFC', padding: '6px 8px', borderRadius: 6, fontSize: 11 }}>
+                  <div style={{ fontWeight: 600 }}>{item.color}</div>
+                  <div style={{ color: 'var(--text3)' }}>{item.size} · {item.qty}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// ─── NEW: Bag Create Screen ───────────────────────────────────────────
+const BagCreateScreen = memo(function BagCreateScreen({
+  scannedPacks, isRemainder, setIsRemainder, worker, setWorker, destination, setDestination,
+  onScanNext, onRemovePack, onSubmit, onBack, submitting
+}) {
+  const count = scannedPacks.length;
+  const totalQty = scannedPacks.reduce((s, p) => s + (parseInt(p.total_qty) || 12), 0);
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', padding: '14px 20px', color: '#fff' }}>
+        <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 14, cursor: 'pointer', marginBottom: 8, opacity: 0.8 }}>← 返回</button>
+        <div style={{ fontSize: 11, letterSpacing: 2, opacity: 0.8, marginBottom: 4 }}>MASTER BAG</div>
+        <div style={{ fontSize: 20, fontWeight: 800 }}>{count} / {MASTER_BAG_SIZE} 包装</div>
+        <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>{totalQty} 件 · Total pieces</div>
+      </div>
+
+      <div style={{ padding: 16 }}>
+        <button onClick={onScanNext} style={{
+          width: '100%', padding: 18, border: 'none', borderRadius: 12,
+          background: '#1E3A8A', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 14
+        }}>📷 扫描包装 QR / 포장 QR 스캔 ({count} 已扫描)</button>
+
+        {count > 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 8 }}>已扫描包装 / 스캔된 포장</div>
+            {scannedPacks.map((p, i) => (
+              <div key={p.uuid} style={{
+                display: 'flex', alignItems: 'center', padding: '8px 0',
+                borderBottom: i < scannedPacks.length - 1 ? '1px solid #F1F5F9' : 'none'
+              }}>
+                <div style={{
+                  width: 24, height: 24, borderRadius: 12, background: '#EDE9FE', color: '#6D28D9',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, marginRight: 10,
+                  flexShrink: 0
+                }}>{i + 1}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{p.mo_number}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text4)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.uuid.substring(0, 13)}...</div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginRight: 10 }}>{p.total_qty}件</div>
+                <button onClick={() => onRemovePack(p.uuid)} style={{ background: 'transparent', border: 'none', color: '#EF4444', fontSize: 18, cursor: 'pointer', padding: 4 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input type="checkbox" checked={isRemainder} onChange={(e) => setIsRemainder(e.target.checked)} style={{ width: 18, height: 18, marginRight: 10 }} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>剩余麻袋 / 자투리 마대</span>
+          </label>
+          <div style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 28, marginTop: 4 }}>不足 {MASTER_BAG_SIZE} 个包装</div>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 6 }}>担当者 / 담당자 *</div>
+          <input type="text" value={worker} onChange={(e) => setWorker(e.target.value)} placeholder="姓名 Name"
+            style={{ width: '100%', padding: 10, border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 6 }}>目的地 / 목적지</div>
+          <input type="text" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="例: ZLO-Manzanillo"
+            style={{ width: '100%', padding: 10, border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
+        </div>
+
+        <button disabled={submitting || count === 0} onClick={onSubmit} style={{
+          width: '100%', padding: 18, border: 'none', borderRadius: 12,
+          background: (submitting || count === 0) ? '#9CA3AF' : 'linear-gradient(135deg, #7C3AED, #6D28D9)',
+          color: '#fff', fontSize: 15, fontWeight: 700, cursor: (submitting || count === 0) ? 'not-allowed' : 'pointer',
+          marginBottom: 20
+        }}>
+          {submitting ? '保存中...' : `✅ ${count}包装 装袋完成 / 마대 완료`}
+        </button>
+      </div>
+    </div>
+  );
+});
+
+// ─── NEW: Bag Success Screen ──────────────────────────────────────────
+const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome }) {
+  if (!bag) return null;
+  const handleDownload = () => {
+    const fname = `${bag.moNumber}_Bag_${bag.bagSequence}.png`;
+    downloadQRPNG(bag.qrDataURL, fname);
+  };
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', padding: '14px 20px', color: '#fff', textAlign: 'center' }}>
+        <div style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: 4, fontSize: 12 }}>BAG CREATED</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{bag.moNumber} · Bag #{bag.bagSequence}</div>
+      </div>
+      <div style={{ padding: 20 }}>
+        <div style={{ background: '#fff', borderRadius: 16, padding: 24, textAlign: 'center', marginBottom: 16 }}>
+          <img src={bag.qrDataURL} alt="QR" style={{ width: '100%', maxWidth: 320, margin: '0 auto', display: 'block' }} />
+          <div style={{ fontSize: 10, color: 'var(--text4)', marginTop: 12, fontFamily: 'monospace', wordBreak: 'break-all' }}>{bag.qrText}</div>
+        </div>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 8 }}>麻袋内容 / 마대 내용</div>
+          <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>{bag.packCount} packs · {bag.totalQty} 件{bag.isRemainder ? ' · 剩余' : ''}</div>
+          {bag.packs && bag.packs.map((p, i) => (
+            <div key={p.uuid} style={{
+              display: 'flex', justifyContent: 'space-between', padding: '4px 0',
+              fontSize: 11, color: 'var(--text3)',
+              borderTop: i === 0 ? '1px solid #F1F5F9' : 'none', marginTop: i === 0 ? 4 : 0
+            }}>
+              <span>Pack {i + 1} · {p.mo_number}</span>
+              <span>{p.total_qty} 件</span>
+            </div>
+          ))}
+        </div>
+        <button onClick={handleDownload} style={{
+          width: '100%', padding: 14, border: 'none', borderRadius: 10,
+          background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', color: '#fff', fontSize: 14, fontWeight: 700,
+          cursor: 'pointer', marginBottom: 10
+        }}>📥 下载 QR 图片 / QR 다운로드</button>
+        <button onClick={onNewBag} style={{
+          width: '100%', padding: 14, border: 'none', borderRadius: 10,
+          background: 'var(--dark)', color: '#A78BFA', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 10
+        }}>➕ 生成新麻袋 / 새 마대</button>
+        <button onClick={onHome} style={{
+          width: '100%', padding: 14, border: 'none', borderRadius: 10,
+          background: '#F1F5F9', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer'
+        }}>🏠 返回主页 / 홈으로</button>
+      </div>
+    </div>
+  );
+});
+
+// ─── NEW: Bag Detail Screen ───────────────────────────────────────────
+const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack }) {
+  if (!detail) return null;
+  const statusLabel = BAG_STATUS_LABELS[detail.bag_status] || detail.bag_status;
+  return (
+    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', padding: '14px 20px', color: '#fff' }}>
+        <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 14, cursor: 'pointer', marginBottom: 8, opacity: 0.8 }}>← 返回</button>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>MASTER BAG DETAIL</div>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>{detail.mo_number} · Bag #{detail.bag_sequence}</div>
+      </div>
+      <div style={{ padding: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>状态 / 상태</div>
+            <div style={{ padding: '4px 12px', borderRadius: 20, background: '#EDE9FE', color: '#6D28D9', fontSize: 11, fontWeight: 700 }}>{statusLabel}</div>
+          </div>
+          {[
+            ['Bag UUID', detail.uuid],
+            ['Brand', detail.brand],
+            ['Inner Packs', String(detail.inner_pack_count) + ' packs'],
+            ['Total Qty', String(detail.total_qty) + ' 件'],
+            ['Is Remainder', detail.is_remainder ? '是 / 예' : '否 / 아니오'],
+            ['Worker / 담당자', detail.worker],
+            ['Destination', detail.destination || '-'],
+            ['Received At MEX', detail.received_at_mex || '-'],
+          ].map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
+              <span style={{ color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
+              <span style={{
+                color: 'var(--text)', fontFamily: label === 'Bag UUID' ? 'monospace' : 'inherit',
+                fontSize: label === 'Bag UUID' ? 10 : 12, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all'
+              }}>{value}</span>
+            </div>
+          ))}
+        </div>
+        {detail.inner_pack_uuids && detail.inner_pack_uuids.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>包装列表 / 포장 목록</div>
+            {detail.inner_pack_uuids.map((uuid, i) => (
+              <div key={uuid} style={{ padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 11, color: 'var(--text3)', fontFamily: 'monospace' }}>
+                {i + 1}. {uuid}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 // ─── App: orchestration only ──────────────────────────────────────────
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState('scan');
+  // ── Existing Production Log state ──
+  const [currentScreen, setCurrentScreen] = useState('home');
   const [moData, setMoData] = useState(null);
   const [moRecordId, setMoRecordId] = useState('');
   const [selectedProcess, setSelectedProcess] = useState({ key: '', cn: '' });
@@ -476,8 +1039,30 @@ export default function App() {
   const [modalLog, setModalLog] = useState(null);
   const fileInputRef = useRef(null);
 
+  // ── New: Inner Pack state ──
+  const [packMO, setPackMO] = useState(null);
+  const [packComposition, setPackComposition] = useState([]);
+  const [packWorker, setPackWorker] = useState('');
+  const [packIsRemainder, setPackIsRemainder] = useState(false);
+  const [packSequence, setPackSequence] = useState(1);
+  const [lastPackComposition, setLastPackComposition] = useState(null);
+  const [createdPack, setCreatedPack] = useState(null);
+  const [scannedPackDetail, setScannedPackDetail] = useState(null);
+
+  // ── New: Master Bag state ──
+  const [bagScannedPacks, setBagScannedPacks] = useState([]);
+  const [bagIsRemainder, setBagIsRemainder] = useState(false);
+  const [bagWorker, setBagWorker] = useState('');
+  const [bagDestination, setBagDestination] = useState('');
+  const [createdBag, setCreatedBag] = useState(null);
+  const [scannedBagDetail, setScannedBagDetail] = useState(null);
+
+  // ── Scan mode ──
+  const [scanMode, setScanMode] = useState('production_log');
+
   useEffect(() => { window.scrollTo(0, 0); }, [currentScreen]);
 
+  // ── Existing Production Log handlers ──
   const fetchLogs = useCallback(async (moNumber) => {
     setLogsShown(true);
     setLogsLoading(true);
@@ -543,38 +1128,457 @@ export default function App() {
     }
   }, [fetchLogs]);
 
-  const handleQR = useCallback((qrText) => {
-    const text = (qrText || '').trim();
-    console.log('[scan] QR detected, len=' + text.length);
-    let moNumber = '', skuVal = '', factoryVal = '';
-    text.split(/[|\n\r]+/).forEach((part) => {
-      part = part.trim();
-      const idx = part.indexOf(':');
-      if (idx < 0) return;
-      const key = part.substring(0, idx).trim().toUpperCase();
-      const val = part.substring(idx + 1).trim();
-      if (key === 'MO') moNumber = val;
-      else if (key === 'SKU') skuVal = val;
-      else if (key === 'FACTORY') factoryVal = val;
-    });
-    if (!moNumber) {
-      if (/^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
-      else {
-        console.warn('[scan] unrecognized QR payload', text);
-        setCameraOpen(false);
-        alert('未能识别订单号\n\n扫描内容: ' + text);
+  // ── New: Inner Pack handlers ──
+  const fetchMODataForPack = useCallback(async (moNumber) => {
+    try {
+      const res = await getRecords(REPORTS.MO);
+      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+      const found = list.find((r) => r['MO_Number'] === moNumber);
+      if (!found) {
+        setCurrentScreen('pack_mo_select');
+        alert('未找到订单: ' + moNumber);
         return;
       }
-    }
-    console.log('[scan] MO=' + moNumber + ' SKU=' + skuVal + ' FACTORY=' + factoryVal);
-    flushSync(() => {
-      setCameraOpen(false);
-      setLoadingMsg('正在读取订单信息...');
-      setCurrentScreen('loading');
-    });
-    fetchMOData(moNumber, skuVal, factoryVal);
-  }, [fetchMOData]);
 
+      let skuStr = '-';
+      const skuRaw = found['Style_SKU'];
+      if (skuRaw) {
+        if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || '-';
+        else skuStr = String(skuRaw);
+      }
+
+      let standardAssortment = [];
+      const jsonStr = found['Standard_Assortment_JSON'];
+      if (jsonStr && typeof jsonStr === 'string') {
+        try {
+          let cleaned = jsonStr.trim();
+          if (!cleaned.startsWith('[')) cleaned = '[' + cleaned + ']';
+          standardAssortment = JSON.parse(cleaned);
+        } catch (e) {
+          console.error('Failed to parse Standard_Assortment_JSON', e);
+          standardAssortment = [];
+        }
+      }
+
+      let nextSequence = 1;
+      try {
+        const packRes = await getRecords(REPORTS.INNER_PACK);
+        if (packRes && packRes.code === 3000 && Array.isArray(packRes.data)) {
+          const existingPacks = packRes.data.filter(p => {
+            let m = p['MO_Number'];
+            if (typeof m === 'object') m = m.display_value || '';
+            return m === moNumber;
+          });
+          nextSequence = existingPacks.length + 1;
+        }
+      } catch (e) {
+        console.warn('Could not fetch existing pack count', e);
+      }
+
+      setPackMO({
+        mo_number: found['MO_Number'] || moNumber,
+        sku: skuStr,
+        factory: String(found['Factory'] || '-'),
+        order_qty: parseInt(found['Plan_Total_Quantity']) || 0,
+        plan_notes: found['Plan_Notes'] || '',
+        standard_assortment: standardAssortment,
+        record_id: found['ID']
+      });
+      setPackSequence(nextSequence);
+
+      if (standardAssortment.length > 0) {
+        setPackComposition(standardAssortment.map(it => ({ ...it, selected: true })));
+      } else {
+        setPackComposition([]);
+      }
+
+      setCurrentScreen('pack_create');
+    } catch (err) {
+      setCurrentScreen('pack_mo_select');
+      alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
+  const fetchInnerPackDetail = useCallback(async (uuid) => {
+    try {
+      const res = await getRecords(REPORTS.INNER_PACK);
+      if (!res || res.code !== 3000 || !Array.isArray(res.data)) {
+        throw new Error('查询失败');
+      }
+      const found = res.data.find(r => r['Pack_UUID'] === uuid);
+      if (!found) {
+        setCurrentScreen('pack_menu');
+        alert('未找到此包装 / 포장 없음\n' + uuid);
+        return;
+      }
+      let items = [];
+      try {
+        const itemsJson = found['Items_JSON'];
+        if (itemsJson) items = JSON.parse(itemsJson);
+      } catch (e) {}
+      let moNum = found['MO_Number'];
+      if (typeof moNum === 'object') moNum = moNum.display_value || '';
+      setScannedPackDetail({
+        uuid: found['Pack_UUID'],
+        brand: found['Brand'] || '',
+        mo_number: moNum,
+        pack_sequence: found['Pack_Sequence'],
+        total_qty: found['Total_Qty'],
+        is_remainder: found['Is_Remainder'] === 'true' || found['Is_Remainder'] === true,
+        items,
+        worker: found['Worker'] || '',
+        factory: found['Factory'] || '',
+        assigned_to_bag: found['Assigned_To_Bag'] || '',
+        pack_status: found['Pack_Status'] || 'Created',
+        created_time: found['Added_Time'] || found['Created_Time'] || ''
+      });
+      setCurrentScreen('pack_detail');
+    } catch (err) {
+      setCurrentScreen('pack_menu');
+      alert('查询失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
+  const handleCreatePack = useCallback(async () => {
+    if (!packMO) return;
+    const selectedItems = packComposition.filter(c => c.selected).map(c => ({
+      color: c.color, size: c.size, qty: c.qty || 1
+    }));
+    if (selectedItems.length === 0) return;
+
+    const qrText = buildInnerPackQR();
+    const uuid = qrText.substring(QR_PREFIX.INNER.length);
+    const totalQty = selectedItems.reduce((sum, it) => sum + (parseInt(it.qty) || 1), 0);
+    const totalExpected = packMO.order_qty > 0 ? Math.ceil(packMO.order_qty / INNER_PACK_SIZE) : 0;
+
+    const packData = {
+      'Pack_UUID':      uuid,
+      'Brand':          BRAND,
+      'MO_Number':      packMO.mo_number,
+      'Pack_Sequence':  packSequence,
+      'Total_Expected': totalExpected,
+      'Total_Qty':      totalQty,
+      'Is_Remainder':   packIsRemainder,
+      'Items_JSON':     JSON.stringify(selectedItems),
+      'Worker':         packWorker.trim(),
+      'Factory':        packMO.factory,
+      'Pack_Status':    'Created'
+    };
+
+    try {
+      setLoadingMsg('保存包装信息...');
+      setCurrentScreen('loading');
+
+      const res = await submitRecord(FORMS.INNER_PACK, packData);
+      if (!res || res.code !== 3000) {
+        throw new Error('保存失败: ' + JSON.stringify(res));
+      }
+
+      const qrDataURL = await generateQRDataURL(qrText, 512);
+
+      setCreatedPack({
+        uuid,
+        qrText,
+        qrDataURL,
+        items: selectedItems,
+        totalQty,
+        packSequence,
+        moNumber: packMO.mo_number,
+        isRemainder: packIsRemainder
+      });
+      setLastPackComposition(selectedItems);
+      setCurrentScreen('pack_success');
+    } catch (err) {
+      setCurrentScreen('pack_create');
+      alert('保存失败 / 저장 실패: ' + (err?.message || String(err)));
+    }
+  }, [packMO, packComposition, packWorker, packIsRemainder, packSequence]);
+
+  // ── New: Master Bag handlers ──
+  const addPackToBag = useCallback(async (uuid, qrText) => {
+    setLoadingMsg('加载包装信息...');
+    setCurrentScreen('loading');
+    try {
+      const res = await getRecords(REPORTS.INNER_PACK);
+      if (!res || res.code !== 3000 || !Array.isArray(res.data)) {
+        throw new Error('查询失败');
+      }
+      const found = res.data.find(r => r['Pack_UUID'] === uuid);
+      if (!found) {
+        setCurrentScreen('bag_create');
+        alert('未找到此包装 / 포장 정보 없음');
+        return;
+      }
+      if (found['Assigned_To_Bag'] && found['Assigned_To_Bag'] !== '') {
+        setCurrentScreen('bag_create');
+        alert('此包装已经装袋: ' + found['Assigned_To_Bag']);
+        return;
+      }
+      let moNum = found['MO_Number'];
+      if (typeof moNum === 'object') moNum = moNum.display_value || '';
+      let items = [];
+      try { items = JSON.parse(found['Items_JSON'] || '[]'); } catch (e) {}
+
+      setBagScannedPacks(prev => [...prev, {
+        uuid,
+        qrText,
+        mo_number: moNum,
+        items,
+        total_qty: found['Total_Qty'] || 12,
+        record_id: found['ID']
+      }]);
+      setCurrentScreen('bag_create');
+    } catch (err) {
+      setCurrentScreen('bag_create');
+      alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
+  const handleRemovePackFromBag = useCallback((uuid) => {
+    setBagScannedPacks(prev => prev.filter(p => p.uuid !== uuid));
+  }, []);
+
+  const handleCreateBag = useCallback(async () => {
+    if (bagScannedPacks.length === 0) {
+      alert('请至少扫描一个包装');
+      return;
+    }
+    if (!bagIsRemainder && bagScannedPacks.length !== MASTER_BAG_SIZE) {
+      if (!window.confirm(`不是 ${MASTER_BAG_SIZE} 个 (${bagScannedPacks.length}个). 继续?`)) return;
+    }
+    if (!bagWorker.trim()) {
+      alert('请输入担当者 / 담당자');
+      return;
+    }
+
+    const primaryMO = bagScannedPacks[0].mo_number;
+    const qrText = buildMasterBagQR();
+    const uuid = qrText.substring(QR_PREFIX.BAG.length);
+    const totalQty = bagScannedPacks.reduce((s, p) => s + (parseInt(p.total_qty) || 12), 0);
+
+    let bagSequence = 1;
+    try {
+      const bagRes = await getRecords(REPORTS.MASTER_BAG);
+      if (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) {
+        const existing = bagRes.data.filter(b => {
+          let m = b['MO_Number'];
+          if (typeof m === 'object') m = m.display_value || '';
+          return m === primaryMO;
+        });
+        bagSequence = existing.length + 1;
+      }
+    } catch (e) {}
+
+    const bagData = {
+      'Bag_UUID':         uuid,
+      'Brand':            BRAND,
+      'Bag_Sequence':     bagSequence,
+      'MO_Number':        primaryMO,
+      'Inner_Pack_Count': bagScannedPacks.length,
+      'Inner_Pack_UUIDs': JSON.stringify(bagScannedPacks.map(p => p.uuid)),
+      'Total_Qty':        totalQty,
+      'Is_Remainder':     bagIsRemainder,
+      'Worker':           bagWorker.trim(),
+      'Destination':      bagDestination.trim(),
+      'Bag_Status':       'Created'
+    };
+
+    try {
+      setLoadingMsg('保存麻袋信息...');
+      setCurrentScreen('loading');
+
+      const bagRes = await submitRecord(FORMS.MASTER_BAG, bagData);
+      if (!bagRes || bagRes.code !== 3000) {
+        throw new Error('保存失败: ' + JSON.stringify(bagRes));
+      }
+
+      for (const p of bagScannedPacks) {
+        try {
+          await updateRecord(REPORTS.INNER_PACK, p.record_id, {
+            'Assigned_To_Bag': uuid,
+            'Pack_Status': 'Bagged'
+          });
+        } catch (updErr) {
+          console.warn('[bag] pack update failed', p.uuid, updErr);
+        }
+      }
+
+      const qrDataURL = await generateQRDataURL(qrText, 512);
+      setCreatedBag({
+        uuid,
+        qrText,
+        qrDataURL,
+        moNumber: primaryMO,
+        bagSequence,
+        packCount: bagScannedPacks.length,
+        totalQty,
+        isRemainder: bagIsRemainder,
+        packs: bagScannedPacks
+      });
+      setCurrentScreen('bag_success');
+    } catch (err) {
+      setCurrentScreen('bag_create');
+      alert('保存失败: ' + (err?.message || String(err)));
+    }
+  }, [bagScannedPacks, bagIsRemainder, bagWorker, bagDestination]);
+
+  const fetchMasterBagDetail = useCallback(async (uuid) => {
+    try {
+      const res = await getRecords(REPORTS.MASTER_BAG);
+      if (!res || res.code !== 3000 || !Array.isArray(res.data)) throw new Error('查询失败');
+      const found = res.data.find(r => r['Bag_UUID'] === uuid);
+      if (!found) {
+        setCurrentScreen('bag_menu');
+        alert('未找到此麻袋 / 마대 없음\n' + uuid);
+        return;
+      }
+      let packUUIDs = [];
+      try { packUUIDs = JSON.parse(found['Inner_Pack_UUIDs'] || '[]'); } catch (e) {}
+      let moNum = found['MO_Number'];
+      if (typeof moNum === 'object') moNum = moNum.display_value || '';
+
+      setScannedBagDetail({
+        uuid: found['Bag_UUID'],
+        brand: found['Brand'] || '',
+        bag_sequence: found['Bag_Sequence'],
+        mo_number: moNum,
+        inner_pack_count: found['Inner_Pack_Count'],
+        inner_pack_uuids: packUUIDs,
+        total_qty: found['Total_Qty'],
+        is_remainder: found['Is_Remainder'] === 'true' || found['Is_Remainder'] === true,
+        worker: found['Worker'] || '',
+        factory: found['Factory'] || '',
+        destination: found['Destination'] || '',
+        bag_status: found['Bag_Status'] || 'Created',
+        received_at_mex: found['Received_At_MEX'] || ''
+      });
+      setCurrentScreen('bag_detail');
+    } catch (err) {
+      setCurrentScreen('bag_menu');
+      alert('查询失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
+  // ── Modified handleQR — dispatches based on scanMode ──
+  const handleQR = useCallback((qrText) => {
+    const text = (qrText || '').trim();
+    console.log('[scan] QR detected, len=' + text.length + ' mode=' + scanMode);
+
+    const qrType = detectQRType(text);
+
+    if (scanMode === 'production_log') {
+      if (qrType !== 'production_log') {
+        setCameraOpen(false);
+        alert('QR 타입 불일치: 생산 진척 QR이 아닙니다.\n扫描的不是生产进度QR');
+        return;
+      }
+      let moNumber = '', skuVal = '', factoryVal = '';
+      text.split(/[|\n\r]+/).forEach((part) => {
+        part = part.trim();
+        const idx = part.indexOf(':');
+        if (idx < 0) return;
+        const key = part.substring(0, idx).trim().toUpperCase();
+        const val = part.substring(idx + 1).trim();
+        if (key === 'MO') moNumber = val;
+        else if (key === 'SKU') skuVal = val;
+        else if (key === 'FACTORY') factoryVal = val;
+      });
+      if (!moNumber) {
+        if (/^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
+        else {
+          setCameraOpen(false);
+          alert('未能识别订单号\n扫描内容: ' + text);
+          return;
+        }
+      }
+      flushSync(() => {
+        setCameraOpen(false);
+        setLoadingMsg('正在读取订单信息...');
+        setCurrentScreen('loading');
+      });
+      fetchMOData(moNumber, skuVal, factoryVal);
+      return;
+    }
+
+    if (scanMode === 'inner_pack_mo') {
+      if (qrType !== 'production_log') {
+        setCameraOpen(false);
+        alert('请扫描生产进度QR (MO QR)\n생산 진척 QR을 스캔하세요');
+        return;
+      }
+      let moNumber = '';
+      text.split(/[|\n\r]+/).forEach((part) => {
+        const idx = part.indexOf(':');
+        if (idx < 0) return;
+        const key = part.substring(0, idx).trim().toUpperCase();
+        if (key === 'MO') moNumber = part.substring(idx + 1).trim();
+      });
+      if (!moNumber && /^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
+      if (!moNumber) {
+        setCameraOpen(false);
+        alert('未能识别订单号');
+        return;
+      }
+      flushSync(() => {
+        setCameraOpen(false);
+        setLoadingMsg('加载订单数据...');
+        setCurrentScreen('loading');
+      });
+      fetchMODataForPack(moNumber);
+      return;
+    }
+
+    if (scanMode === 'inner_pack_detail') {
+      const uuid = parseInnerPackQR(text);
+      if (!uuid) {
+        setCameraOpen(false);
+        alert('不是有效的包装QR');
+        return;
+      }
+      flushSync(() => {
+        setCameraOpen(false);
+        setLoadingMsg('查询包装信息...');
+        setCurrentScreen('loading');
+      });
+      fetchInnerPackDetail(uuid);
+      return;
+    }
+
+    if (scanMode === 'master_bag_compose') {
+      const uuid = parseInnerPackQR(text);
+      if (!uuid) {
+        setCameraOpen(false);
+        alert('请扫描中间包装QR (IKU-INNER-...)');
+        return;
+      }
+      if (bagScannedPacks.find(p => p.uuid === uuid)) {
+        setCameraOpen(false);
+        alert('此包装已经添加过了');
+        return;
+      }
+      setCameraOpen(false);
+      addPackToBag(uuid, text);
+      return;
+    }
+
+    if (scanMode === 'master_bag_detail') {
+      const uuid = parseMasterBagQR(text);
+      if (!uuid) {
+        setCameraOpen(false);
+        alert('不是有效的麻袋QR');
+        return;
+      }
+      flushSync(() => {
+        setCameraOpen(false);
+        setLoadingMsg('查询麻袋信息...');
+        setCurrentScreen('loading');
+      });
+      fetchMasterBagDetail(uuid);
+      return;
+    }
+  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail]);
+
+  // ── Existing handlers (unchanged except handleBackToScan goes to 'home') ──
   const handleScanRequest = useCallback(() => setCameraOpen(true), []);
   const handleCameraCancel = useCallback(() => setCameraOpen(false), []);
 
@@ -640,9 +1644,6 @@ export default function App() {
       if (map.dateEnd)   updateData[map.dateEnd]   = todayStr;
       if (map.qty)       updateData[map.qty]       = form.completedQty;
     }
-    // MO update is best-effort: the log save above is the source of truth.
-    // Log failures to DevTools so scope/credential issues are visible
-    // without blocking the success screen.
     try {
       await updateRecord(MO_REPORT, moRecordId, updateData);
     } catch (updErr) {
@@ -672,27 +1673,41 @@ export default function App() {
   }, [moData, moRecordId, selectedProcess]);
 
   const handleBackToInfo = useCallback(() => setCurrentScreen('info'), []);
+
   const handleBackToScan = useCallback(() => {
     setMoData(null); setMoRecordId('');
     setSelectedProcess({ key: '', cn: '' });
     setLogs([]); setLogsShown(false);
     setSubmitResult(null);
-    setCurrentScreen('scan');
+    setCurrentScreen('home');
   }, []);
+
   const handleNextProcess = useCallback(() => {
     setSelectedProcess({ key: '', cn: '' });
     setSubmitResult(null);
     setCurrentScreen('info');
     if (moData && moData.mo_number) setTimeout(() => fetchLogs(moData.mo_number), 200);
   }, [moData, fetchLogs]);
+
   const handleCloseModal = useCallback(() => setModalLog(null), []);
 
   return (
     <>
       <div className="container" style={{ overflow: 'hidden' }}>
-        {currentScreen === 'scan'    && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} />}
+
+        {/* Home */}
+        {currentScreen === 'home' && (
+          <HomeScreen
+            onSelectProductionLog={() => { setScanMode('production_log'); setCurrentScreen('scan'); }}
+            onSelectInnerPack={() => setCurrentScreen('pack_menu')}
+            onSelectMasterBag={() => setCurrentScreen('bag_menu')}
+          />
+        )}
+
+        {/* Production Log screens */}
+        {currentScreen === 'scan' && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} />}
         {currentScreen === 'loading' && <LoadingScreen message={loadingMsg} />}
-        {currentScreen === 'info'    && (
+        {currentScreen === 'info' && (
           <InfoScreen
             moData={moData}
             logs={logs}
@@ -704,7 +1719,7 @@ export default function App() {
             onOpenLog={setModalLog}
           />
         )}
-        {currentScreen === 'input'   && (
+        {currentScreen === 'input' && (
           <InputScreen
             moData={moData}
             process={selectedProcess}
@@ -716,9 +1731,123 @@ export default function App() {
           <SuccessScreen
             result={submitResult}
             onNextProcess={handleNextProcess}
-            onNewScan={handleBackToScan}
+            onNewScan={() => setCurrentScreen('home')}
           />
         )}
+
+        {/* Inner Pack screens */}
+        {currentScreen === 'pack_menu' && (
+          <PackMenuScreen
+            onCreate={() => setCurrentScreen('pack_mo_select')}
+            onScan={() => { setScanMode('inner_pack_detail'); setCameraOpen(true); }}
+            onBack={() => setCurrentScreen('home')}
+          />
+        )}
+        {currentScreen === 'pack_mo_select' && (
+          <PackMOSelectScreen
+            onScan={() => { setScanMode('inner_pack_mo'); setCameraOpen(true); }}
+            onManual={(mo) => {
+              setLoadingMsg('加载订单数据...');
+              setCurrentScreen('loading');
+              fetchMODataForPack(mo);
+            }}
+            onBack={() => setCurrentScreen('pack_menu')}
+          />
+        )}
+        {currentScreen === 'pack_create' && packMO && (
+          <PackCreateScreen
+            packMO={packMO}
+            composition={packComposition}
+            setComposition={setPackComposition}
+            packSequence={packSequence}
+            worker={packWorker}
+            setWorker={setPackWorker}
+            isRemainder={packIsRemainder}
+            setIsRemainder={setPackIsRemainder}
+            lastComposition={lastPackComposition}
+            onSubmit={handleCreatePack}
+            onBack={() => setCurrentScreen('pack_mo_select')}
+            submitting={false}
+          />
+        )}
+        {currentScreen === 'pack_success' && (
+          <PackSuccessScreen
+            pack={createdPack}
+            onNextPack={() => {
+              setPackSequence(s => s + 1);
+              setCreatedPack(null);
+              setPackComposition(
+                packMO && packMO.standard_assortment
+                  ? packMO.standard_assortment.map(it => ({ ...it, selected: true }))
+                  : []
+              );
+              setPackIsRemainder(false);
+              setCurrentScreen('pack_create');
+            }}
+            onHome={() => {
+              setPackMO(null); setCreatedPack(null); setPackComposition([]);
+              setPackWorker(''); setPackIsRemainder(false); setPackSequence(1);
+              setCurrentScreen('home');
+            }}
+          />
+        )}
+        {currentScreen === 'pack_detail' && scannedPackDetail && (
+          <PackDetailScreen
+            detail={scannedPackDetail}
+            onBack={() => { setScannedPackDetail(null); setCurrentScreen('pack_menu'); }}
+          />
+        )}
+
+        {/* Master Bag screens */}
+        {currentScreen === 'bag_menu' && (
+          <BagMenuScreen
+            onCreate={() => {
+              setBagScannedPacks([]); setBagIsRemainder(false);
+              setBagWorker(''); setBagDestination('');
+              setCurrentScreen('bag_create');
+            }}
+            onScan={() => { setScanMode('master_bag_detail'); setCameraOpen(true); }}
+            onBack={() => setCurrentScreen('home')}
+          />
+        )}
+        {currentScreen === 'bag_create' && (
+          <BagCreateScreen
+            scannedPacks={bagScannedPacks}
+            isRemainder={bagIsRemainder}
+            setIsRemainder={setBagIsRemainder}
+            worker={bagWorker}
+            setWorker={setBagWorker}
+            destination={bagDestination}
+            setDestination={setBagDestination}
+            onScanNext={() => { setScanMode('master_bag_compose'); setCameraOpen(true); }}
+            onRemovePack={handleRemovePackFromBag}
+            onSubmit={handleCreateBag}
+            onBack={() => setCurrentScreen('bag_menu')}
+            submitting={false}
+          />
+        )}
+        {currentScreen === 'bag_success' && (
+          <BagSuccessScreen
+            bag={createdBag}
+            onNewBag={() => {
+              setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
+              setBagWorker(''); setBagDestination('');
+              setCurrentScreen('bag_create');
+            }}
+            onHome={() => {
+              setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
+              setBagWorker(''); setBagDestination('');
+              setCurrentScreen('home');
+            }}
+          />
+        )}
+        {currentScreen === 'bag_detail' && scannedBagDetail && (
+          <BagDetailScreen
+            detail={scannedBagDetail}
+            onBack={() => { setScannedBagDetail(null); setCurrentScreen('bag_menu'); }}
+          />
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
