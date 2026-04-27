@@ -4,26 +4,34 @@ import JSZip from 'jszip';
 import { QR_PREFIX } from './config.js';
 
 export function buildInnerPackQR() {
-  return QR_PREFIX.INNER + uuidv4();
+  return window.location.origin + '/view/inner/' + uuidv4();
 }
 
 export function buildMasterBagQR() {
-  return QR_PREFIX.BAG + uuidv4();
+  return window.location.origin + '/view/bag/' + uuidv4();
 }
 
 export function parseInnerPackQR(text) {
-  if (!text || !text.startsWith(QR_PREFIX.INNER)) return null;
-  return text.substring(QR_PREFIX.INNER.length);
+  if (!text) return null;
+  const urlMatch = text.match(/\/view\/inner\/([0-9a-f-]{36})$/i);
+  if (urlMatch) return urlMatch[1];
+  if (text.startsWith(QR_PREFIX.INNER)) return text.substring(QR_PREFIX.INNER.length);
+  return null;
 }
 
 export function parseMasterBagQR(text) {
-  if (!text || !text.startsWith(QR_PREFIX.BAG)) return null;
-  return text.substring(QR_PREFIX.BAG.length);
+  if (!text) return null;
+  const urlMatch = text.match(/\/view\/bag\/([0-9a-f-]{36})$/i);
+  if (urlMatch) return urlMatch[1];
+  if (text.startsWith(QR_PREFIX.BAG)) return text.substring(QR_PREFIX.BAG.length);
+  return null;
 }
 
 export function detectQRType(text) {
   if (!text) return 'unknown';
   const t = text.trim();
+  if (/\/view\/inner\/[0-9a-f-]{36}$/i.test(t)) return 'inner_pack';
+  if (/\/view\/bag\/[0-9a-f-]{36}$/i.test(t)) return 'master_bag';
   if (t.startsWith(QR_PREFIX.INNER)) return 'inner_pack';
   if (t.startsWith(QR_PREFIX.BAG)) return 'master_bag';
   if (/^MO:|^[A-Z]{2}\d{2}-/i.test(t)) return 'production_log';

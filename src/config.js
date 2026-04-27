@@ -40,3 +40,6 @@ export const BAG_STATUS_LABELS = {
   'Out_For_Delivery': '配送中 / Out for Delivery',
   'Delivered':        '已交付 / Delivered',
 };
+
+export const APP_PIN = 'JERA8888';
+export const PIN_STORAGE_KEY = 'factoryapp_pin_verified';

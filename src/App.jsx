@@ -3,8 +3,8 @@ import { flushSync } from 'react-dom';
 import jsQR from 'jsqr';
 import { getRecords, submitRecord, updateRecord } from './api.js';
 import {
-  BRAND, INNER_PACK_SIZE, MASTER_BAG_SIZE, REPORTS, FORMS, QR_PREFIX,
-  PACK_STATUS_LABELS, BAG_STATUS_LABELS
+  BRAND, INNER_PACK_SIZE, MASTER_BAG_SIZE, REPORTS, FORMS,
+  PACK_STATUS_LABELS, BAG_STATUS_LABELS, APP_PIN, PIN_STORAGE_KEY
 } from './config.js';
 import {
   buildInnerPackQR, buildMasterBagQR, parseInnerPackQR, parseMasterBagQR,
@@ -1023,10 +1023,326 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack }) {
   );
 });
 
+// ─── URL routing helper ───────────────────────────────────────────────
+function getInitialScreenFromUrl() {
+  const path = window.location.pathname;
+  const innerMatch = path.match(/^\/view\/inner\/([0-9a-f-]+)$/i);
+  const bagMatch   = path.match(/^\/view\/bag\/([0-9a-f-]+)$/i);
+  if (innerMatch) return { screen: 'view-inner', uuid: innerMatch[1] };
+  if (bagMatch)   return { screen: 'view-bag',   uuid: bagMatch[1] };
+  return { screen: 'home', uuid: null };
+}
+
+// ─── ViewInnerScreen (read-only, URL-accessible) ──────────────────────
+const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
+  const [record, setRecord]     = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getRecords(REPORTS.INNER_PACK);
+        if (cancelled) return;
+        const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+        const found = list.find(r => r['Pack_UUID'] === uuid);
+        if (!found) { setNotFound(true); return; }
+        let items = [];
+        try { items = JSON.parse(found['Items_JSON'] || '[]'); } catch (e) {}
+        let moNum = found['MO_Number'];
+        if (typeof moNum === 'object') moNum = moNum.display_value || '';
+        setRecord({
+          uuid: found['Pack_UUID'],
+          mo_number: moNum,
+          sku: found['Style_SKU'] || found['SKU'] || '',
+          factory: found['Factory'] || '',
+          pack_sequence: found['Pack_Sequence'],
+          total_qty: found['Total_Qty'],
+          items,
+          worker: found['Worker'] || '',
+          created_time: found['Added_Time'] || found['Created_Time'] || '',
+          pack_status: found['Pack_Status'] || 'Created',
+          is_remainder: found['Is_Remainder'] === 'true' || found['Is_Remainder'] === true,
+        });
+      } catch (e) {
+        if (!cancelled) setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [uuid]);
+
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div className="spinner"></div>
+    </div>
+  );
+
+  if (notFound) return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>记录未找到 / 기록을 찾을 수 없습니다</div>
+      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 24, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{uuid}</div>
+      <button onClick={onHome} style={{ padding: '12px 24px', border: 'none', borderRadius: 10, background: 'var(--dark)', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🏠 返回首页 / 홈으로</button>
+    </div>
+  );
+
+  const statusLabel = PACK_STATUS_LABELS[record.pack_status] || record.pack_status;
+  return (
+    <div style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
+      <div style={{ background: 'var(--dark)', padding: '14px 20px', color: '#fff' }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: 'var(--gold)', marginBottom: 4 }}>中间包装详情 / 중간포장 상세</div>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>{record.mo_number} · Pack #{record.pack_sequence}</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{record.factory}</div>
+      </div>
+      <div style={{ padding: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>状态 / 상태</div>
+            <div style={{ padding: '4px 12px', borderRadius: 20, background: '#FEF3C7', color: '#92400E', fontSize: 11, fontWeight: 700 }}>{statusLabel}</div>
+          </div>
+          {record.is_remainder && (
+            <div style={{ display: 'inline-block', padding: '2px 10px', background: '#FEE2E2', color: '#991B1B', borderRadius: 20, fontSize: 11, fontWeight: 700, marginBottom: 10 }}>자투리 / 残余</div>
+          )}
+          {[
+            ['MO 번호 / 订单号', record.mo_number],
+            ['SKU', record.sku || '-'],
+            ['工厂 / 공장', record.factory || '-'],
+            ['Pack # / 포장 순번', String(record.pack_sequence)],
+            ['总件数 / 총 수량', String(record.total_qty) + ' 件'],
+            ['担当者 / 담당자', record.worker || '-'],
+            ['创建时间 / 생성 시간', formatDate(record.created_time)],
+          ].map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
+              <span style={{ color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
+              <span style={{ color: 'var(--text)', textAlign: 'right', maxWidth: '60%' }}>{value}</span>
+            </div>
+          ))}
+        </div>
+        {record.items && record.items.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>包装内容 / 포장 내용</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
+              <span>颜色 / Color</span><span style={{ textAlign: 'center' }}>尺码 / Size</span><span style={{ textAlign: 'right' }}>数量 / Qty</span>
+            </div>
+            {record.items.map((item, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '5px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
+                <span style={{ color: '#374151' }}>{item.color}</span>
+                <span style={{ textAlign: 'center', color: '#374151' }}>{item.size}</span>
+                <span style={{ textAlign: 'right', fontWeight: 600, color: '#1E3A8A' }}>{item.qty}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={onHome} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 10, background: '#F1F5F9', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🏠 返回首页 / 홈으로</button>
+      </div>
+    </div>
+  );
+});
+
+// ─── ViewBagScreen (read-only, URL-accessible) ────────────────────────
+const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
+  const [bagRecord, setBagRecord]           = useState(null);
+  const [innerPacks, setInnerPacks]         = useState([]);
+  const [colorSizeSummary, setColorSizeSummary] = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [notFound, setNotFound]             = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const bagRes = await getRecords(REPORTS.MASTER_BAG);
+        const bagList = (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) ? bagRes.data : [];
+        const foundBag = bagList.find(r => r['Bag_UUID'] === uuid);
+        if (!foundBag) { if (!cancelled) setNotFound(true); return; }
+
+        let packUUIDs = [];
+        try { packUUIDs = JSON.parse(foundBag['Inner_Pack_UUIDs'] || '[]'); } catch (e) {}
+        let moNum = foundBag['MO_Number'];
+        if (typeof moNum === 'object') moNum = moNum.display_value || '';
+
+        const bagData = {
+          uuid: foundBag['Bag_UUID'],
+          mo_number: moNum,
+          factory: foundBag['Factory'] || '',
+          destination: foundBag['Destination'] || '',
+          bag_sequence: foundBag['Bag_Sequence'],
+          inner_pack_count: foundBag['Inner_Pack_Count'],
+          inner_pack_uuids: packUUIDs,
+          total_qty: foundBag['Total_Qty'],
+          is_remainder: foundBag['Is_Remainder'] === 'true' || foundBag['Is_Remainder'] === true,
+          worker: foundBag['Worker'] || '',
+          created_time: foundBag['Added_Time'] || foundBag['Created_Time'] || '',
+          bag_status: foundBag['Bag_Status'] || 'Created',
+          received_at_mex: foundBag['Received_At_MEX'] || '',
+        };
+
+        let packs = [];
+        if (packUUIDs.length > 0) {
+          const packRes = await getRecords(REPORTS.INNER_PACK);
+          if (packRes && packRes.code === 3000 && Array.isArray(packRes.data)) {
+            packs = packRes.data
+              .filter(r => packUUIDs.includes(r['Pack_UUID']))
+              .map(r => {
+                let items = [];
+                try { items = JSON.parse(r['Items_JSON'] || '[]'); } catch (e) {}
+                let moN = r['MO_Number'];
+                if (typeof moN === 'object') moN = moN.display_value || '';
+                return { uuid: r['Pack_UUID'], pack_sequence: r['Pack_Sequence'], total_qty: r['Total_Qty'], mo_number: moN, items };
+              });
+          }
+        }
+
+        const map = {};
+        packs.forEach(p => {
+          (p.items || []).forEach(item => {
+            const key = item.color + '|' + item.size;
+            if (!map[key]) map[key] = { color: item.color, size: item.size, qty: 0 };
+            map[key].qty += parseInt(item.qty) || 1;
+          });
+        });
+        const summary = Object.values(map).sort((a, b) => a.color.localeCompare(b.color) || a.size.localeCompare(b.size));
+
+        if (!cancelled) { setBagRecord(bagData); setInnerPacks(packs); setColorSizeSummary(summary); }
+      } catch (e) {
+        if (!cancelled) setNotFound(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [uuid]);
+
+  if (loading) return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div className="spinner"></div>
+    </div>
+  );
+
+  if (notFound) return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>记录未找到 / 기록을 찾을 수 없습니다</div>
+      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 24, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{uuid}</div>
+      <button onClick={onHome} style={{ padding: '12px 24px', border: 'none', borderRadius: 10, background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🏠 返回首页 / 홈으로</button>
+    </div>
+  );
+
+  const statusLabel = BAG_STATUS_LABELS[bagRecord.bag_status] || bagRecord.bag_status;
+  const extraRows = bagRecord.received_at_mex ? [['Received At MEX', formatDate(bagRecord.received_at_mex)]] : [];
+  return (
+    <div style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', padding: '14px 20px', color: '#fff' }}>
+        <div style={{ fontSize: 11, letterSpacing: 2, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>麻袋详情 / 마대 상세</div>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>{bagRecord.mo_number} · Bag #{bagRecord.bag_sequence}</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{bagRecord.factory}{bagRecord.destination ? ' → ' + bagRecord.destination : ''}</div>
+      </div>
+      <div style={{ padding: 16 }}>
+        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>状态 / 상태</div>
+            <div style={{ padding: '4px 12px', borderRadius: 20, background: '#EDE9FE', color: '#6D28D9', fontSize: 11, fontWeight: 700 }}>{statusLabel}</div>
+          </div>
+          {bagRecord.is_remainder && (
+            <div style={{ display: 'inline-block', padding: '2px 10px', background: '#FEE2E2', color: '#991B1B', borderRadius: 20, fontSize: 11, fontWeight: 700, marginBottom: 10 }}>자투리 / 残余</div>
+          )}
+          {[
+            ['MO 번호 / 订单号', bagRecord.mo_number],
+            ['工厂 / 공장', bagRecord.factory || '-'],
+            ['目的地 / 목적지', bagRecord.destination || '-'],
+            ['Bag # / 마대 순번', String(bagRecord.bag_sequence)],
+            ['内装包数 / 포장 수', String(bagRecord.inner_pack_count) + ' packs'],
+            ['总件数 / 총 수량', String(bagRecord.total_qty) + ' 件'],
+            ['担当者 / 담당자', bagRecord.worker || '-'],
+            ['创建时间 / 생성 시간', formatDate(bagRecord.created_time)],
+            ...extraRows,
+          ].map(([label, value]) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
+              <span style={{ color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
+              <span style={{ color: 'var(--text)', textAlign: 'right', maxWidth: '60%' }}>{value}</span>
+            </div>
+          ))}
+        </div>
+
+        {innerPacks.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>包装列表 / 포장 목록</div>
+            {innerPacks.map((p, i) => (
+              <div key={p.uuid} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
+                <span style={{ color: 'var(--text3)' }}>Pack {p.pack_sequence || (i + 1)} · {p.uuid.substring(0, 8)}...</span>
+                <span style={{ color: 'var(--text)', fontWeight: 600 }}>{p.total_qty} 件</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {colorSizeSummary.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>颜色/尺码汇总 / 색상·사이즈 합계</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
+              <span>颜色 / Color</span><span style={{ textAlign: 'center' }}>尺码 / Size</span><span style={{ textAlign: 'right' }}>合计 / 합계</span>
+            </div>
+            {colorSizeSummary.map((row, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '5px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
+                <span style={{ color: '#374151' }}>{row.color}</span>
+                <span style={{ textAlign: 'center', color: '#374151' }}>{row.size}</span>
+                <span style={{ textAlign: 'right', fontWeight: 600, color: '#1E3A8A' }}>{row.qty}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={onHome} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 10, background: '#F1F5F9', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🏠 返回首页 / 홈으로</button>
+      </div>
+    </div>
+  );
+});
+
+// ─── PinGate modal ────────────────────────────────────────────────────
+const PinGate = memo(function PinGate({ onSuccess, onCancel }) {
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
+
+  const handleSubmit = () => {
+    if (pinInput === APP_PIN) {
+      localStorage.setItem(PIN_STORAGE_KEY, 'verified');
+      onSuccess();
+    } else {
+      setPinError('PIN码错误 / PIN이 틀립니다');
+      setPinInput('');
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '90%', maxWidth: 360, padding: 28, boxShadow: '0 20px 60px rgba(0,0,0,.3)' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 20, textAlign: 'center' }}>🔒 请输入PIN码 / PIN 입력</div>
+        <input
+          type="password"
+          value={pinInput}
+          onChange={(e) => { setPinInput(e.target.value); setPinError(''); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+          placeholder="8자리 PIN / 8位PIN"
+          maxLength={8}
+          autoFocus
+          style={{ width: '100%', padding: 14, border: '2px solid #E2E8F0', borderRadius: 10, fontSize: 18, textAlign: 'center', letterSpacing: 6, boxSizing: 'border-box', marginBottom: 12 }}
+        />
+        {pinError && <div style={{ color: '#EF4444', fontSize: 12, textAlign: 'center', marginBottom: 12, fontWeight: 600 }}>{pinError}</div>}
+        <button onClick={handleSubmit} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 10, background: 'var(--dark)', color: 'var(--gold)', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 10 }}>确认 / 확인</button>
+        <button onClick={onCancel} style={{ width: '100%', padding: 14, border: '1px solid #E2E8F0', borderRadius: 10, background: '#fff', color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>取消 / 취소</button>
+      </div>
+    </div>
+  );
+});
+
 // ─── App: orchestration only ──────────────────────────────────────────
 export default function App() {
   // ── Existing Production Log state ──
-  const [currentScreen, setCurrentScreen] = useState('home');
+  const [currentScreen, setCurrentScreen] = useState(getInitialScreenFromUrl().screen);
+  const [viewUuid, setViewUuid] = useState(getInitialScreenFromUrl().uuid);
   const [moData, setMoData] = useState(null);
   const [moRecordId, setMoRecordId] = useState('');
   const [selectedProcess, setSelectedProcess] = useState({ key: '', cn: '' });
@@ -1059,6 +1375,27 @@ export default function App() {
 
   // ── Scan mode ──
   const [scanMode, setScanMode] = useState('production_log');
+
+  // ── PIN gate state ──
+  const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [pinSuccessCallback, setPinSuccessCallback] = useState(null);
+
+  const isPinVerified = () => localStorage.getItem(PIN_STORAGE_KEY) === 'verified';
+  const requirePin = (onSuccess) => {
+    if (isPinVerified()) { onSuccess(); }
+    else { setPinSuccessCallback(() => onSuccess); setPinModalOpen(true); }
+  };
+
+  // ── URL routing — popstate (browser back/forward) ──
+  useEffect(() => {
+    const onPop = () => {
+      const { screen, uuid } = getInitialScreenFromUrl();
+      setCurrentScreen(screen);
+      setViewUuid(uuid);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   useEffect(() => { window.scrollTo(0, 0); }, [currentScreen]);
 
@@ -1247,7 +1584,7 @@ export default function App() {
     if (selectedItems.length === 0) return;
 
     const qrText = buildInnerPackQR();
-    const uuid = qrText.substring(QR_PREFIX.INNER.length);
+    const uuid = qrText.split('/view/inner/')[1];
     const totalQty = selectedItems.reduce((sum, it) => sum + (parseInt(it.qty) || 1), 0);
     const totalExpected = packMO.order_qty > 0 ? Math.ceil(packMO.order_qty / INNER_PACK_SIZE) : 0;
 
@@ -1353,7 +1690,7 @@ export default function App() {
 
     const primaryMO = bagScannedPacks[0].mo_number;
     const qrText = buildMasterBagQR();
-    const uuid = qrText.substring(QR_PREFIX.BAG.length);
+    const uuid = qrText.split('/view/bag/')[1];
     const totalQty = bagScannedPacks.reduce((s, p) => s + (parseInt(p.total_qty) || 12), 0);
 
     let bagSequence = 1;
@@ -1548,7 +1885,7 @@ export default function App() {
       const uuid = parseInnerPackQR(text);
       if (!uuid) {
         setCameraOpen(false);
-        alert('请扫描中间包装QR (IKU-INNER-...)');
+        alert('请扫描中间包装QR\n중간 포장 QR을 스캔하세요');
         return;
       }
       if (bagScannedPacks.find(p => p.uuid === uuid)) {
@@ -1738,9 +2075,9 @@ export default function App() {
         {/* Inner Pack screens */}
         {currentScreen === 'pack_menu' && (
           <PackMenuScreen
-            onCreate={() => setCurrentScreen('pack_mo_select')}
+            onCreate={() => requirePin(() => setCurrentScreen('pack_mo_select'))}
             onScan={() => { setScanMode('inner_pack_detail'); setCameraOpen(true); }}
-            onBack={() => setCurrentScreen('home')}
+            onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
           />
         )}
         {currentScreen === 'pack_mo_select' && (
@@ -1801,13 +2138,13 @@ export default function App() {
         {/* Master Bag screens */}
         {currentScreen === 'bag_menu' && (
           <BagMenuScreen
-            onCreate={() => {
+            onCreate={() => requirePin(() => {
               setBagScannedPacks([]); setBagIsRemainder(false);
               setBagWorker(''); setBagDestination('');
               setCurrentScreen('bag_create');
-            }}
+            })}
             onScan={() => { setScanMode('master_bag_detail'); setCameraOpen(true); }}
-            onBack={() => setCurrentScreen('home')}
+            onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
           />
         )}
         {currentScreen === 'bag_create' && (
@@ -1848,6 +2185,20 @@ export default function App() {
           />
         )}
 
+        {/* Public read-only view screens */}
+        {currentScreen === 'view-inner' && (
+          <ViewInnerScreen
+            uuid={viewUuid}
+            onHome={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); setViewUuid(null); }}
+          />
+        )}
+        {currentScreen === 'view-bag' && (
+          <ViewBagScreen
+            uuid={viewUuid}
+            onHome={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); setViewUuid(null); }}
+          />
+        )}
+
         <input
           ref={fileInputRef}
           type="file"
@@ -1858,6 +2209,12 @@ export default function App() {
       </div>
       {modalLog && <LogModal log={modalLog} onClose={handleCloseModal} />}
       {cameraOpen && <CameraOverlay onResult={handleQR} onCancel={handleCameraCancel} />}
+      {pinModalOpen && (
+        <PinGate
+          onSuccess={() => { setPinModalOpen(false); if (pinSuccessCallback) { pinSuccessCallback(); setPinSuccessCallback(null); } }}
+          onCancel={() => { setPinModalOpen(false); setPinSuccessCallback(null); }}
+        />
+      )}
     </>
   );
 }
