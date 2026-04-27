@@ -8,7 +8,7 @@ import {
 } from './config.js';
 import {
   buildInnerPackQR, buildMasterBagQR, parseInnerPackQR, parseMasterBagQR,
-  detectQRType, generateQRDataURL, downloadQRPNG
+  detectQRType, generateQRDataURL, generateQRDataURLWithLabel, downloadQRPNG
 } from './qrUtils.js';
 
 // Keep legacy constants for existing Production Log flow
@@ -177,9 +177,10 @@ function CameraOverlay({ onResult, onCancel }) {
 }
 
 // ─── Existing Production Log screens ──────────────────────────────────
-const ScanScreen = memo(function ScanScreen({ onScan, onUpload }) {
+const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onBack }) {
   return (
     <div className="screen active" id="screen-scan">
+      <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'transparent', border:'1px solid #D4AF37', color:'#D4AF37', fontSize:10, fontWeight:300, letterSpacing:2, padding:'7px 14px', cursor:'pointer', zIndex:10, fontFamily:'inherit' }}>← 返回</button>
       <div className="scan-wordmark">IKU Production System</div>
       <div className="scan-frame-wrap">
         <div className="sc-corner sc-tl"></div>
@@ -537,6 +538,13 @@ function DkRow({ label, value, mono }) {
   );
 }
 
+function getField(rec, key) {
+  const v = rec?.[key];
+  if (v == null) return '';
+  if (typeof v === 'object' && v.display_value !== undefined) return v.display_value;
+  return String(v);
+}
+
 // ─── SVG Icons ────────────────────────────────────────────────────────
 const IconFactory = () => (
   <svg viewBox="0 0 48 48" width="42" height="42" fill="none" stroke="#D4AF37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -619,7 +627,7 @@ const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInn
 });
 
 // ─── NEW: Pack Menu Screen ────────────────────────────────────────────
-const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onScan, onBack }) {
+const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onScan, onList, onBack }) {
   return (
     <DkScreen style={{ padding:'80px 20px 40px' }}>
       <DkBack onClick={onBack} />
@@ -630,13 +638,14 @@ const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onScan, onBack }
         <div style={{ fontSize:10, color:'#A89060', marginTop:4, letterSpacing:2 }}>12 pcs / pack</div>
       </div>
       <DkBtn onClick={onCreate}>➕ 新建包装 / 새 포장 생성</DkBtn>
+      <DkBtnOutline onClick={onList}>📋 查询包装 / 포장 조회</DkBtnOutline>
       <DkBtnOutline onClick={onScan}>🔍 扫码查询 / 스캔 조회</DkBtnOutline>
     </DkScreen>
   );
 });
 
 // ─── NEW: Bag Menu Screen ─────────────────────────────────────────────
-const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onScan, onBack }) {
+const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onScan, onList, onBack }) {
   return (
     <DkScreen style={{ padding:'80px 20px 40px' }}>
       <DkBack onClick={onBack} />
@@ -647,6 +656,7 @@ const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onScan, onBack }) 
         <div style={{ fontSize:10, color:'#A89060', marginTop:4, letterSpacing:2 }}>10 packs · 120 pcs / bag</div>
       </div>
       <DkBtn onClick={onCreate}>➕ 新建麻袋 / 새 마대 생성</DkBtn>
+      <DkBtnOutline onClick={onList}>📋 查询麻袋 / 마대 조회</DkBtnOutline>
       <DkBtnOutline onClick={onScan}>🔍 扫码查询 / 스캔 조회</DkBtnOutline>
     </DkScreen>
   );
@@ -772,7 +782,11 @@ const PackCreateScreen = memo(function PackCreateScreen({
 // ─── NEW: Pack Success Screen ─────────────────────────────────────────
 const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, onHome }) {
   if (!pack) return null;
-  const handleDownload = () => downloadQRPNG(pack.qrDataURL, `${pack.moNumber}_Pack_${pack.packSequence}.png`);
+  const handleDownload = async () => {
+    const label = `${pack.moNumber} / Pack #${pack.packSequence} / ${pack.totalQty} pcs`;
+    const dataURL = await generateQRDataURLWithLabel(pack.qrText, label);
+    downloadQRPNG(dataURL, `${pack.moNumber}_Pack_${pack.packSequence}.png`);
+  };
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div style={{ background:'rgba(0,0,0,0.7)', borderBottom:'1px solid rgba(212,175,55,0.2)', padding:'20px 20px 20px', textAlign:'center' }}>
@@ -807,9 +821,17 @@ const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, on
 });
 
 // ─── NEW: Pack Detail Screen ──────────────────────────────────────────
-const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack }) {
+const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEditStatus, requirePin: reqPin }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [updating, setUpdating] = useState(false);
   if (!detail) return null;
   const statusLabel = PACK_STATUS_LABELS[detail.pack_status] || detail.pack_status;
+  const handleStatusSelect = async (newStatus) => {
+    setUpdating(true);
+    try { await onEditStatus(newStatus); setShowPicker(false); }
+    catch (e) { alert('更新失败: ' + (e?.message || String(e))); }
+    finally { setUpdating(false); }
+  };
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
@@ -822,7 +844,12 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack }) {
         <DkCard>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
             <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', fontWeight:300 }}>状态 / 상태</div>
-            <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:'#D4AF37', letterSpacing:1 }}>{statusLabel}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:'#D4AF37', letterSpacing:1 }}>{statusLabel}</div>
+              {reqPin && onEditStatus && (
+                <button onClick={() => reqPin(() => setShowPicker(true))} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:'#A89060', fontSize:9, letterSpacing:1, padding:'3px 8px', cursor:'pointer', fontFamily:'inherit' }}>✏️</button>
+              )}
+            </div>
           </div>
           <DkRow label="Pack UUID" value={detail.uuid} mono />
           <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
@@ -844,7 +871,30 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack }) {
             </div>
           </DkCard>
         )}
+        <DkBtn onClick={async () => {
+          const qrUrl = window.location.origin + '/view/inner/' + detail.uuid;
+          const label = `${detail.mo_number} / Pack #${detail.pack_sequence} / ${detail.total_qty} pcs`;
+          const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
+          downloadQRPNG(dataURL, `${detail.mo_number}_Pack_${detail.pack_sequence}.png`);
+        }}>📥 下载 QR / QR 다운로드</DkBtn>
       </div>
+      {showPicker && (
+        <div style={{ position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.75)', backdropFilter:'blur(4px)', zIndex:9999, display:'flex', justifyContent:'center', alignItems:'center' }}
+          onClick={() => { if (!updating) setShowPicker(false); }}
+        >
+          <div style={{ background:'#1A1710', border:'1px solid rgba(212,175,55,0.35)', borderRadius:4, width:'88%', maxWidth:360, padding:24 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize:10, letterSpacing:3, color:'#D4AF37', marginBottom:16, fontWeight:300 }}>更新状态 / 상태 변경</div>
+            {Object.entries(PACK_STATUS_LABELS).map(([key, lbl]) => (
+              <button key={key} onClick={() => { if (!updating) handleStatusSelect(key); }} disabled={updating}
+                style={{ display:'block', width:'100%', padding:'11px 14px', marginBottom:6, background: key === detail.pack_status ? 'rgba(212,175,55,0.12)' : 'transparent', border:'1px solid '+(key === detail.pack_status ? 'rgba(212,175,55,0.5)' : 'rgba(212,175,55,0.15)'), color: key === detail.pack_status ? '#D4AF37' : '#A89060', fontSize:11, letterSpacing:1, cursor: updating ? 'wait' : 'pointer', fontFamily:'inherit', textAlign:'left', borderRadius:2 }}
+              >{lbl}</button>
+            ))}
+            <button onClick={() => setShowPicker(false)} style={{ display:'block', width:'100%', padding:10, marginTop:6, background:'transparent', border:'none', color:'rgba(168,144,96,0.5)', fontSize:10, cursor:'pointer', fontFamily:'inherit' }}>取消 / 취소</button>
+          </div>
+        </div>
+      )}
     </DkScreen>
   );
 });
@@ -914,7 +964,11 @@ const BagCreateScreen = memo(function BagCreateScreen({
 // ─── NEW: Bag Success Screen ──────────────────────────────────────────
 const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome }) {
   if (!bag) return null;
-  const handleDownload = () => downloadQRPNG(bag.qrDataURL, `${bag.moNumber}_Bag_${bag.bagSequence}.png`);
+  const handleDownload = async () => {
+    const label = `${bag.moNumber} / Bag #${bag.bagSequence} / ${bag.totalQty} pcs`;
+    const dataURL = await generateQRDataURLWithLabel(bag.qrText, label);
+    downloadQRPNG(dataURL, `${bag.moNumber}_Bag_${bag.bagSequence}.png`);
+  };
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div style={{ background:'rgba(0,0,0,0.7)', borderBottom:'1px solid rgba(212,175,55,0.2)', padding:'20px', textAlign:'center' }}>
@@ -945,9 +999,17 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome 
 });
 
 // ─── NEW: Bag Detail Screen ───────────────────────────────────────────
-const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack }) {
+const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditStatus, requirePin: reqPin }) {
+  const [showPicker, setShowPicker] = useState(false);
+  const [updating, setUpdating] = useState(false);
   if (!detail) return null;
   const statusLabel = BAG_STATUS_LABELS[detail.bag_status] || detail.bag_status;
+  const handleStatusSelect = async (newStatus) => {
+    setUpdating(true);
+    try { await onEditStatus(newStatus); setShowPicker(false); }
+    catch (e) { alert('更新失败: ' + (e?.message || String(e))); }
+    finally { setUpdating(false); }
+  };
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
@@ -959,7 +1021,12 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack }) {
         <DkCard>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
             <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', fontWeight:300 }}>状态 / 상태</div>
-            <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:'#D4AF37', letterSpacing:1 }}>{statusLabel}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:'#D4AF37', letterSpacing:1 }}>{statusLabel}</div>
+              {reqPin && onEditStatus && (
+                <button onClick={() => reqPin(() => setShowPicker(true))} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:'#A89060', fontSize:9, letterSpacing:1, padding:'3px 8px', cursor:'pointer', fontFamily:'inherit' }}>✏️</button>
+              )}
+            </div>
           </div>
           <DkRow label="Bag UUID" value={detail.uuid} mono />
           <DkRow label="Inner Packs" value={String(detail.inner_pack_count) + ' packs'} />
@@ -979,6 +1046,201 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack }) {
             ))}
           </DkCard>
         )}
+        <DkBtn onClick={async () => {
+          const qrUrl = window.location.origin + '/view/bag/' + detail.uuid;
+          const label = `${detail.mo_number} / Bag #${detail.bag_sequence}`;
+          const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
+          downloadQRPNG(dataURL, `${detail.mo_number}_Bag_${detail.bag_sequence}.png`);
+        }}>📥 下载 QR / QR 다운로드</DkBtn>
+      </div>
+      {showPicker && (
+        <div style={{ position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.75)', backdropFilter:'blur(4px)', zIndex:9999, display:'flex', justifyContent:'center', alignItems:'center' }}
+          onClick={() => { if (!updating) setShowPicker(false); }}
+        >
+          <div style={{ background:'#1A1710', border:'1px solid rgba(212,175,55,0.35)', borderRadius:4, width:'88%', maxWidth:360, padding:24 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize:10, letterSpacing:3, color:'#D4AF37', marginBottom:16, fontWeight:300 }}>更新状态 / 상태 변경</div>
+            {Object.entries(BAG_STATUS_LABELS).map(([key, lbl]) => (
+              <button key={key} onClick={() => { if (!updating) handleStatusSelect(key); }} disabled={updating}
+                style={{ display:'block', width:'100%', padding:'11px 14px', marginBottom:6, background: key === detail.bag_status ? 'rgba(212,175,55,0.12)' : 'transparent', border:'1px solid '+(key === detail.bag_status ? 'rgba(212,175,55,0.5)' : 'rgba(212,175,55,0.15)'), color: key === detail.bag_status ? '#D4AF37' : '#A89060', fontSize:11, letterSpacing:1, cursor: updating ? 'wait' : 'pointer', fontFamily:'inherit', textAlign:'left', borderRadius:2 }}
+              >{lbl}</button>
+            ))}
+            <button onClick={() => setShowPicker(false)} style={{ display:'block', width:'100%', padding:10, marginTop:6, background:'transparent', border:'none', color:'rgba(168,144,96,0.5)', fontSize:10, cursor:'pointer', fontFamily:'inherit' }}>取消 / 취소</button>
+          </div>
+        </div>
+      )}
+    </DkScreen>
+  );
+});
+
+// ─── Pack List Screen ─────────────────────────────────────────────────
+const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
+  const [mo, setMo] = useState('');
+  const [packs, setPacks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  const search = async () => {
+    const moNum = mo.trim().toUpperCase();
+    if (!moNum) { alert('请输入订单号'); return; }
+    setLoading(true);
+    setSearched(true);
+    try {
+      const res = await getRecords(REPORTS.INNER_PACK);
+      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+      const filtered = list
+        .filter(r => {
+          let m = r['MO_Number'];
+          if (typeof m === 'object') m = m.display_value || '';
+          return String(m).toUpperCase() === moNum;
+        })
+        .map(r => {
+          let moN = r['MO_Number'];
+          if (typeof moN === 'object') moN = moN.display_value || '';
+          const w = r['Worker'];
+          return {
+            uuid: r['Pack_UUID'],
+            mo_number: moN,
+            pack_sequence: parseInt(r['Pack_Sequence']) || 0,
+            total_qty: r['Total_Qty'],
+            pack_status: r['Pack_Status'] || 'Created',
+            worker: typeof w === 'object' ? (w.display_value || '') : (w || ''),
+            created_time: r['Added_Time'] || r['Created_Time'] || '',
+          };
+        })
+        .sort((a, b) => a.pack_sequence - b.pack_sequence);
+      setPacks(filtered);
+    } catch (e) {
+      alert('查询失败: ' + (e?.message || String(e)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>PACK QUERY</div>
+        <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>查询包装 / 포장 조회</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: TS26-105" />
+          <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
+        </DkCard>
+        {searched && !loading && packs.length === 0 && (
+          <div style={{ textAlign:'center', color:'#A89060', padding:24, fontSize:11, letterSpacing:1 }}>此订单没有包装记录</div>
+        )}
+        {packs.map(p => (
+          <DkCard key={p.uuid} style={{ marginBottom:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+              <div onClick={() => onSelectPack(p.uuid)} style={{ flex:1, cursor:'pointer' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <div style={{ fontSize:9, letterSpacing:2, color:'#D4AF37', border:'1px solid rgba(212,175,55,0.4)', padding:'1px 6px' }}>Pack #{p.pack_sequence}</div>
+                  <div style={{ fontSize:9, color:'#A89060', letterSpacing:1 }}>{PACK_STATUS_LABELS[p.pack_status] || p.pack_status}</div>
+                </div>
+                <div style={{ fontSize:11, color:'#F5E6D3', marginBottom:2 }}>{p.mo_number} · {p.total_qty} 件</div>
+                <div style={{ fontSize:9, color:'#A89060' }}>{p.worker || '-'} · {formatDate(p.created_time)}</div>
+              </div>
+              <button onClick={async e => {
+                e.stopPropagation();
+                const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
+                const label = `${p.mo_number} / Pack #${p.pack_sequence} / ${p.total_qty} pcs`;
+                const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
+                downloadQRPNG(dataURL, `${p.mo_number}_Pack_${p.pack_sequence}.png`);
+              }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:'#A89060', fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
+            </div>
+          </DkCard>
+        ))}
+      </div>
+    </DkScreen>
+  );
+});
+
+// ─── Bag List Screen ──────────────────────────────────────────────────
+const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
+  const [mo, setMo] = useState('');
+  const [bags, setBags] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  const search = async () => {
+    const moNum = mo.trim().toUpperCase();
+    if (!moNum) { alert('请输入订单号'); return; }
+    setLoading(true);
+    setSearched(true);
+    try {
+      const res = await getRecords(REPORTS.MASTER_BAG);
+      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+      const filtered = list
+        .filter(r => {
+          let m = r['MO_Number'];
+          if (typeof m === 'object') m = m.display_value || '';
+          return String(m).toUpperCase() === moNum;
+        })
+        .map(r => {
+          let moN = r['MO_Number'];
+          if (typeof moN === 'object') moN = moN.display_value || '';
+          const w = r['Worker'];
+          return {
+            uuid: r['Bag_UUID'],
+            mo_number: moN,
+            bag_sequence: parseInt(r['Bag_Sequence']) || 0,
+            inner_pack_count: r['Inner_Pack_Count'],
+            total_qty: r['Total_Qty'],
+            bag_status: r['Bag_Status'] || 'Created',
+            worker: typeof w === 'object' ? (w.display_value || '') : (w || ''),
+            destination: r['Destination'] || '',
+            created_time: r['Added_Time'] || r['Created_Time'] || '',
+          };
+        })
+        .sort((a, b) => a.bag_sequence - b.bag_sequence);
+      setBags(filtered);
+    } catch (e) {
+      alert('查询失败: ' + (e?.message || String(e)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>BAG QUERY</div>
+        <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>查询麻袋 / 마대 조회</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: TS26-105" />
+          <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
+        </DkCard>
+        {searched && !loading && bags.length === 0 && (
+          <div style={{ textAlign:'center', color:'#A89060', padding:24, fontSize:11, letterSpacing:1 }}>此订单没有麻袋记录</div>
+        )}
+        {bags.map(b => (
+          <DkCard key={b.uuid} style={{ marginBottom:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+              <div onClick={() => onSelectBag(b.uuid)} style={{ flex:1, cursor:'pointer' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                  <div style={{ fontSize:9, letterSpacing:2, color:'#D4AF37', border:'1px solid rgba(212,175,55,0.4)', padding:'1px 6px' }}>Bag #{b.bag_sequence}</div>
+                  <div style={{ fontSize:9, color:'#A89060', letterSpacing:1 }}>{BAG_STATUS_LABELS[b.bag_status] || b.bag_status}</div>
+                </div>
+                <div style={{ fontSize:11, color:'#F5E6D3', marginBottom:2 }}>{b.mo_number} · {b.inner_pack_count} packs · {b.total_qty} 件</div>
+                <div style={{ fontSize:9, color:'#A89060' }}>{b.worker || '-'}{b.destination ? ' → ' + b.destination : ''} · {formatDate(b.created_time)}</div>
+              </div>
+              <button onClick={async e => {
+                e.stopPropagation();
+                const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
+                const label = `${b.mo_number} / Bag #${b.bag_sequence}`;
+                const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
+                downloadQRPNG(dataURL, `${b.mo_number}_Bag_${b.bag_sequence}.png`);
+              }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:'#A89060', fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
+            </div>
+          </DkCard>
+        ))}
       </div>
     </DkScreen>
   );
@@ -1016,13 +1278,13 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
         setRecord({
           uuid: found['Pack_UUID'],
           mo_number: moNum,
-          sku: found['Style_SKU'] || found['SKU'] || '',
-          factory: found['Factory'] || '',
+          sku: getField(found, 'Style_SKU') || getField(found, 'SKU'),
+          factory: getField(found, 'Factory'),
           pack_sequence: found['Pack_Sequence'],
           total_qty: found['Total_Qty'],
           items,
-          worker: found['Worker'] || '',
-          created_time: found['Added_Time'] || found['Created_Time'] || '',
+          worker: getField(found, 'Worker'),
+          created_time: getField(found, 'Added_Time') || getField(found, 'Created_Time'),
           pack_status: found['Pack_Status'] || 'Created',
           is_remainder: found['Is_Remainder'] === 'true' || found['Is_Remainder'] === true,
         });
@@ -1121,17 +1383,17 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
         const bagData = {
           uuid: foundBag['Bag_UUID'],
           mo_number: moNum,
-          factory: foundBag['Factory'] || '',
-          destination: foundBag['Destination'] || '',
+          factory: getField(foundBag, 'Factory'),
+          destination: getField(foundBag, 'Destination'),
           bag_sequence: foundBag['Bag_Sequence'],
           inner_pack_count: foundBag['Inner_Pack_Count'],
           inner_pack_uuids: packUUIDs,
           total_qty: foundBag['Total_Qty'],
           is_remainder: foundBag['Is_Remainder'] === 'true' || foundBag['Is_Remainder'] === true,
-          worker: foundBag['Worker'] || '',
-          created_time: foundBag['Added_Time'] || foundBag['Created_Time'] || '',
+          worker: getField(foundBag, 'Worker'),
+          created_time: getField(foundBag, 'Added_Time') || getField(foundBag, 'Created_Time'),
           bag_status: foundBag['Bag_Status'] || 'Created',
-          received_at_mex: foundBag['Received_At_MEX'] || '',
+          received_at_mex: getField(foundBag, 'Received_At_MEX'),
         };
 
         let packs = [];
@@ -1322,6 +1584,10 @@ export default function App() {
   // ── Scan mode ──
   const [scanMode, setScanMode] = useState('production_log');
 
+  // ── Detail nav source ──
+  const [packDetailFrom, setPackDetailFrom] = useState('pack_menu');
+  const [bagDetailFrom, setBagDetailFrom] = useState('bag_menu');
+
   // ── PIN gate state ──
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [pinSuccessCallback, setPinSuccessCallback] = useState(null);
@@ -1503,6 +1769,7 @@ export default function App() {
       if (typeof moNum === 'object') moNum = moNum.display_value || '';
       setScannedPackDetail({
         uuid: found['Pack_UUID'],
+        record_id: found['ID'],
         brand: found['Brand'] || '',
         mo_number: moNum,
         pack_sequence: found['Pack_Sequence'],
@@ -1722,6 +1989,7 @@ export default function App() {
 
       setScannedBagDetail({
         uuid: found['Bag_UUID'],
+        record_id: found['ID'],
         brand: found['Brand'] || '',
         bag_sequence: found['Bag_Sequence'],
         mo_number: moNum,
@@ -1741,6 +2009,19 @@ export default function App() {
       alert('查询失败: ' + (err?.message || String(err)));
     }
   }, []);
+
+  // ── Status change handlers ──
+  const handlePackStatusChange = useCallback(async (newStatus) => {
+    if (!scannedPackDetail?.record_id) return;
+    await updateRecord(REPORTS.INNER_PACK, scannedPackDetail.record_id, { 'Pack_Status': newStatus });
+    setScannedPackDetail(prev => ({ ...prev, pack_status: newStatus }));
+  }, [scannedPackDetail]);
+
+  const handleBagStatusChange = useCallback(async (newStatus) => {
+    if (!scannedBagDetail?.record_id) return;
+    await updateRecord(REPORTS.MASTER_BAG, scannedBagDetail.record_id, { 'Bag_Status': newStatus });
+    setScannedBagDetail(prev => ({ ...prev, bag_status: newStatus }));
+  }, [scannedBagDetail]);
 
   // ── Modified handleQR — dispatches based on scanMode ──
   const handleQR = useCallback((qrText) => {
@@ -1988,7 +2269,7 @@ export default function App() {
         )}
 
         {/* Production Log screens */}
-        {currentScreen === 'scan' && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} />}
+        {currentScreen === 'scan' && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} onBack={() => { setScanMode('production_log'); setCurrentScreen('home'); }} />}
         {currentScreen === 'loading' && <LoadingScreen message={loadingMsg} />}
         {currentScreen === 'info' && (
           <InfoScreen
@@ -2022,7 +2303,8 @@ export default function App() {
         {currentScreen === 'pack_menu' && (
           <PackMenuScreen
             onCreate={() => requirePin(() => setCurrentScreen('pack_mo_select'))}
-            onScan={() => { setScanMode('inner_pack_detail'); setCameraOpen(true); }}
+            onScan={() => { setPackDetailFrom('pack_menu'); setScanMode('inner_pack_detail'); setCameraOpen(true); }}
+            onList={() => setCurrentScreen('pack_list')}
             onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
           />
         )}
@@ -2077,7 +2359,20 @@ export default function App() {
         {currentScreen === 'pack_detail' && scannedPackDetail && (
           <PackDetailScreen
             detail={scannedPackDetail}
-            onBack={() => { setScannedPackDetail(null); setCurrentScreen('pack_menu'); }}
+            onBack={() => { setScannedPackDetail(null); setCurrentScreen(packDetailFrom); }}
+            onEditStatus={handlePackStatusChange}
+            requirePin={requirePin}
+          />
+        )}
+        {currentScreen === 'pack_list' && (
+          <PackListScreen
+            onBack={() => setCurrentScreen('pack_menu')}
+            onSelectPack={(uuid) => {
+              setPackDetailFrom('pack_list');
+              setLoadingMsg('查询包装信息...');
+              setCurrentScreen('loading');
+              fetchInnerPackDetail(uuid);
+            }}
           />
         )}
 
@@ -2089,7 +2384,8 @@ export default function App() {
               setBagWorker(''); setBagDestination('');
               setCurrentScreen('bag_create');
             })}
-            onScan={() => { setScanMode('master_bag_detail'); setCameraOpen(true); }}
+            onScan={() => { setBagDetailFrom('bag_menu'); setScanMode('master_bag_detail'); setCameraOpen(true); }}
+            onList={() => setCurrentScreen('bag_list')}
             onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
           />
         )}
@@ -2127,7 +2423,20 @@ export default function App() {
         {currentScreen === 'bag_detail' && scannedBagDetail && (
           <BagDetailScreen
             detail={scannedBagDetail}
-            onBack={() => { setScannedBagDetail(null); setCurrentScreen('bag_menu'); }}
+            onBack={() => { setScannedBagDetail(null); setCurrentScreen(bagDetailFrom); }}
+            onEditStatus={handleBagStatusChange}
+            requirePin={requirePin}
+          />
+        )}
+        {currentScreen === 'bag_list' && (
+          <BagListScreen
+            onBack={() => setCurrentScreen('bag_menu')}
+            onSelectBag={(uuid) => {
+              setBagDetailFrom('bag_list');
+              setLoadingMsg('查询麻袋信息...');
+              setCurrentScreen('loading');
+              fetchMasterBagDetail(uuid);
+            }}
           />
         )}
 
