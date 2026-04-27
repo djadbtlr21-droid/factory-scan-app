@@ -862,7 +862,7 @@ const PackCreateScreen = memo(function PackCreateScreen({
 const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, onHome }) {
   if (!pack) return null;
   const handleDownload = async () => {
-    const label = `${pack.moNumber} / Pack #${pack.packSequence} / ${pack.totalQty} pcs`;
+    const label = `${pack.moNumber} / Inner Pack #${pack.packSequence} / ${pack.totalQty} pcs`;
     const dataURL = await generateQRDataURLWithLabel(pack.qrText, label);
     downloadQRPNG(dataURL, sanitizeFilename(`${pack.moNumber}_Pack_${pack.packSequence}.png`));
   };
@@ -913,11 +913,11 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
-      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>INNER PACK DETAIL</div>
         <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{detail.mo_number} · Pack #{detail.pack_sequence}</div>
-        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{detail.factory}</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{(detail.factory && typeof detail.factory === 'object') ? (detail.factory.display_value || '') : (detail.factory || '')}</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
@@ -932,10 +932,10 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
           </div>
           <DkRow label="Pack UUID" value={detail.uuid} mono />
           <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
-          <DkRow label="Total Qty" value={String(detail.total_qty) + ' 件'} />
-          <DkRow label="Is Remainder" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
-          <DkRow label="Assigned To Bag" value={detail.assigned_to_bag || '-'} />
-          <DkRow label="Created Time" value={detail.created_time || '-'} />
+          <DkRow label="Total Qty / 총 수량" value={String(detail.total_qty) + ' 件'} />
+          <DkRow label="Is Remainder / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
+          <DkRow label="Assigned To Bag / 마대 소속" value={detail.assigned_to_bag || '-'} />
+          <DkRow label="Created Time / 생성 시간" value={detail.created_time || '-'} />
         </DkCard>
         {detail.items && detail.items.length > 0 && (
           <DkCard>
@@ -952,7 +952,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
         )}
         <DkBtn onClick={async () => {
           const qrUrl = window.location.origin + '/view/inner/' + detail.uuid;
-          const label = `${detail.mo_number} / Pack #${detail.pack_sequence} / ${detail.total_qty} pcs`;
+          const label = `${detail.mo_number} / Inner Pack #${detail.pack_sequence} / ${detail.total_qty} pcs`;
           const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
           downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_Pack_${detail.pack_sequence}.png`));
         }}>📥 下载 QR / QR 다운로드</DkBtn>
@@ -1049,7 +1049,7 @@ const BagCreateScreen = memo(function BagCreateScreen({
 const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome }) {
   if (!bag) return null;
   const handleDownload = async () => {
-    const label = `${bag.moNumber} / Bag #${bag.bagSequence} / ${bag.totalQty} pcs`;
+    const label = `${bag.moNumber} / Master Bag #${bag.bagSequence} / ${bag.totalQty} pcs`;
     const dataURL = await generateQRDataURLWithLabel(bag.qrText, label);
     downloadQRPNG(dataURL, sanitizeFilename(`${bag.moNumber}_Bag_${bag.bagSequence}.png`));
   };
@@ -1096,7 +1096,7 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
-      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>MASTER BAG DETAIL</div>
         <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{detail.mo_number} · Bag #{detail.bag_sequence}</div>
@@ -1113,12 +1113,12 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
             </div>
           </div>
           <DkRow label="Bag UUID" value={detail.uuid} mono />
-          <DkRow label="Inner Packs" value={String(detail.inner_pack_count) + ' packs'} />
-          <DkRow label="Total Qty" value={String(detail.total_qty) + ' 件'} />
-          <DkRow label="Is Remainder" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
+          <DkRow label="Inner Packs / 포장 수" value={String(detail.inner_pack_count) + ' packs'} />
+          <DkRow label="Total Qty / 총 수량" value={String(detail.total_qty) + ' 件'} />
+          <DkRow label="Is Remainder / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
           <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
-          <DkRow label="Destination" value={detail.destination || '-'} />
-          <DkRow label="Received At MEX" value={detail.received_at_mex || '-'} />
+          <DkRow label="Destination / 출고지" value={detail.destination || '-'} />
+          <DkRow label="Received At MEX / 멕시코 도착" value={detail.received_at_mex || '-'} />
         </DkCard>
         {detail.inner_pack_uuids && detail.inner_pack_uuids.length > 0 && (
           <DkCard>
@@ -1132,7 +1132,7 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
         )}
         <DkBtn onClick={async () => {
           const qrUrl = window.location.origin + '/view/bag/' + detail.uuid;
-          const label = `${detail.mo_number} / Bag #${detail.bag_sequence}`;
+          const label = `${detail.mo_number} / Master Bag #${detail.bag_sequence}`;
           const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
           downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_Bag_${detail.bag_sequence}.png`));
         }}>📥 下载 QR / QR 다운로드</DkBtn>
@@ -1236,7 +1236,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
               <button onClick={async e => {
                 e.stopPropagation();
                 const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
-                const label = `${p.mo_number} / Pack #${p.pack_sequence} / ${p.total_qty} pcs`;
+                const label = `${p.mo_number} / Inner Pack #${p.pack_sequence} / ${p.total_qty} pcs`;
                 const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
                 downloadQRPNG(dataURL, sanitizeFilename(`${p.mo_number}_Pack_${p.pack_sequence}.png`));
               }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:'#A89060', fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
@@ -1323,7 +1323,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
               <button onClick={async e => {
                 e.stopPropagation();
                 const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
-                const label = `${b.mo_number} / Bag #${b.bag_sequence}`;
+                const label = `${b.mo_number} / Master Bag #${b.bag_sequence}`;
                 const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
                 downloadQRPNG(dataURL, sanitizeFilename(`${b.mo_number}_Bag_${b.bag_sequence}.png`));
               }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:'#A89060', fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
