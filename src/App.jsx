@@ -1,14 +1,14 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import jsQR from 'jsqr';
-import { getRecords, submitRecord, updateRecord } from './api.js';
+import { getRecords, submitRecord, updateRecord, deleteRecord } from './api.js';
 import {
   BRAND, INNER_PACK_SIZE, MASTER_BAG_SIZE, REPORTS, FORMS,
   PACK_STATUS_LABELS, BAG_STATUS_LABELS, APP_PIN, PIN_STORAGE_KEY
 } from './config.js';
 import {
   buildInnerPackQR, buildMasterBagQR, parseInnerPackQR, parseMasterBagQR,
-  detectQRType, generateQRDataURL, generateQRDataURLWithLabel, downloadQRPNG
+  detectQRType, generateQRDataURL, generateQRDataURLWithLabel, downloadQRPNG, sanitizeFilename
 } from './qrUtils.js';
 
 // Keep legacy constants for existing Production Log flow
@@ -588,8 +588,18 @@ const IconMasterBag = () => (
   </svg>
 );
 
+const IconStatusScan = () => (
+  <svg viewBox="0 0 48 48" width="42" height="42" fill="none" stroke="#D4AF37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 24 A14 14 0 0 1 38 24"/>
+    <polyline points="34,17 38,24 43,21"/>
+    <path d="M38 24 A14 14 0 0 1 10 24"/>
+    <polyline points="14,31 10,24 5,27"/>
+    <rect x="19" y="20" width="10" height="8" rx="1"/>
+  </svg>
+);
+
 // ─── NEW: Home Screen ─────────────────────────────────────────────────
-const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag }) {
+const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan }) {
   const card = (onClick, Icon, label, sub) => (
     <div onClick={onClick} style={{ position:'relative', border:'1px solid rgba(212,175,55,0.25)', borderRadius:2, background:'rgba(255,255,255,0.03)', padding:'20px 20px 20px 24px', marginBottom:14, display:'flex', alignItems:'center', gap:20, cursor:'pointer', transition:'all .2s' }}
       onMouseEnter={e => { e.currentTarget.style.border='1px solid rgba(212,175,55,0.6)'; e.currentTarget.style.background='rgba(212,175,55,0.06)'; }}
@@ -622,7 +632,76 @@ const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInn
       {card(onSelectProductionLog, IconFactory, '生产进度扫码', 'Production Log Scan')}
       {card(onSelectInnerPack, IconInnerPack, '中间包装', 'Inner Pack · 12 pcs')}
       {card(onSelectMasterBag, IconMasterBag, '麻袋', 'Master Bag · 10 packs · 120 pcs')}
+      {card(onSelectStatusScan, IconStatusScan, '状态扫描', 'Status Scan · Bag QR')}
     </div>
+  );
+});
+
+// ─── NEW: Status Scan Screens ────────────────────────────────────────
+const STATUS_SCAN_OPTIONS = [
+  { key: 'Shipped',          icon: '🚚' },
+  { key: 'Received',         icon: '📦' },
+  { key: 'Out_For_Delivery', icon: '🛵' },
+  { key: 'Delivered',        icon: '✅' },
+];
+
+const StatusScanModeScreen = memo(function StatusScanModeScreen({ onSelectStatus, onBack }) {
+  return (
+    <DkScreen style={{ padding: '80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign: 'center', marginBottom: 40 }}>
+        <IconStatusScan />
+        <div style={{ fontSize: 11, letterSpacing: 4, color: G.gold, marginTop: 16, fontWeight: 300 }}>STATUS SCAN</div>
+        <div style={{ fontSize: 20, color: G.cream, marginTop: 6, fontWeight: 300, letterSpacing: 1 }}>选择更新状态</div>
+        <div style={{ fontSize: 10, color: G.goldDim, marginTop: 4, letterSpacing: 2 }}>扫描麻袋 QR 自动更新</div>
+      </div>
+      {STATUS_SCAN_OPTIONS.map(s => (
+        <DkBtn key={s.key} onClick={() => onSelectStatus(s.key)}>
+          {s.icon} {BAG_STATUS_LABELS[s.key] || s.key}
+        </DkBtn>
+      ))}
+    </DkScreen>
+  );
+});
+
+const StatusScanCameraScreen = memo(function StatusScanCameraScreen({ targetStatus, onScan, onBack }) {
+  const statusLabel = BAG_STATUS_LABELS[targetStatus] || targetStatus;
+  return (
+    <DkScreen style={{ padding: '80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign: 'center', marginBottom: 36 }}>
+        <div style={{ fontSize: 9, letterSpacing: 4, color: G.goldDim, fontWeight: 300 }}>STATUS SCAN</div>
+        <div style={{ fontSize: 20, color: G.cream, marginTop: 10, fontWeight: 300, letterSpacing: 1 }}>扫描麻袋 QR</div>
+        <div style={{ display: 'inline-block', border: '1px solid rgba(212,175,55,0.5)', padding: '4px 16px', fontSize: 11, color: G.gold, letterSpacing: 1, marginTop: 12 }}>{statusLabel}</div>
+        <div style={{ fontSize: 10, color: G.goldDim, marginTop: 10 }}>将麻袋 QR 对准摄像头 / 마대 QR을 스캔하세요</div>
+      </div>
+      <DkBtn onClick={onScan}>📷 开始扫描 / 스캔 시작</DkBtn>
+      <DkBtnOutline onClick={onBack}>← 重新选择状态</DkBtnOutline>
+    </DkScreen>
+  );
+});
+
+const StatusScanSuccessScreen = memo(function StatusScanSuccessScreen({ result, onContinue, onHome }) {
+  if (!result) return null;
+  const statusLabel = BAG_STATUS_LABELS[result.status] || result.status;
+  return (
+    <DkScreen style={{ paddingTop: 0 }}>
+      <div style={{ background: 'rgba(0,0,0,0.7)', borderBottom: '1px solid rgba(212,175,55,0.2)', padding: '20px', textAlign: 'center' }}>
+        <div style={{ fontSize: 9, letterSpacing: 6, color: G.gold, fontWeight: 300 }}>STATUS UPDATED</div>
+        <div style={{ fontSize: 11, color: G.goldDim, marginTop: 4 }}>{result.moNum} · Bag #{result.bagSeq}</div>
+      </div>
+      <div style={{ padding: '20px 20px 40px' }}>
+        <DkCard>
+          <DkRow label="新状态 / 새 상태" value={statusLabel} />
+          <DkRow label="MO 번호" value={result.moNum} />
+          <DkRow label="Bag #" value={String(result.bagSeq)} />
+          <DkRow label="Bag UUID" value={result.bagUuid} mono />
+          <DkRow label="已更新包装" value={String(result.packCount) + ' packs'} />
+        </DkCard>
+        <DkBtn onClick={onContinue}>📷 继续扫描 / 계속 스캔</DkBtn>
+        <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
+      </div>
+    </DkScreen>
   );
 });
 
@@ -785,7 +864,7 @@ const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, on
   const handleDownload = async () => {
     const label = `${pack.moNumber} / Pack #${pack.packSequence} / ${pack.totalQty} pcs`;
     const dataURL = await generateQRDataURLWithLabel(pack.qrText, label);
-    downloadQRPNG(dataURL, `${pack.moNumber}_Pack_${pack.packSequence}.png`);
+    downloadQRPNG(dataURL, sanitizeFilename(`${pack.moNumber}_Pack_${pack.packSequence}.png`));
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
@@ -821,7 +900,7 @@ const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, on
 });
 
 // ─── NEW: Pack Detail Screen ──────────────────────────────────────────
-const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEditStatus, requirePin: reqPin }) {
+const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEditStatus, onDelete, requirePin: reqPin }) {
   const [showPicker, setShowPicker] = useState(false);
   const [updating, setUpdating] = useState(false);
   if (!detail) return null;
@@ -875,8 +954,13 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
           const qrUrl = window.location.origin + '/view/inner/' + detail.uuid;
           const label = `${detail.mo_number} / Pack #${detail.pack_sequence} / ${detail.total_qty} pcs`;
           const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-          downloadQRPNG(dataURL, `${detail.mo_number}_Pack_${detail.pack_sequence}.png`);
+          downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_Pack_${detail.pack_sequence}.png`));
         }}>📥 下载 QR / QR 다운로드</DkBtn>
+        {onDelete && reqPin && (
+          <button onClick={() => reqPin(() => onDelete())}
+            style={{ width:'100%', padding:14, border:'1px solid rgba(239,68,68,0.35)', borderRadius:2, background:'rgba(239,68,68,0.07)', color:'#EF4444', fontSize:11, fontWeight:300, letterSpacing:2, cursor:'pointer', fontFamily:'inherit', marginBottom:10 }}
+          >🗑️ 删除包装 / 포장 삭제</button>
+        )}
       </div>
       {showPicker && (
         <div style={{ position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.75)', backdropFilter:'blur(4px)', zIndex:9999, display:'flex', justifyContent:'center', alignItems:'center' }}
@@ -967,7 +1051,7 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome 
   const handleDownload = async () => {
     const label = `${bag.moNumber} / Bag #${bag.bagSequence} / ${bag.totalQty} pcs`;
     const dataURL = await generateQRDataURLWithLabel(bag.qrText, label);
-    downloadQRPNG(dataURL, `${bag.moNumber}_Bag_${bag.bagSequence}.png`);
+    downloadQRPNG(dataURL, sanitizeFilename(`${bag.moNumber}_Bag_${bag.bagSequence}.png`));
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
@@ -999,7 +1083,7 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome 
 });
 
 // ─── NEW: Bag Detail Screen ───────────────────────────────────────────
-const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditStatus, requirePin: reqPin }) {
+const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditStatus, onDelete, requirePin: reqPin }) {
   const [showPicker, setShowPicker] = useState(false);
   const [updating, setUpdating] = useState(false);
   if (!detail) return null;
@@ -1050,8 +1134,13 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
           const qrUrl = window.location.origin + '/view/bag/' + detail.uuid;
           const label = `${detail.mo_number} / Bag #${detail.bag_sequence}`;
           const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-          downloadQRPNG(dataURL, `${detail.mo_number}_Bag_${detail.bag_sequence}.png`);
+          downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_Bag_${detail.bag_sequence}.png`));
         }}>📥 下载 QR / QR 다운로드</DkBtn>
+        {onDelete && reqPin && (
+          <button onClick={() => reqPin(() => onDelete())}
+            style={{ width:'100%', padding:14, border:'1px solid rgba(239,68,68,0.35)', borderRadius:2, background:'rgba(239,68,68,0.07)', color:'#EF4444', fontSize:11, fontWeight:300, letterSpacing:2, cursor:'pointer', fontFamily:'inherit', marginBottom:10 }}
+          >🗑️ 删除麻袋 / 마대 삭제</button>
+        )}
       </div>
       {showPicker && (
         <div style={{ position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.75)', backdropFilter:'blur(4px)', zIndex:9999, display:'flex', justifyContent:'center', alignItems:'center' }}
@@ -1109,7 +1198,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
             created_time: r['Added_Time'] || r['Created_Time'] || '',
           };
         })
-        .sort((a, b) => a.pack_sequence - b.pack_sequence);
+        .sort((a, b) => parseDateRaw(b.created_time) - parseDateRaw(a.created_time));
       setPacks(filtered);
     } catch (e) {
       alert('查询失败: ' + (e?.message || String(e)));
@@ -1149,7 +1238,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
                 const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
                 const label = `${p.mo_number} / Pack #${p.pack_sequence} / ${p.total_qty} pcs`;
                 const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-                downloadQRPNG(dataURL, `${p.mo_number}_Pack_${p.pack_sequence}.png`);
+                downloadQRPNG(dataURL, sanitizeFilename(`${p.mo_number}_Pack_${p.pack_sequence}.png`));
               }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:'#A89060', fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
             </div>
           </DkCard>
@@ -1196,7 +1285,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
             created_time: r['Added_Time'] || r['Created_Time'] || '',
           };
         })
-        .sort((a, b) => a.bag_sequence - b.bag_sequence);
+        .sort((a, b) => parseDateRaw(b.created_time) - parseDateRaw(a.created_time));
       setBags(filtered);
     } catch (e) {
       alert('查询失败: ' + (e?.message || String(e)));
@@ -1236,7 +1325,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
                 const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
                 const label = `${b.mo_number} / Bag #${b.bag_sequence}`;
                 const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-                downloadQRPNG(dataURL, `${b.mo_number}_Bag_${b.bag_sequence}.png`);
+                downloadQRPNG(dataURL, sanitizeFilename(`${b.mo_number}_Bag_${b.bag_sequence}.png`));
               }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:'#A89060', fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
             </div>
           </DkCard>
@@ -1592,6 +1681,17 @@ export default function App() {
   const [pinModalOpen, setPinModalOpen] = useState(false);
   const [pinSuccessCallback, setPinSuccessCallback] = useState(null);
 
+  // ── Status Scan state ──
+  const [statusScanTargetStatus, setStatusScanTargetStatus] = useState('');
+  const [statusScanResult, setStatusScanResult] = useState(null);
+
+  // ── Toast state ──
+  const [toastMsg, setToastMsg] = useState('');
+  const showToast = useCallback((msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 2500);
+  }, []);
+
   const isPinVerified = () => localStorage.getItem(PIN_STORAGE_KEY) === 'verified';
   const requirePin = (onSuccess) => {
     if (isPinVerified()) { onSuccess(); }
@@ -1942,16 +2042,13 @@ export default function App() {
         throw new Error('保存失败: ' + JSON.stringify(bagRes));
       }
 
-      for (const p of bagScannedPacks) {
-        try {
-          await updateRecord(REPORTS.INNER_PACK, p.record_id, {
-            'Assigned_To_Bag': uuid,
-            'Pack_Status': 'Bagged'
-          });
-        } catch (updErr) {
-          console.warn('[bag] pack update failed', p.uuid, updErr);
-        }
-      }
+      setLoadingMsg('状态更新中...');
+      await Promise.all(bagScannedPacks.map(p =>
+        updateRecord(REPORTS.INNER_PACK, p.record_id, {
+          'Assigned_To_Bag': uuid,
+          'Pack_Status': 'Bagged'
+        }).catch(updErr => console.warn('[bag] pack update failed', p.uuid, updErr))
+      ));
 
       const qrDataURL = await generateQRDataURL(qrText, 512);
       setCreatedBag({
@@ -2022,6 +2119,85 @@ export default function App() {
     await updateRecord(REPORTS.MASTER_BAG, scannedBagDetail.record_id, { 'Bag_Status': newStatus });
     setScannedBagDetail(prev => ({ ...prev, bag_status: newStatus }));
   }, [scannedBagDetail]);
+
+  // ── Status Scan handler ──
+  const handleStatusScanUpdate = useCallback(async (bagUuid) => {
+    setLoadingMsg('状态更新中...');
+    setCurrentScreen('loading');
+    try {
+      const bagRes = await getRecords(REPORTS.MASTER_BAG);
+      const bagList = (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) ? bagRes.data : [];
+      const foundBag = bagList.find(r => r['Bag_UUID'] === bagUuid);
+      if (!foundBag) {
+        setCurrentScreen('status_scan_camera');
+        alert('未找到此麻袋 / 마대 없음');
+        return;
+      }
+      let moNum = foundBag['MO_Number'];
+      if (typeof moNum === 'object') moNum = moNum.display_value || '';
+      let packUUIDs = [];
+      try { packUUIDs = JSON.parse(foundBag['Inner_Pack_UUIDs'] || '[]'); } catch (e) {}
+
+      await updateRecord(REPORTS.MASTER_BAG, foundBag['ID'], { 'Bag_Status': statusScanTargetStatus });
+
+      let packCount = 0;
+      if (packUUIDs.length > 0) {
+        const packRes = await getRecords(REPORTS.INNER_PACK);
+        const packList = (packRes && packRes.code === 3000 && Array.isArray(packRes.data)) ? packRes.data : [];
+        const matched = packList.filter(r => packUUIDs.includes(r['Pack_UUID']));
+        packCount = matched.length;
+        await Promise.all(matched.map(p =>
+          updateRecord(REPORTS.INNER_PACK, p['ID'], { 'Pack_Status': statusScanTargetStatus })
+            .catch(e => console.warn('[status-scan] pack update failed', p['Pack_UUID'], e))
+        ));
+      }
+
+      setStatusScanResult({
+        bagUuid,
+        moNum,
+        bagSeq: foundBag['Bag_Sequence'],
+        packCount,
+        status: statusScanTargetStatus
+      });
+      setCurrentScreen('status_scan_success');
+    } catch (err) {
+      setCurrentScreen('status_scan_camera');
+      alert('更新失败: ' + (err?.message || String(err)));
+    }
+  }, [statusScanTargetStatus]);
+
+  // ── Delete handlers ──
+  const handleDeletePack = useCallback(async () => {
+    if (!scannedPackDetail?.record_id) return;
+    if (!window.confirm(`确定删除此包装? 不可撤销\nPack #${scannedPackDetail.pack_sequence} · ${scannedPackDetail.mo_number}`)) return;
+    try {
+      setLoadingMsg('正在删除...');
+      setCurrentScreen('loading');
+      await deleteRecord(REPORTS.INNER_PACK, scannedPackDetail.record_id);
+      setScannedPackDetail(null);
+      showToast('✓ 包装已删除');
+      setCurrentScreen(packDetailFrom);
+    } catch (e) {
+      setCurrentScreen('pack_detail');
+      alert('删除失败: ' + (e?.message || String(e)));
+    }
+  }, [scannedPackDetail, packDetailFrom, showToast]);
+
+  const handleDeleteBag = useCallback(async () => {
+    if (!scannedBagDetail?.record_id) return;
+    if (!window.confirm(`确定删除此麻袋? 不可撤销\nBag #${scannedBagDetail.bag_sequence} · ${scannedBagDetail.mo_number}`)) return;
+    try {
+      setLoadingMsg('正在删除...');
+      setCurrentScreen('loading');
+      await deleteRecord(REPORTS.MASTER_BAG, scannedBagDetail.record_id);
+      setScannedBagDetail(null);
+      showToast('✓ 麻袋已删除');
+      setCurrentScreen(bagDetailFrom);
+    } catch (e) {
+      setCurrentScreen('bag_detail');
+      alert('删除失败: ' + (e?.message || String(e)));
+    }
+  }, [scannedBagDetail, bagDetailFrom, showToast]);
 
   // ── Modified handleQR — dispatches based on scanMode ──
   const handleQR = useCallback((qrText) => {
@@ -2140,7 +2316,23 @@ export default function App() {
       fetchMasterBagDetail(uuid);
       return;
     }
-  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail]);
+
+    if (scanMode === 'status_scan') {
+      const uuid = parseMasterBagQR(text);
+      if (!uuid) {
+        setCameraOpen(false);
+        alert('不是有效的麻袋QR / 유효한 마대 QR이 아닙니다');
+        return;
+      }
+      flushSync(() => {
+        setCameraOpen(false);
+        setLoadingMsg('状态更新中...');
+        setCurrentScreen('loading');
+      });
+      handleStatusScanUpdate(uuid);
+      return;
+    }
+  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate]);
 
   // ── Existing handlers (unchanged except handleBackToScan goes to 'home') ──
   const handleScanRequest = useCallback(() => setCameraOpen(true), []);
@@ -2265,6 +2457,7 @@ export default function App() {
             onSelectProductionLog={() => { setScanMode('production_log'); setCurrentScreen('scan'); }}
             onSelectInnerPack={() => setCurrentScreen('pack_menu')}
             onSelectMasterBag={() => setCurrentScreen('bag_menu')}
+            onSelectStatusScan={() => setCurrentScreen('status_scan_mode')}
           />
         )}
 
@@ -2361,6 +2554,7 @@ export default function App() {
             detail={scannedPackDetail}
             onBack={() => { setScannedPackDetail(null); setCurrentScreen(packDetailFrom); }}
             onEditStatus={handlePackStatusChange}
+            onDelete={handleDeletePack}
             requirePin={requirePin}
           />
         )}
@@ -2425,6 +2619,7 @@ export default function App() {
             detail={scannedBagDetail}
             onBack={() => { setScannedBagDetail(null); setCurrentScreen(bagDetailFrom); }}
             onEditStatus={handleBagStatusChange}
+            onDelete={handleDeleteBag}
             requirePin={requirePin}
           />
         )}
@@ -2437,6 +2632,32 @@ export default function App() {
               setCurrentScreen('loading');
               fetchMasterBagDetail(uuid);
             }}
+          />
+        )}
+
+        {/* Status Scan screens */}
+        {currentScreen === 'status_scan_mode' && (
+          <StatusScanModeScreen
+            onSelectStatus={(status) => {
+              setStatusScanTargetStatus(status);
+              setStatusScanResult(null);
+              setCurrentScreen('status_scan_camera');
+            }}
+            onBack={() => setCurrentScreen('home')}
+          />
+        )}
+        {currentScreen === 'status_scan_camera' && (
+          <StatusScanCameraScreen
+            targetStatus={statusScanTargetStatus}
+            onScan={() => { setScanMode('status_scan'); setCameraOpen(true); }}
+            onBack={() => setCurrentScreen('status_scan_mode')}
+          />
+        )}
+        {currentScreen === 'status_scan_success' && (
+          <StatusScanSuccessScreen
+            result={statusScanResult}
+            onContinue={() => { setStatusScanResult(null); setCurrentScreen('status_scan_camera'); }}
+            onHome={() => { setStatusScanResult(null); setStatusScanTargetStatus(''); setCurrentScreen('home'); }}
           />
         )}
 
@@ -2469,6 +2690,11 @@ export default function App() {
           onSuccess={() => { setPinModalOpen(false); if (pinSuccessCallback) { pinSuccessCallback(); setPinSuccessCallback(null); } }}
           onCancel={() => { setPinModalOpen(false); setPinSuccessCallback(null); }}
         />
+      )}
+      {toastMsg && (
+        <div style={{ position:'fixed', bottom:28, left:'50%', transform:'translateX(-50%)', background:'rgba(20,16,6,0.95)', border:'1px solid rgba(212,175,55,0.5)', color:G.gold, padding:'10px 22px', borderRadius:2, fontSize:11, letterSpacing:2, zIndex:99999, whiteSpace:'nowrap', pointerEvents:'none' }}>
+          {toastMsg}
+        </div>
       )}
     </>
   );

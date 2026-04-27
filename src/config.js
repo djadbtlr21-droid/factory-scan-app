@@ -26,7 +26,6 @@ export const PACK_STATUS_LABELS = {
   'Created':          '已创建 / Created',
   'Bagged':           '已装袋 / Bagged',
   'Shipped':          '已发货 / Shipped',
-  'In_Transit':       '运输中 / In Transit',
   'Received':         '已入仓 / Received',
   'Out_For_Delivery': '配送中 / Out for Delivery',
   'Delivered':        '已交付 / Delivered',
@@ -35,11 +34,10 @@ export const PACK_STATUS_LABELS = {
 export const BAG_STATUS_LABELS = {
   'Created':          '已创建 / Created',
   'Shipped':          '已发货 / Shipped',
-  'In_Transit':       '运输中 / In Transit',
   'Received':         '已入仓 / Received',
   'Out_For_Delivery': '配送中 / Out for Delivery',
   'Delivered':        '已交付 / Delivered',
 };
 
-export const APP_PIN = 'JERA8888';
+export const APP_PIN = 'jera8888';
 export const PIN_STORAGE_KEY = 'factoryapp_pin_verified';

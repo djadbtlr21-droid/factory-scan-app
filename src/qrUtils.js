@@ -74,24 +74,34 @@ export async function downloadQRsAsZIP(qrItems, zipFilename) {
   URL.revokeObjectURL(url);
 }
 
-export async function generateQRDataURLWithLabel(text, label, size = 512) {
+export function sanitizeFilename(name) {
+  return name.replace(/[/\\:*?"<>|]/g, '_');
+}
+
+export async function generateQRDataURLWithLabel(text, label, size = 512, border = false) {
   const qrDataURL = await generateQRDataURL(text, size);
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const labelH = 60;
+      const pad = border ? 8 : 0;
       const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size + labelH;
+      canvas.width = size + pad * 2;
+      canvas.height = size + labelH + pad * 2;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, size, size);
+      if (border) {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+      }
+      ctx.drawImage(img, pad, pad, size, size);
       ctx.fillStyle = '#000000';
       ctx.font = 'bold 20px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, size / 2, size + labelH / 2);
+      ctx.fillText(label, canvas.width / 2, pad + size + labelH / 2);
       resolve(canvas.toDataURL('image/png'));
     };
     img.src = qrDataURL;

@@ -30,3 +30,9 @@ export function updateRecord(report, id, data) {
     body: JSON.stringify({ data })
   });
 }
+
+export function deleteRecord(report, id) {
+  return jfetch('/api/delete-record?report=' + encodeURIComponent(report) + '&id=' + encodeURIComponent(id), {
+    method: 'DELETE'
+  });
+}
