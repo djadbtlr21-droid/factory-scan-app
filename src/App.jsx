@@ -470,52 +470,150 @@ const LogModal = memo(function LogModal({ log, onClose }) {
   );
 });
 
+// ─── Design System helpers ────────────────────────────────────────────
+const G = { bg:'#0D0A06', card:'rgba(255,255,255,0.04)', gold:'#D4AF37', goldDim:'#A89060', cream:'#F5E6D3', creamDim:'#C4A882', border:'rgba(212,175,55,0.2)', borderHover:'rgba(212,175,55,0.5)' };
+
+function DkBack({ onClick }) {
+  return (
+    <button onClick={onClick} style={{ position:'absolute', top:16, left:16, background:'transparent', border:'1px solid '+G.gold, color:G.gold, fontSize:10, fontWeight:300, letterSpacing:2, padding:'7px 14px', cursor:'pointer', minHeight:44, fontFamily:'inherit', zIndex:10 }}>← 返回</button>
+  );
+}
+
+function DkScreen({ children, style }) {
+  return (
+    <div style={{ minHeight:'100vh', width:'100%', background:G.bg, backgroundImage:'radial-gradient(ellipse at 50% -10%, rgba(212,175,55,0.07) 0%, transparent 55%)', position:'relative', color:G.cream, paddingBottom:40, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function DkCard({ children, style }) {
+  const br = { position:'absolute', width:14, height:14 };
+  const ln = (s) => ({ position:'absolute', background:G.gold, ...s });
+  return (
+    <div style={{ position:'relative', border:'1px solid '+G.border, borderRadius:2, background:G.card, backdropFilter:'blur(4px)', padding:18, marginBottom:14, ...style }}>
+      <div style={{ ...br, top:-1, left:-1 }}><div style={ln({ top:0, left:0, width:14, height:1.5 })} /><div style={ln({ top:0, left:0, width:1.5, height:14 })} /></div>
+      <div style={{ ...br, top:-1, right:-1 }}><div style={ln({ top:0, right:0, width:14, height:1.5 })} /><div style={ln({ top:0, right:0, width:1.5, height:14 })} /></div>
+      <div style={{ ...br, bottom:-1, left:-1 }}><div style={ln({ bottom:0, left:0, width:14, height:1.5 })} /><div style={ln({ bottom:0, left:0, width:1.5, height:14 })} /></div>
+      <div style={{ ...br, bottom:-1, right:-1 }}><div style={ln({ bottom:0, right:0, width:14, height:1.5 })} /><div style={ln({ bottom:0, right:0, width:1.5, height:14 })} /></div>
+      {children}
+    </div>
+  );
+}
+
+function DkBtn({ onClick, disabled, children, style }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{ width:'100%', padding:16, border:'1px solid '+(disabled?'rgba(212,175,55,0.2)':G.gold), borderRadius:2, background:disabled?'rgba(212,175,55,0.08)':'rgba(212,175,55,0.12)', color:disabled?G.goldDim:G.gold, fontSize:12, fontWeight:300, letterSpacing:3, textTransform:'uppercase', cursor:disabled?'not-allowed':'pointer', fontFamily:'inherit', transition:'all .15s', marginBottom:10, ...style }}>
+      {children}
+    </button>
+  );
+}
+
+function DkBtnOutline({ onClick, children, style }) {
+  return (
+    <button onClick={onClick} style={{ width:'100%', padding:14, border:'1px solid rgba(212,175,55,0.3)', borderRadius:2, background:'transparent', color:G.goldDim, fontSize:11, fontWeight:300, letterSpacing:2, textTransform:'uppercase', cursor:'pointer', fontFamily:'inherit', marginBottom:10, ...style }}>
+      {children}
+    </button>
+  );
+}
+
+function DkInput({ label, value, onChange, placeholder, type='text', inputMode }) {
+  return (
+    <div style={{ marginBottom:14 }}>
+      {label && <div style={{ fontSize:9, fontWeight:300, letterSpacing:2, color:G.goldDim, textTransform:'uppercase', marginBottom:6 }}>{label}</div>}
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder} inputMode={inputMode}
+        style={{ width:'100%', padding:'10px 0', background:'transparent', border:'none', borderBottom:'1px solid rgba(212,175,55,0.3)', color:G.cream, fontSize:14, outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}
+      />
+    </div>
+  );
+}
+
+function DkRow({ label, value, mono }) {
+  return (
+    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', padding:'7px 0', borderBottom:'1px solid rgba(212,175,55,0.08)' }}>
+      <span style={{ fontSize:10, color:G.goldDim, letterSpacing:1, fontWeight:300, flexShrink:0, paddingRight:8 }}>{label}</span>
+      <span style={{ fontSize: mono ? 10 : 12, color:G.cream, textAlign:'right', wordBreak:'break-all', fontFamily: mono ? 'monospace' : 'inherit' }}>{value}</span>
+    </div>
+  );
+}
+
+// ─── SVG Icons ────────────────────────────────────────────────────────
+const IconFactory = () => (
+  <svg viewBox="0 0 48 48" width="42" height="42" fill="none" stroke="#D4AF37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="6" y="20" width="36" height="22" rx="1"/>
+    <path d="M6 20 L6 14 L18 20"/>
+    <path d="M18 20 L18 14 L30 20"/>
+    <path d="M30 20 L30 14 L42 20"/>
+    <rect x="11" y="26" width="6" height="6" rx="0.5"/>
+    <rect x="21" y="26" width="6" height="6" rx="0.5"/>
+    <rect x="31" y="26" width="6" height="6" rx="0.5"/>
+    <rect x="19" y="34" width="10" height="8" rx="0.5"/>
+    <line x1="16" y1="10" x2="16" y2="6"/>
+    <line x1="24" y1="10" x2="24" y2="5"/>
+    <line x1="32" y1="10" x2="32" y2="7"/>
+  </svg>
+);
+
+const IconInnerPack = () => (
+  <svg viewBox="0 0 48 48" width="42" height="42" fill="none" stroke="#D4AF37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 12 Q10 8 14 8 L34 8 Q38 8 38 12 L38 42 Q38 44 36 44 L12 44 Q10 44 10 42 Z"/>
+    <path d="M14 8 L14 6 Q14 4 16 4 L32 4 Q34 4 34 6 L34 8"/>
+    <line x1="12" y1="16" x2="17" y2="11"/>
+    <line x1="12" y1="21" x2="20" y2="13"/>
+    <rect x="17" y="22" width="14" height="14" rx="1"/>
+    <path d="M20 22 Q24 18 28 22"/>
+    <path d="M17 22 L14 26 L17 27"/>
+    <path d="M31 22 L34 26 L31 27"/>
+  </svg>
+);
+
+const IconMasterBag = () => (
+  <svg viewBox="0 0 48 48" width="42" height="42" fill="none" stroke="#D4AF37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 14 Q8 18 8 30 Q8 44 24 44 Q40 44 40 30 Q40 18 30 14 Z"/>
+    <path d="M18 14 Q24 10 30 14"/>
+    <ellipse cx="24" cy="11" rx="5" ry="2"/>
+    <path d="M19 11 L16 8 M29 11 L32 8"/>
+    <line x1="15" y1="24" x2="22" y2="31"/>
+    <line x1="18" y1="20" x2="28" y2="30"/>
+    <line x1="22" y1="19" x2="33" y2="30"/>
+    <line x1="26" y1="19" x2="36" y2="29"/>
+  </svg>
+);
+
 // ─── NEW: Home Screen ─────────────────────────────────────────────────
 const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag }) {
-  const btnStyle = {
-    width: '100%',
-    padding: '24px 20px',
-    marginBottom: 16,
-    border: 'none',
-    borderRadius: 12,
-    fontSize: 16,
-    fontWeight: 700,
-    cursor: 'pointer',
-    textAlign: 'left',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 16,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-    transition: 'transform 0.15s, box-shadow 0.15s',
-  };
-  return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', padding: 20, background: 'var(--surface2)' }}>
-      <div style={{ textAlign: 'center', padding: '32px 0 40px' }}>
-        <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: 32, letterSpacing: 4, color: 'var(--dark)' }}>IKU</div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', letterSpacing: 2, marginTop: 4 }}>PRODUCTION SYSTEM</div>
-        <div style={{ fontSize: 11, color: 'var(--text4)', marginTop: 4 }}>生产管理系统</div>
+  const card = (onClick, Icon, label, sub) => (
+    <div onClick={onClick} style={{ position:'relative', border:'1px solid rgba(212,175,55,0.25)', borderRadius:2, background:'rgba(255,255,255,0.03)', padding:'20px 20px 20px 24px', marginBottom:14, display:'flex', alignItems:'center', gap:20, cursor:'pointer', transition:'all .2s' }}
+      onMouseEnter={e => { e.currentTarget.style.border='1px solid rgba(212,175,55,0.6)'; e.currentTarget.style.background='rgba(212,175,55,0.06)'; }}
+      onMouseLeave={e => { e.currentTarget.style.border='1px solid rgba(212,175,55,0.25)'; e.currentTarget.style.background='rgba(255,255,255,0.03)'; }}
+    >
+      {[{t:'-1px',l:'-1px'},{t:'-1px',r:'-1px'},{b:'-1px',l:'-1px'},{b:'-1px',r:'-1px'}].map((pos, i) => {
+        const isRight = pos.r !== undefined; const isBottom = pos.b !== undefined;
+        return (
+          <div key={i} style={{ position:'absolute', width:14, height:14, top:pos.t, bottom:pos.b, left:pos.l, right:pos.r }}>
+            <div style={{ position:'absolute', background:'#D4AF37', [isBottom?'bottom':'top']:0, [isRight?'right':'left']:0, width:14, height:1.5 }} />
+            <div style={{ position:'absolute', background:'#D4AF37', [isBottom?'bottom':'top']:0, [isRight?'right':'left']:0, width:1.5, height:14 }} />
+          </div>
+        );
+      })}
+      <Icon />
+      <div>
+        <div style={{ fontSize:16, fontWeight:300, letterSpacing:2, color:'#F5E6D3' }}>{label}</div>
+        <div style={{ fontSize:10, color:'#A89060', letterSpacing:1.5, marginTop:4, fontWeight:300 }}>{sub}</div>
       </div>
-      <button style={{ ...btnStyle, background: 'linear-gradient(135deg, #1E3A8A, #1E40AF)', color: '#fff' }} onClick={onSelectProductionLog}>
-        <span style={{ fontSize: 32 }}>🏭</span>
-        <div>
-          <div>生产进度扫码</div>
-          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Production Log Scan</div>
-        </div>
-      </button>
-      <button style={{ ...btnStyle, background: 'linear-gradient(135deg, #C9A84C, #B08E3A)', color: '#fff' }} onClick={onSelectInnerPack}>
-        <span style={{ fontSize: 32 }}>📦</span>
-        <div>
-          <div>中间包装</div>
-          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Inner Pack · 12 pcs</div>
-        </div>
-      </button>
-      <button style={{ ...btnStyle, background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', color: '#fff' }} onClick={onSelectMasterBag}>
-        <span style={{ fontSize: 32 }}>🎒</span>
-        <div>
-          <div>麻袋</div>
-          <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.85, marginTop: 2 }}>Master Bag · 10 packs · 120 pcs</div>
-        </div>
-      </button>
+    </div>
+  );
+  return (
+    <div style={{ minHeight:'100vh', width:'100%', background:'#0D0A06', backgroundImage:'radial-gradient(ellipse at 50% -10%, rgba(212,175,55,0.07) 0%, transparent 55%)', padding:'0 20px 40px', display:'flex', flexDirection:'column' }}>
+      <div style={{ textAlign:'center', padding:'60px 0 48px' }}>
+        <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:52, letterSpacing:12, color:'#D4AF37', lineHeight:1 }}>IKU</div>
+        <div style={{ fontSize:9, color:'#A89060', letterSpacing:6, marginTop:8, fontWeight:300 }}>PRODUCTION SYSTEM</div>
+        <div style={{ fontSize:10, color:'rgba(168,144,96,0.6)', letterSpacing:2, marginTop:6, fontWeight:300 }}>生产管理系统</div>
+        <div style={{ width:60, height:1, background:'rgba(212,175,55,0.2)', margin:'20px auto 0' }} />
+      </div>
+      {card(onSelectProductionLog, IconFactory, '生产进度扫码', 'Production Log Scan')}
+      {card(onSelectInnerPack, IconInnerPack, '中间包装', 'Inner Pack · 12 pcs')}
+      {card(onSelectMasterBag, IconMasterBag, '麻袋', 'Master Bag · 10 packs · 120 pcs')}
     </div>
   );
 });
@@ -523,72 +621,34 @@ const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInn
 // ─── NEW: Pack Menu Screen ────────────────────────────────────────────
 const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onScan, onBack }) {
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', padding: 20, background: 'var(--surface2)' }}>
-      <button className="back-link" onClick={onBack} style={{ marginBottom: 20 }}>← 返回 / 돌아가기</button>
-      <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
-        <div style={{ fontSize: 48 }}>📦</div>
-        <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>中间包装 / 중간 포장</div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>12 pcs / pack</div>
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:40 }}>
+        <IconInnerPack />
+        <div style={{ fontSize:11, letterSpacing:4, color:'#D4AF37', marginTop:16, fontWeight:300 }}>INNER PACK</div>
+        <div style={{ fontSize:20, color:'#F5E6D3', marginTop:6, fontWeight:300, letterSpacing:1 }}>중간포장</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:4, letterSpacing:2 }}>12 pcs / pack</div>
       </div>
-      <button onClick={onCreate} style={{
-        width: '100%', padding: '24px', marginBottom: 12, border: 'none', borderRadius: 12,
-        background: 'linear-gradient(135deg, #C9A84C, #B08E3A)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-      }}>
-        <span style={{ fontSize: 28 }}>➕</span>
-        <div style={{ textAlign: 'left' }}>
-          <div>生成新包装</div>
-          <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>Create New Inner Pack</div>
-        </div>
-      </button>
-      <button onClick={onScan} style={{
-        width: '100%', padding: '24px', border: 'none', borderRadius: 12,
-        background: '#fff', color: 'var(--text)', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-      }}>
-        <span style={{ fontSize: 28 }}>🔍</span>
-        <div style={{ textAlign: 'left' }}>
-          <div>扫码查询</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Scan to View Details</div>
-        </div>
-      </button>
-    </div>
+      <DkBtn onClick={onCreate}>➕ 新建包装 / 새 포장 생성</DkBtn>
+      <DkBtnOutline onClick={onScan}>🔍 扫码查询 / 스캔 조회</DkBtnOutline>
+    </DkScreen>
   );
 });
 
 // ─── NEW: Bag Menu Screen ─────────────────────────────────────────────
 const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onScan, onBack }) {
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', padding: 20, background: 'var(--surface2)' }}>
-      <button className="back-link" onClick={onBack} style={{ marginBottom: 20 }}>← 返回 / 돌아가기</button>
-      <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
-        <div style={{ fontSize: 48 }}>🎒</div>
-        <div style={{ fontSize: 20, fontWeight: 800, marginTop: 8 }}>麻袋 / 마대</div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>10 packs · 120 pcs / bag</div>
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:40 }}>
+        <IconMasterBag />
+        <div style={{ fontSize:11, letterSpacing:4, color:'#D4AF37', marginTop:16, fontWeight:300 }}>MASTER BAG</div>
+        <div style={{ fontSize:20, color:'#F5E6D3', marginTop:6, fontWeight:300, letterSpacing:1 }}>마대</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:4, letterSpacing:2 }}>10 packs · 120 pcs / bag</div>
       </div>
-      <button onClick={onCreate} style={{
-        width: '100%', padding: '24px', marginBottom: 12, border: 'none', borderRadius: 12,
-        background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-      }}>
-        <span style={{ fontSize: 28 }}>➕</span>
-        <div style={{ textAlign: 'left' }}>
-          <div>生成新麻袋</div>
-          <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>Create New Master Bag</div>
-        </div>
-      </button>
-      <button onClick={onScan} style={{
-        width: '100%', padding: '24px', border: 'none', borderRadius: 12,
-        background: '#fff', color: 'var(--text)', fontSize: 15, fontWeight: 700, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-      }}>
-        <span style={{ fontSize: 28 }}>🔍</span>
-        <div style={{ textAlign: 'left' }}>
-          <div>扫码查询</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>Scan to View Details</div>
-        </div>
-      </button>
-    </div>
+      <DkBtn onClick={onCreate}>➕ 新建麻袋 / 새 마대 생성</DkBtn>
+      <DkBtnOutline onClick={onScan}>🔍 扫码查询 / 스캔 조회</DkBtnOutline>
+    </DkScreen>
   );
 });
 
@@ -601,32 +661,21 @@ const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, 
     onManual(mo);
   };
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', padding: 20, background: 'var(--surface2)' }}>
-      <button className="back-link" onClick={onBack} style={{ marginBottom: 20 }}>← 返回</button>
-      <div style={{ textAlign: 'center', padding: '20px 0 30px' }}>
-        <div style={{ fontSize: 20, fontWeight: 800 }}>选择订单 / MO 선택</div>
-        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>Which MO is this pack for?</div>
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:36 }}>
+        <div style={{ fontSize:9, letterSpacing:4, color:'#A89060', fontWeight:300 }}>STEP 1 / 3</div>
+        <div style={{ fontSize:20, color:'#F5E6D3', marginTop:10, fontWeight:300, letterSpacing:1 }}>选择订单 / MO 선택</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:4 }}>Which MO is this pack for?</div>
       </div>
-      <button onClick={onScan} style={{
-        width: '100%', padding: '20px', marginBottom: 16, border: 'none', borderRadius: 12,
-        background: 'linear-gradient(135deg, #1E3A8A, #1E40AF)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer'
-      }}>📷 扫描 MO QR / QR 스캔</button>
-      <div style={{ textAlign: 'center', color: 'var(--text4)', fontSize: 12, margin: '16px 0' }}>— 或 / or —</div>
-      <div style={{ background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 8 }}>手动输入订单号 / 수동 입력</div>
-        <input
-          type="text"
-          value={manualMO}
-          onChange={(e) => setManualMO(e.target.value)}
-          placeholder="例: TS26-105"
-          style={{ width: '100%', padding: 12, border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, marginBottom: 10, boxSizing: 'border-box' }}
-        />
-        <button onClick={handleManualSubmit} style={{
-          width: '100%', padding: 12, border: 'none', borderRadius: 8,
-          background: 'var(--dark)', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer'
-        }}>确认 / 확인</button>
-      </div>
-    </div>
+      <DkBtn onClick={onScan}>📷 扫描 MO QR / QR 스캔</DkBtn>
+      <div style={{ textAlign:'center', color:'rgba(168,144,96,0.5)', fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
+      <DkCard>
+        <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:12, fontWeight:300 }}>手动输入 / 수동 입력</div>
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: TS26-105" />
+        <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
+      </DkCard>
+    </DkScreen>
   );
 });
 
@@ -636,26 +685,19 @@ const PackCreateScreen = memo(function PackCreateScreen({
   isRemainder, setIsRemainder, lastComposition, onSubmit, onBack, submitting
 }) {
   const selectedCount = composition.filter(c => c.selected).length;
-
-  const applyStandard = () => {
-    setComposition(composition.map(c => ({ ...c, selected: true })));
-  };
-
+  const applyStandard = () => setComposition(composition.map(c => ({ ...c, selected: true })));
   const applyLastPack = () => {
     if (!lastComposition) return;
-    const newComp = composition.map(c => {
+    setComposition(composition.map(c => {
       const found = lastComposition.find(l => l.color === c.color && l.size === c.size);
       return { ...c, selected: !!found };
-    });
-    setComposition(newComp);
+    }));
   };
-
   const toggleItem = (idx) => {
     const next = [...composition];
     next[idx] = { ...next[idx], selected: !next[idx].selected };
     setComposition(next);
   };
-
   const handleSubmit = () => {
     if (selectedCount === 0) { alert('请选择包装组成'); return; }
     if (!isRemainder && selectedCount !== INNER_PACK_SIZE) {
@@ -664,128 +706,103 @@ const PackCreateScreen = memo(function PackCreateScreen({
     if (!worker.trim()) { alert('请输入担当者 / 담당자를 입력하세요'); return; }
     onSubmit();
   };
-
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
-      <div style={{ background: 'var(--dark)', padding: '14px 20px', color: '#fff' }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 14, cursor: 'pointer', marginBottom: 8 }}>← 返回</button>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: 'var(--gold)', marginBottom: 4 }}>INNER PACK #{packSequence}</div>
-        <div style={{ fontSize: 18, fontWeight: 800 }}>{packMO.mo_number}</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{packMO.sku} · {packMO.factory}</div>
-      </div>
-
-      <div style={{ padding: 16 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 800 }}>包装组成 / 포장 구성</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)' }}>{selectedCount} / {INNER_PACK_SIZE}</div>
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>INNER PACK #{packSequence}</div>
+        <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{packMO.mo_number}</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{packMO.sku} · {packMO.factory}</div>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:12 }}>
+          <div style={{ fontSize:11, color:'#D4AF37' }}>{selectedCount}</div>
+          <div style={{ flex:1, height:2, background:'rgba(212,175,55,0.15)', borderRadius:1 }}>
+            <div style={{ height:'100%', background:'#D4AF37', width:Math.min(100, selectedCount / INNER_PACK_SIZE * 100) + '%', borderRadius:1, transition:'width .2s' }} />
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <button onClick={applyStandard} style={{ flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, background: 'var(--gold)', color: '#4A3510', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>标准配货 / Standard</button>
+          <div style={{ fontSize:11, color:'#A89060' }}>{INNER_PACK_SIZE}</div>
+        </div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:12, fontWeight:300 }}>包装组成 / 포장 구성</div>
+          <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+            <button onClick={applyStandard} style={{ flex:1, padding:'9px 8px', border:'1px solid rgba(212,175,55,0.4)', borderRadius:2, background:'rgba(212,175,55,0.1)', color:'#D4AF37', fontSize:10, letterSpacing:1, cursor:'pointer', fontFamily:'inherit' }}>标准 / Standard</button>
             {lastComposition && (
-              <button onClick={applyLastPack} style={{ flex: 1, padding: '10px 8px', border: 'none', borderRadius: 8, background: '#F1F5F9', color: 'var(--text)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>上次相同 / Copy Last</button>
+              <button onClick={applyLastPack} style={{ flex:1, padding:'9px 8px', border:'1px solid rgba(212,175,55,0.2)', borderRadius:2, background:'transparent', color:'#A89060', fontSize:10, letterSpacing:1, cursor:'pointer', fontFamily:'inherit' }}>上次 / Copy Last</button>
             )}
           </div>
-          <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+          <div style={{ maxHeight:260, overflowY:'auto' }}>
             {composition.length === 0 ? (
-              <div style={{ textAlign: 'center', color: 'var(--text4)', padding: 20, fontSize: 12 }}>
-                此订单没有标准配货信息 / Standard Assortment 없음
-              </div>
-            ) : (
-              composition.map((item, idx) => (
-                <div key={idx} onClick={() => toggleItem(idx)} style={{
-                  display: 'flex', alignItems: 'center', padding: '10px 4px',
-                  borderBottom: idx < composition.length - 1 ? '1px solid #F1F5F9' : 'none',
-                  cursor: 'pointer'
-                }}>
-                  <input type="checkbox" checked={!!item.selected} readOnly style={{ width: 18, height: 18, marginRight: 12 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{item.color}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>Size: {item.size}</div>
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>x {item.qty || 1}</div>
+              <div style={{ textAlign:'center', color:'#A89060', padding:20, fontSize:11, letterSpacing:1 }}>此订单没有标准配货信息</div>
+            ) : composition.map((item, idx) => (
+              <div key={idx} onClick={() => toggleItem(idx)} style={{ display:'flex', alignItems:'center', padding:'10px 0', borderBottom: idx < composition.length - 1 ? '1px solid rgba(212,175,55,0.08)' : 'none', cursor:'pointer' }}>
+                <div style={{ width:16, height:16, border:'1px solid '+(item.selected?'#D4AF37':'rgba(212,175,55,0.3)'), borderRadius:2, marginRight:12, background:item.selected?'rgba(212,175,55,0.2)':'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {item.selected && <div style={{ width:8, height:8, background:'#D4AF37', borderRadius:1 }} />}
                 </div>
-              ))
-            )}
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:13, color:'#F5E6D3', fontWeight:300 }}>{item.color}</div>
+                  <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>Size: {item.size}</div>
+                </div>
+                <div style={{ fontSize:11, color:'#A89060' }}>×{item.qty || 1}</div>
+              </div>
+            ))}
           </div>
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-            <input type="checkbox" checked={isRemainder} onChange={(e) => setIsRemainder(e.target.checked)} style={{ width: 18, height: 18, marginRight: 10 }} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>剩余包装 / 자투리 포장</span>
+        </DkCard>
+        <DkCard>
+          <label style={{ display:'flex', alignItems:'center', cursor:'pointer', gap:12 }}>
+            <div onClick={() => setIsRemainder(!isRemainder)} style={{ width:16, height:16, border:'1px solid '+(isRemainder?'#D4AF37':'rgba(212,175,55,0.3)'), borderRadius:2, background:isRemainder?'rgba(212,175,55,0.2)':'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {isRemainder && <div style={{ width:8, height:8, background:'#D4AF37', borderRadius:1 }} />}
+            </div>
+            <div>
+              <div style={{ fontSize:12, color:'#F5E6D3', fontWeight:300 }}>剩余包装 / 자투리 포장</div>
+              <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>末尾零头, 不是{INNER_PACK_SIZE}件标准包装</div>
+            </div>
           </label>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 28, marginTop: 4 }}>末尾零头, 不是12件标准包装</div>
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 6 }}>担当者 / 담당자 *</div>
-          <input type="text" value={worker} onChange={(e) => setWorker(e.target.value)}
-            placeholder="姓名 Name"
-            style={{ width: '100%', padding: 10, border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <button disabled={submitting} onClick={handleSubmit} style={{
-          width: '100%', padding: 18, border: 'none', borderRadius: 12,
-          background: submitting ? '#9CA3AF' : 'linear-gradient(135deg, #C9A84C, #B08E3A)',
-          color: '#fff', fontSize: 15, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer',
-          marginBottom: 20
-        }}>
-          {submitting ? '保存中...' : `✅ ${selectedCount}件 打包完成 / ${selectedCount}개 포장 완료`}
-        </button>
+        </DkCard>
+        <DkCard>
+          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" />
+        </DkCard>
+        <DkBtn onClick={handleSubmit} disabled={submitting} style={{ marginTop:8, padding:18, fontSize:11, letterSpacing:3 }}>
+          {submitting ? '保存中...' : `✅ ${selectedCount}件 打包完成 / 포장 완료`}
+        </DkBtn>
       </div>
-    </div>
+    </DkScreen>
   );
 });
 
 // ─── NEW: Pack Success Screen ─────────────────────────────────────────
 const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, onHome }) {
   if (!pack) return null;
-  const handleDownload = () => {
-    const fname = `${pack.moNumber}_Pack_${pack.packSequence}.png`;
-    downloadQRPNG(pack.qrDataURL, fname);
-  };
+  const handleDownload = () => downloadQRPNG(pack.qrDataURL, `${pack.moNumber}_Pack_${pack.packSequence}.png`);
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
-      <div style={{ background: 'var(--dark)', padding: '14px 20px', color: '#fff', textAlign: 'center' }}>
-        <div style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: 4, fontSize: 12, color: 'var(--gold)' }}>PACK CREATED</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{pack.moNumber} · Pack #{pack.packSequence}</div>
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.7)', borderBottom:'1px solid rgba(212,175,55,0.2)', padding:'20px 20px 20px', textAlign:'center' }}>
+        <div style={{ fontSize:9, letterSpacing:6, color:'#D4AF37', fontWeight:300 }}>PACK CREATED</div>
+        <div style={{ fontSize:11, color:'#A89060', marginTop:4 }}>{pack.moNumber} · Pack #{pack.packSequence}</div>
       </div>
-      <div style={{ padding: 20 }}>
-        <div style={{ background: '#fff', borderRadius: 16, padding: 24, textAlign: 'center', marginBottom: 16 }}>
-          <img src={pack.qrDataURL} alt="QR" style={{ width: '100%', maxWidth: 320, margin: '0 auto', display: 'block' }} />
-          <div style={{ fontSize: 10, color: 'var(--text4)', marginTop: 12, fontFamily: 'monospace', wordBreak: 'break-all' }}>{pack.qrText}</div>
-        </div>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 8 }}>包装内容 / 포장 내용</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard style={{ textAlign:'center', padding:20 }}>
+          <img src={pack.qrDataURL} alt="QR" style={{ width:'100%', maxWidth:280, margin:'0 auto', display:'block', borderRadius:2 }} />
+          <div style={{ fontSize:9, color:'#A89060', marginTop:12, fontFamily:'monospace', wordBreak:'break-all', letterSpacing:.5 }}>{pack.qrText}</div>
+        </DkCard>
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:12, fontWeight:300 }}>包装内容 / 포장 내용</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
             {pack.items.map((item, i) => (
-              <div key={i} style={{ background: '#F8FAFC', padding: '6px 8px', borderRadius: 6, fontSize: 11 }}>
-                <div style={{ fontWeight: 600 }}>{item.color}</div>
-                <div style={{ color: 'var(--text3)' }}>{item.size} · {item.qty}</div>
+              <div key={i} style={{ border:'1px solid rgba(212,175,55,0.15)', padding:'6px 8px', borderRadius:2 }}>
+                <div style={{ fontSize:11, color:'#F5E6D3', fontWeight:300 }}>{item.color}</div>
+                <div style={{ fontSize:10, color:'#A89060' }}>{item.size} · {item.qty}</div>
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #F1F5F9', fontSize: 12, color: 'var(--text2)' }}>
-            Total: <b>{pack.totalQty} 件</b>{pack.isRemainder ? ' · 剩余' : ''}
+          <div style={{ marginTop:12, paddingTop:10, borderTop:'1px solid rgba(212,175,55,0.1)', fontSize:11, color:'#A89060', letterSpacing:1 }}>
+            Total <span style={{ color:'#D4AF37' }}>{pack.totalQty} 件</span>{pack.isRemainder ? ' · 剩余' : ''}
           </div>
-        </div>
-        <button onClick={handleDownload} style={{
-          width: '100%', padding: 14, border: 'none', borderRadius: 10,
-          background: 'linear-gradient(135deg, #C9A84C, #B08E3A)', color: '#fff', fontSize: 14, fontWeight: 700,
-          cursor: 'pointer', marginBottom: 10
-        }}>📥 下载 QR 图片 / QR 다운로드</button>
-        <button onClick={onNextPack} style={{
-          width: '100%', padding: 14, border: 'none', borderRadius: 10,
-          background: 'var(--dark)', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 10
-        }}>➕ 继续下一包 / 다음 포장 (같은 MO)</button>
-        <button onClick={onHome} style={{
-          width: '100%', padding: 14, border: 'none', borderRadius: 10,
-          background: '#F1F5F9', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer'
-        }}>🏠 返回主页 / 홈으로</button>
+        </DkCard>
+        <DkBtn onClick={handleDownload}>📥 下载 QR 图片 / QR 다운로드</DkBtn>
+        <DkBtn onClick={onNextPack}>➕ 继续下一包 / 다음 포장</DkBtn>
+        <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
       </div>
-    </div>
+    </DkScreen>
   );
 });
 
@@ -794,52 +811,41 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack }) {
   if (!detail) return null;
   const statusLabel = PACK_STATUS_LABELS[detail.pack_status] || detail.pack_status;
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
-      <div style={{ background: 'var(--dark)', padding: '14px 20px', color: '#fff' }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: 'var(--gold)', fontSize: 14, cursor: 'pointer', marginBottom: 8 }}>← 返回</button>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: 'var(--gold)', marginBottom: 4 }}>INNER PACK DETAIL</div>
-        <div style={{ fontSize: 18, fontWeight: 800 }}>{detail.mo_number} · Pack #{detail.pack_sequence}</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{detail.factory}</div>
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>INNER PACK DETAIL</div>
+        <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{detail.mo_number} · Pack #{detail.pack_sequence}</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{detail.factory}</div>
       </div>
-      <div style={{ padding: 16 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 800 }}>状态 / 상태</div>
-            <div style={{ padding: '4px 12px', borderRadius: 20, background: '#FEF3C7', color: '#92400E', fontSize: 11, fontWeight: 700 }}>{statusLabel}</div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', fontWeight:300 }}>状态 / 상태</div>
+            <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:'#D4AF37', letterSpacing:1 }}>{statusLabel}</div>
           </div>
-          {[
-            ['Pack UUID', detail.uuid],
-            ['Brand', detail.brand],
-            ['Worker / 담당자', detail.worker],
-            ['Total Qty', String(detail.total_qty) + ' 件'],
-            ['Is Remainder', detail.is_remainder ? '是 / 예' : '否 / 아니오'],
-            ['Assigned To Bag', detail.assigned_to_bag || '-'],
-            ['Created Time', detail.created_time || '-'],
-          ].map(([label, value]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
-              <span style={{ color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
-              <span style={{
-                color: 'var(--text)', fontFamily: label === 'Pack UUID' ? 'monospace' : 'inherit',
-                fontSize: label === 'Pack UUID' ? 10 : 12, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all'
-              }}>{value}</span>
-            </div>
-          ))}
-        </div>
+          <DkRow label="Pack UUID" value={detail.uuid} mono />
+          <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
+          <DkRow label="Total Qty" value={String(detail.total_qty) + ' 件'} />
+          <DkRow label="Is Remainder" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
+          <DkRow label="Assigned To Bag" value={detail.assigned_to_bag || '-'} />
+          <DkRow label="Created Time" value={detail.created_time || '-'} />
+        </DkCard>
         {detail.items && detail.items.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>包装内容 / 포장 내용</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          <DkCard>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:12, fontWeight:300 }}>包装内容 / 포장 내용</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
               {detail.items.map((item, i) => (
-                <div key={i} style={{ background: '#F8FAFC', padding: '6px 8px', borderRadius: 6, fontSize: 11 }}>
-                  <div style={{ fontWeight: 600 }}>{item.color}</div>
-                  <div style={{ color: 'var(--text3)' }}>{item.size} · {item.qty}</div>
+                <div key={i} style={{ border:'1px solid rgba(212,175,55,0.15)', padding:'6px 8px', borderRadius:2 }}>
+                  <div style={{ fontSize:11, color:'#F5E6D3', fontWeight:300 }}>{item.color}</div>
+                  <div style={{ fontSize:10, color:'#A89060' }}>{item.size} · {item.qty}</div>
                 </div>
               ))}
             </div>
-          </div>
+          </DkCard>
         )}
       </div>
-    </div>
+    </DkScreen>
   );
 });
 
@@ -851,124 +857,90 @@ const BagCreateScreen = memo(function BagCreateScreen({
   const count = scannedPacks.length;
   const totalQty = scannedPacks.reduce((s, p) => s + (parseInt(p.total_qty) || 12), 0);
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
-      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', padding: '14px 20px', color: '#fff' }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 14, cursor: 'pointer', marginBottom: 8, opacity: 0.8 }}>← 返回</button>
-        <div style={{ fontSize: 11, letterSpacing: 2, opacity: 0.8, marginBottom: 4 }}>MASTER BAG</div>
-        <div style={{ fontSize: 20, fontWeight: 800 }}>{count} / {MASTER_BAG_SIZE} 包装</div>
-        <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>{totalQty} 件 · Total pieces</div>
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>MASTER BAG</div>
+        <div style={{ fontSize:20, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{count} / {MASTER_BAG_SIZE} 包装</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{totalQty} 件 · Total pieces</div>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:12 }}>
+          <div style={{ flex:1, height:2, background:'rgba(212,175,55,0.15)', borderRadius:1 }}>
+            <div style={{ height:'100%', background:'#D4AF37', width:Math.min(100, count / MASTER_BAG_SIZE * 100) + '%', borderRadius:1, transition:'width .2s' }} />
+          </div>
+          <div style={{ fontSize:10, color:'#A89060' }}>{count}/{MASTER_BAG_SIZE}</div>
+        </div>
       </div>
-
-      <div style={{ padding: 16 }}>
-        <button onClick={onScanNext} style={{
-          width: '100%', padding: 18, border: 'none', borderRadius: 12,
-          background: '#1E3A8A', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 14
-        }}>📷 扫描包装 QR / 포장 QR 스캔 ({count} 已扫描)</button>
-
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkBtn onClick={onScanNext}>📷 扫描包装 QR / 포장 QR 스캔 ({count} 已扫描)</DkBtn>
         {count > 0 && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text3)', marginBottom: 8 }}>已扫描包装 / 스캔된 포장</div>
+          <DkCard>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:10, fontWeight:300 }}>已扫描包装 / 스캔된 포장</div>
             {scannedPacks.map((p, i) => (
-              <div key={p.uuid} style={{
-                display: 'flex', alignItems: 'center', padding: '8px 0',
-                borderBottom: i < scannedPacks.length - 1 ? '1px solid #F1F5F9' : 'none'
-              }}>
-                <div style={{
-                  width: 24, height: 24, borderRadius: 12, background: '#EDE9FE', color: '#6D28D9',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, marginRight: 10,
-                  flexShrink: 0
-                }}>{i + 1}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600 }}>{p.mo_number}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text4)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.uuid.substring(0, 13)}...</div>
+              <div key={p.uuid} style={{ display:'flex', alignItems:'center', padding:'8px 0', borderBottom: i < scannedPacks.length - 1 ? '1px solid rgba(212,175,55,0.08)' : 'none' }}>
+                <div style={{ width:22, height:22, border:'1px solid rgba(212,175,55,0.4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#D4AF37', marginRight:12, flexShrink:0 }}>{i + 1}</div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, color:'#F5E6D3', fontWeight:300 }}>{p.mo_number}</div>
+                  <div style={{ fontSize:9, color:'#A89060', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.uuid.substring(0, 13)}...</div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text3)', marginRight: 10 }}>{p.total_qty}件</div>
-                <button onClick={() => onRemovePack(p.uuid)} style={{ background: 'transparent', border: 'none', color: '#EF4444', fontSize: 18, cursor: 'pointer', padding: 4 }}>✕</button>
+                <div style={{ fontSize:11, color:'#A89060', marginRight:10 }}>{p.total_qty}件</div>
+                <button onClick={() => onRemovePack(p.uuid)} style={{ background:'transparent', border:'none', color:'rgba(212,175,55,0.5)', fontSize:16, cursor:'pointer', padding:4 }}>✕</button>
               </div>
             ))}
-          </div>
+          </DkCard>
         )}
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-            <input type="checkbox" checked={isRemainder} onChange={(e) => setIsRemainder(e.target.checked)} style={{ width: 18, height: 18, marginRight: 10 }} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>剩余麻袋 / 자투리 마대</span>
-          </label>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 28, marginTop: 4 }}>不足 {MASTER_BAG_SIZE} 个包装</div>
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 6 }}>担当者 / 담당자 *</div>
-          <input type="text" value={worker} onChange={(e) => setWorker(e.target.value)} placeholder="姓名 Name"
-            style={{ width: '100%', padding: 10, border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
-        </div>
-
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 6 }}>目的地 / 목적지</div>
-          <input type="text" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="例: ZLO-Manzanillo"
-            style={{ width: '100%', padding: 10, border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 14, boxSizing: 'border-box' }} />
-        </div>
-
-        <button disabled={submitting || count === 0} onClick={onSubmit} style={{
-          width: '100%', padding: 18, border: 'none', borderRadius: 12,
-          background: (submitting || count === 0) ? '#9CA3AF' : 'linear-gradient(135deg, #7C3AED, #6D28D9)',
-          color: '#fff', fontSize: 15, fontWeight: 700, cursor: (submitting || count === 0) ? 'not-allowed' : 'pointer',
-          marginBottom: 20
-        }}>
+        <DkCard>
+          <div style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer' }} onClick={() => setIsRemainder(!isRemainder)}>
+            <div style={{ width:16, height:16, border:'1px solid '+(isRemainder?'#D4AF37':'rgba(212,175,55,0.3)'), borderRadius:2, background:isRemainder?'rgba(212,175,55,0.2)':'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {isRemainder && <div style={{ width:8, height:8, background:'#D4AF37', borderRadius:1 }} />}
+            </div>
+            <div>
+              <div style={{ fontSize:12, color:'#F5E6D3', fontWeight:300 }}>剩余麻袋 / 자투리 마대</div>
+              <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>不足 {MASTER_BAG_SIZE} 个包装</div>
+            </div>
+          </div>
+        </DkCard>
+        <DkCard>
+          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" />
+          <DkInput label="目的地 / 목적지" value={destination} onChange={e => setDestination(e.target.value)} placeholder="例: ZLO-Manzanillo" />
+        </DkCard>
+        <DkBtn onClick={onSubmit} disabled={submitting || count === 0} style={{ padding:18, fontSize:11, letterSpacing:3 }}>
           {submitting ? '保存中...' : `✅ ${count}包装 装袋完成 / 마대 완료`}
-        </button>
+        </DkBtn>
       </div>
-    </div>
+    </DkScreen>
   );
 });
 
 // ─── NEW: Bag Success Screen ──────────────────────────────────────────
 const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome }) {
   if (!bag) return null;
-  const handleDownload = () => {
-    const fname = `${bag.moNumber}_Bag_${bag.bagSequence}.png`;
-    downloadQRPNG(bag.qrDataURL, fname);
-  };
+  const handleDownload = () => downloadQRPNG(bag.qrDataURL, `${bag.moNumber}_Bag_${bag.bagSequence}.png`);
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
-      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', padding: '14px 20px', color: '#fff', textAlign: 'center' }}>
-        <div style={{ fontFamily: "'Bebas Neue', cursive", letterSpacing: 4, fontSize: 12 }}>BAG CREATED</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{bag.moNumber} · Bag #{bag.bagSequence}</div>
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.7)', borderBottom:'1px solid rgba(212,175,55,0.2)', padding:'20px', textAlign:'center' }}>
+        <div style={{ fontSize:9, letterSpacing:6, color:'#D4AF37', fontWeight:300 }}>BAG CREATED</div>
+        <div style={{ fontSize:11, color:'#A89060', marginTop:4 }}>{bag.moNumber} · Bag #{bag.bagSequence}</div>
       </div>
-      <div style={{ padding: 20 }}>
-        <div style={{ background: '#fff', borderRadius: 16, padding: 24, textAlign: 'center', marginBottom: 16 }}>
-          <img src={bag.qrDataURL} alt="QR" style={{ width: '100%', maxWidth: 320, margin: '0 auto', display: 'block' }} />
-          <div style={{ fontSize: 10, color: 'var(--text4)', marginTop: 12, fontFamily: 'monospace', wordBreak: 'break-all' }}>{bag.qrText}</div>
-        </div>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)', marginBottom: 8 }}>麻袋内容 / 마대 내용</div>
-          <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>{bag.packCount} packs · {bag.totalQty} 件{bag.isRemainder ? ' · 剩余' : ''}</div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard style={{ textAlign:'center', padding:20 }}>
+          <img src={bag.qrDataURL} alt="QR" style={{ width:'100%', maxWidth:280, margin:'0 auto', display:'block', borderRadius:2 }} />
+          <div style={{ fontSize:9, color:'#A89060', marginTop:12, fontFamily:'monospace', wordBreak:'break-all' }}>{bag.qrText}</div>
+        </DkCard>
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:10, fontWeight:300 }}>麻袋内容 / 마대 내용</div>
+          <div style={{ fontSize:12, color:'#F5E6D3', marginBottom:8 }}>{bag.packCount} packs · {bag.totalQty} 件{bag.isRemainder ? ' · 剩余' : ''}</div>
           {bag.packs && bag.packs.map((p, i) => (
-            <div key={p.uuid} style={{
-              display: 'flex', justifyContent: 'space-between', padding: '4px 0',
-              fontSize: 11, color: 'var(--text3)',
-              borderTop: i === 0 ? '1px solid #F1F5F9' : 'none', marginTop: i === 0 ? 4 : 0
-            }}>
+            <div key={p.uuid} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', fontSize:11, color:'#A89060', borderTop: i === 0 ? '1px solid rgba(212,175,55,0.1)' : 'none', marginTop: i === 0 ? 6 : 0 }}>
               <span>Pack {i + 1} · {p.mo_number}</span>
               <span>{p.total_qty} 件</span>
             </div>
           ))}
-        </div>
-        <button onClick={handleDownload} style={{
-          width: '100%', padding: 14, border: 'none', borderRadius: 10,
-          background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', color: '#fff', fontSize: 14, fontWeight: 700,
-          cursor: 'pointer', marginBottom: 10
-        }}>📥 下载 QR 图片 / QR 다운로드</button>
-        <button onClick={onNewBag} style={{
-          width: '100%', padding: 14, border: 'none', borderRadius: 10,
-          background: 'var(--dark)', color: '#A78BFA', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 10
-        }}>➕ 生成新麻袋 / 새 마대</button>
-        <button onClick={onHome} style={{
-          width: '100%', padding: 14, border: 'none', borderRadius: 10,
-          background: '#F1F5F9', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer'
-        }}>🏠 返回主页 / 홈으로</button>
+        </DkCard>
+        <DkBtn onClick={handleDownload}>📥 下载 QR 图片 / QR 다운로드</DkBtn>
+        <DkBtn onClick={onNewBag}>➕ 生成新麻袋 / 새 마대</DkBtn>
+        <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
       </div>
-    </div>
+    </DkScreen>
   );
 });
 
@@ -977,49 +949,38 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack }) {
   if (!detail) return null;
   const statusLabel = BAG_STATUS_LABELS[detail.bag_status] || detail.bag_status;
   return (
-    <div className="screen active" style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
-      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', padding: '14px 20px', color: '#fff' }}>
-        <button onClick={onBack} style={{ background: 'transparent', border: 'none', color: '#fff', fontSize: 14, cursor: 'pointer', marginBottom: 8, opacity: 0.8 }}>← 返回</button>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>MASTER BAG DETAIL</div>
-        <div style={{ fontSize: 18, fontWeight: 800 }}>{detail.mo_number} · Bag #{detail.bag_sequence}</div>
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>MASTER BAG DETAIL</div>
+        <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{detail.mo_number} · Bag #{detail.bag_sequence}</div>
       </div>
-      <div style={{ padding: 16 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 800 }}>状态 / 상태</div>
-            <div style={{ padding: '4px 12px', borderRadius: 20, background: '#EDE9FE', color: '#6D28D9', fontSize: 11, fontWeight: 700 }}>{statusLabel}</div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', fontWeight:300 }}>状态 / 상태</div>
+            <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:'#D4AF37', letterSpacing:1 }}>{statusLabel}</div>
           </div>
-          {[
-            ['Bag UUID', detail.uuid],
-            ['Brand', detail.brand],
-            ['Inner Packs', String(detail.inner_pack_count) + ' packs'],
-            ['Total Qty', String(detail.total_qty) + ' 件'],
-            ['Is Remainder', detail.is_remainder ? '是 / 예' : '否 / 아니오'],
-            ['Worker / 담당자', detail.worker],
-            ['Destination', detail.destination || '-'],
-            ['Received At MEX', detail.received_at_mex || '-'],
-          ].map(([label, value]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
-              <span style={{ color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
-              <span style={{
-                color: 'var(--text)', fontFamily: label === 'Bag UUID' ? 'monospace' : 'inherit',
-                fontSize: label === 'Bag UUID' ? 10 : 12, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all'
-              }}>{value}</span>
-            </div>
-          ))}
-        </div>
+          <DkRow label="Bag UUID" value={detail.uuid} mono />
+          <DkRow label="Inner Packs" value={String(detail.inner_pack_count) + ' packs'} />
+          <DkRow label="Total Qty" value={String(detail.total_qty) + ' 件'} />
+          <DkRow label="Is Remainder" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
+          <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
+          <DkRow label="Destination" value={detail.destination || '-'} />
+          <DkRow label="Received At MEX" value={detail.received_at_mex || '-'} />
+        </DkCard>
         {detail.inner_pack_uuids && detail.inner_pack_uuids.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>包装列表 / 포장 목록</div>
+          <DkCard>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:10, fontWeight:300 }}>包装列表 / 포장 목록</div>
             {detail.inner_pack_uuids.map((uuid, i) => (
-              <div key={uuid} style={{ padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 11, color: 'var(--text3)', fontFamily: 'monospace' }}>
+              <div key={uuid} style={{ padding:'6px 0', borderBottom:'1px solid rgba(212,175,55,0.08)', fontSize:10, color:'#A89060', fontFamily:'monospace' }}>
                 {i + 1}. {uuid}
               </div>
             ))}
-          </div>
+          </DkCard>
         )}
       </div>
-    </div>
+    </DkScreen>
   );
 });
 
@@ -1075,70 +1036,63 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
   }, [uuid]);
 
   if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <DkScreen style={{ display:'flex', justifyContent:'center', alignItems:'center' }}>
       <div className="spinner"></div>
-    </div>
+    </DkScreen>
   );
 
   if (notFound) return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
-      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>记录未找到 / 기록을 찾을 수 없습니다</div>
-      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 24, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{uuid}</div>
-      <button onClick={onHome} style={{ padding: '12px 24px', border: 'none', borderRadius: 10, background: 'var(--dark)', color: 'var(--gold)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🏠 返回首页 / 홈으로</button>
-    </div>
+    <DkScreen style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ fontSize:11, letterSpacing:3, color:G.goldDim, marginBottom:16 }}>记录未找到</div>
+      <div style={{ fontSize:13, color:G.cream, marginBottom:8 }}>기록을 찾을 수 없습니다</div>
+      <div style={{ fontSize:10, color:G.goldDim, marginBottom:24, fontFamily:'monospace', wordBreak:'break-all', textAlign:'center' }}>{uuid}</div>
+      <DkBtn onClick={onHome} style={{ width:'auto', padding:'12px 32px' }}>🏠 返回首页 / 홈으로</DkBtn>
+    </DkScreen>
   );
 
   const statusLabel = PACK_STATUS_LABELS[record.pack_status] || record.pack_status;
   return (
-    <div style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
-      <div style={{ background: 'var(--dark)', padding: '14px 20px', color: '#fff' }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: 'var(--gold)', marginBottom: 4 }}>中间包装详情 / 중간포장 상세</div>
-        <div style={{ fontSize: 18, fontWeight: 800 }}>{record.mo_number} · Pack #{record.pack_sequence}</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{record.factory}</div>
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'20px 20px 18px' }}>
+        <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>中间包装详情 / 중간포장 상세</div>
+        <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{record.mo_number} · Pack #{record.pack_sequence}</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{record.factory}</div>
       </div>
-      <div style={{ padding: 16 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 800 }}>状态 / 상태</div>
-            <div style={{ padding: '4px 12px', borderRadius: 20, background: '#FEF3C7', color: '#92400E', fontSize: 11, fontWeight: 700 }}>{statusLabel}</div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', fontWeight:300 }}>状态 / 상태</div>
+            <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:'#D4AF37', letterSpacing:1 }}>{statusLabel}</div>
           </div>
           {record.is_remainder && (
-            <div style={{ display: 'inline-block', padding: '2px 10px', background: '#FEE2E2', color: '#991B1B', borderRadius: 20, fontSize: 11, fontWeight: 700, marginBottom: 10 }}>자투리 / 残余</div>
+            <div style={{ display:'inline-block', border:'1px solid rgba(212,175,55,0.4)', padding:'2px 10px', fontSize:10, color:'#A89060', marginBottom:10, letterSpacing:1 }}>자투리 / 残余</div>
           )}
-          {[
-            ['MO 번호 / 订单号', record.mo_number],
-            ['SKU', record.sku || '-'],
-            ['工厂 / 공장', record.factory || '-'],
-            ['Pack # / 포장 순번', String(record.pack_sequence)],
-            ['总件数 / 총 수량', String(record.total_qty) + ' 件'],
-            ['担当者 / 담당자', record.worker || '-'],
-            ['创建时间 / 생성 시간', formatDate(record.created_time)],
-          ].map(([label, value]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
-              <span style={{ color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
-              <span style={{ color: 'var(--text)', textAlign: 'right', maxWidth: '60%' }}>{value}</span>
-            </div>
-          ))}
-        </div>
+          <DkRow label="MO 번호 / 订单号" value={record.mo_number} />
+          <DkRow label="SKU" value={record.sku || '-'} />
+          <DkRow label="工厂 / 공장" value={record.factory || '-'} />
+          <DkRow label="Pack # / 포장 순번" value={String(record.pack_sequence)} />
+          <DkRow label="总件数 / 총 수량" value={String(record.total_qty) + ' 件'} />
+          <DkRow label="担当者 / 담당자" value={record.worker || '-'} />
+          <DkRow label="创建时间 / 생성 시간" value={formatDate(record.created_time)} />
+        </DkCard>
         {record.items && record.items.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>包装内容 / 포장 내용</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
-              <span>颜色 / Color</span><span style={{ textAlign: 'center' }}>尺码 / Size</span><span style={{ textAlign: 'right' }}>数量 / Qty</span>
+          <DkCard>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:12, fontWeight:300 }}>包装内容 / 포장 내용</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4, fontSize:9, color:G.goldDim, letterSpacing:1, marginBottom:8 }}>
+              <span>颜色 / Color</span><span style={{ textAlign:'center' }}>尺码 / Size</span><span style={{ textAlign:'right' }}>数量 / Qty</span>
             </div>
             {record.items.map((item, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '5px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
-                <span style={{ color: '#374151' }}>{item.color}</span>
-                <span style={{ textAlign: 'center', color: '#374151' }}>{item.size}</span>
-                <span style={{ textAlign: 'right', fontWeight: 600, color: '#1E3A8A' }}>{item.qty}</span>
+              <div key={i} style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', padding:'5px 0', borderBottom:'1px solid rgba(212,175,55,0.08)', fontSize:12 }}>
+                <span style={{ color:G.cream }}>{item.color}</span>
+                <span style={{ textAlign:'center', color:G.cream }}>{item.size}</span>
+                <span style={{ textAlign:'right', color:G.gold }}>{item.qty}</span>
               </div>
             ))}
-          </div>
+          </DkCard>
         )}
-        <button onClick={onHome} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 10, background: '#F1F5F9', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🏠 返回首页 / 홈으로</button>
+        <DkBtnOutline onClick={onHome}>🏠 返回首页 / 홈으로</DkBtnOutline>
       </div>
-    </div>
+    </DkScreen>
   );
 });
 
@@ -1217,87 +1171,79 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
   }, [uuid]);
 
   if (loading) return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <DkScreen style={{ display:'flex', justifyContent:'center', alignItems:'center' }}>
       <div className="spinner"></div>
-    </div>
+    </DkScreen>
   );
 
   if (notFound) return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
-      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>记录未找到 / 기록을 찾을 수 없습니다</div>
-      <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 24, fontFamily: 'monospace', wordBreak: 'break-all', textAlign: 'center' }}>{uuid}</div>
-      <button onClick={onHome} style={{ padding: '12px 24px', border: 'none', borderRadius: 10, background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🏠 返回首页 / 홈으로</button>
-    </div>
+    <DkScreen style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ fontSize:11, letterSpacing:3, color:G.goldDim, marginBottom:16 }}>记录未找到</div>
+      <div style={{ fontSize:13, color:G.cream, marginBottom:8 }}>기록을 찾을 수 없습니다</div>
+      <div style={{ fontSize:10, color:G.goldDim, marginBottom:24, fontFamily:'monospace', wordBreak:'break-all', textAlign:'center' }}>{uuid}</div>
+      <DkBtn onClick={onHome} style={{ width:'auto', padding:'12px 32px' }}>🏠 返回首页 / 홈으로</DkBtn>
+    </DkScreen>
   );
 
   const statusLabel = BAG_STATUS_LABELS[bagRecord.bag_status] || bagRecord.bag_status;
-  const extraRows = bagRecord.received_at_mex ? [['Received At MEX', formatDate(bagRecord.received_at_mex)]] : [];
   return (
-    <div style={{ minHeight: '100vh', width: '100%', background: 'var(--surface2)' }}>
-      <div style={{ background: 'linear-gradient(135deg, #7C3AED, #6D28D9)', padding: '14px 20px', color: '#fff' }}>
-        <div style={{ fontSize: 11, letterSpacing: 2, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>麻袋详情 / 마대 상세</div>
-        <div style={{ fontSize: 18, fontWeight: 800 }}>{bagRecord.mo_number} · Bag #{bagRecord.bag_sequence}</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{bagRecord.factory}{bagRecord.destination ? ' → ' + bagRecord.destination : ''}</div>
+    <DkScreen style={{ paddingTop:0 }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'20px 20px 18px' }}>
+        <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>麻袋详情 / 마대 상세</div>
+        <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{bagRecord.mo_number} · Bag #{bagRecord.bag_sequence}</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{bagRecord.factory}{bagRecord.destination ? ' → ' + bagRecord.destination : ''}</div>
       </div>
-      <div style={{ padding: 16 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 800 }}>状态 / 상태</div>
-            <div style={{ padding: '4px 12px', borderRadius: 20, background: '#EDE9FE', color: '#6D28D9', fontSize: 11, fontWeight: 700 }}>{statusLabel}</div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', fontWeight:300 }}>状态 / 상태</div>
+            <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:'#D4AF37', letterSpacing:1 }}>{statusLabel}</div>
           </div>
           {bagRecord.is_remainder && (
-            <div style={{ display: 'inline-block', padding: '2px 10px', background: '#FEE2E2', color: '#991B1B', borderRadius: 20, fontSize: 11, fontWeight: 700, marginBottom: 10 }}>자투리 / 残余</div>
+            <div style={{ display:'inline-block', border:'1px solid rgba(212,175,55,0.4)', padding:'2px 10px', fontSize:10, color:'#A89060', marginBottom:10, letterSpacing:1 }}>자투리 / 残余</div>
           )}
-          {[
-            ['MO 번호 / 订单号', bagRecord.mo_number],
-            ['工厂 / 공장', bagRecord.factory || '-'],
-            ['目的地 / 목적지', bagRecord.destination || '-'],
-            ['Bag # / 마대 순번', String(bagRecord.bag_sequence)],
-            ['内装包数 / 포장 수', String(bagRecord.inner_pack_count) + ' packs'],
-            ['总件数 / 총 수량', String(bagRecord.total_qty) + ' 件'],
-            ['担当者 / 담당자', bagRecord.worker || '-'],
-            ['创建时间 / 생성 시간', formatDate(bagRecord.created_time)],
-            ...extraRows,
-          ].map(([label, value]) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
-              <span style={{ color: 'var(--text3)', fontWeight: 600 }}>{label}</span>
-              <span style={{ color: 'var(--text)', textAlign: 'right', maxWidth: '60%' }}>{value}</span>
-            </div>
-          ))}
-        </div>
+          <DkRow label="MO 번호 / 订单号" value={bagRecord.mo_number} />
+          <DkRow label="工厂 / 공장" value={bagRecord.factory || '-'} />
+          <DkRow label="目的地 / 목적지" value={bagRecord.destination || '-'} />
+          <DkRow label="Bag # / 마대 순번" value={String(bagRecord.bag_sequence)} />
+          <DkRow label="内装包数 / 포장 수" value={String(bagRecord.inner_pack_count) + ' packs'} />
+          <DkRow label="总件数 / 총 수량" value={String(bagRecord.total_qty) + ' 件'} />
+          <DkRow label="担当者 / 담당자" value={bagRecord.worker || '-'} />
+          <DkRow label="创建时间 / 생성 시간" value={formatDate(bagRecord.created_time)} />
+          {bagRecord.received_at_mex && <DkRow label="Received At MEX" value={formatDate(bagRecord.received_at_mex)} />}
+        </DkCard>
 
         {innerPacks.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>包装列表 / 포장 목록</div>
+          <DkCard>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:10, fontWeight:300 }}>包装列表 / 포장 목록</div>
             {innerPacks.map((p, i) => (
-              <div key={p.uuid} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
-                <span style={{ color: 'var(--text3)' }}>Pack {p.pack_sequence || (i + 1)} · {p.uuid.substring(0, 8)}...</span>
-                <span style={{ color: 'var(--text)', fontWeight: 600 }}>{p.total_qty} 件</span>
+              <div key={p.uuid} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid rgba(212,175,55,0.08)', fontSize:11 }}>
+                <span style={{ color:G.goldDim }}>Pack {p.pack_sequence || (i + 1)} · {p.uuid.substring(0, 8)}...</span>
+                <span style={{ color:G.gold }}>{p.total_qty} 件</span>
               </div>
             ))}
-          </div>
+          </DkCard>
         )}
 
         {colorSizeSummary.length > 0 && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>颜色/尺码汇总 / 색상·사이즈 합계</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, fontSize: 11, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
-              <span>颜色 / Color</span><span style={{ textAlign: 'center' }}>尺码 / Size</span><span style={{ textAlign: 'right' }}>合计 / 합계</span>
+          <DkCard>
+            <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:10, fontWeight:300 }}>颜色/尺码汇总 / 색상·사이즈 합계</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4, fontSize:9, color:G.goldDim, letterSpacing:1, marginBottom:8 }}>
+              <span>颜色 / Color</span><span style={{ textAlign:'center' }}>尺码 / Size</span><span style={{ textAlign:'right' }}>합계</span>
             </div>
             {colorSizeSummary.map((row, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', padding: '5px 0', borderBottom: '1px solid #F8FAFC', fontSize: 12 }}>
-                <span style={{ color: '#374151' }}>{row.color}</span>
-                <span style={{ textAlign: 'center', color: '#374151' }}>{row.size}</span>
-                <span style={{ textAlign: 'right', fontWeight: 600, color: '#1E3A8A' }}>{row.qty}</span>
+              <div key={i} style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', padding:'5px 0', borderBottom:'1px solid rgba(212,175,55,0.08)', fontSize:12 }}>
+                <span style={{ color:G.cream }}>{row.color}</span>
+                <span style={{ textAlign:'center', color:G.cream }}>{row.size}</span>
+                <span style={{ textAlign:'right', color:G.gold }}>{row.qty}</span>
               </div>
             ))}
-          </div>
+          </DkCard>
         )}
 
-        <button onClick={onHome} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 10, background: '#F1F5F9', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🏠 返回首页 / 홈으로</button>
+        <DkBtnOutline onClick={onHome}>🏠 返回首页 / 홈으로</DkBtnOutline>
       </div>
-    </div>
+    </DkScreen>
   );
 });
 
