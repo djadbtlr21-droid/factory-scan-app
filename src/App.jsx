@@ -935,7 +935,8 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
           <DkRow label="Total Qty / 총 수량" value={String(detail.total_qty) + ' 件'} />
           <DkRow label="Is Remainder / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
           <DkRow label="Assigned To Bag / 마대 소속" value={detail.assigned_to_bag || '-'} />
-          <DkRow label="Created Time / 생성 시간" value={detail.created_time || '-'} />
+          <DkRow label="Created Time / 생성 시간" value={formatDate(detail.created_time) || '-'} />
+          <DkRow label="Last Modified / 최근 수정" value={formatDate(detail.modified_time) || '-'} />
         </DkCard>
         {detail.items && detail.items.length > 0 && (
           <DkCard>
@@ -1119,6 +1120,8 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
           <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
           <DkRow label="Destination / 출고지" value={detail.destination || '-'} />
           <DkRow label="Received At MEX / 멕시코 도착" value={detail.received_at_mex || '-'} />
+          <DkRow label="Created Time / 생성 시간" value={formatDate(detail.created_time) || '-'} />
+          <DkRow label="Last Modified / 최근 수정" value={formatDate(detail.modified_time) || '-'} />
         </DkCard>
         {detail.inner_pack_uuids && detail.inner_pack_uuids.length > 0 && (
           <DkCard>
@@ -1374,6 +1377,7 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
           items,
           worker: getField(found, 'Worker'),
           created_time: getField(found, 'Added_Time') || getField(found, 'Created_Time'),
+          modified_time: getField(found, 'Modified_Time'),
           pack_status: found['Pack_Status'] || 'Created',
           is_remainder: found['Is_Remainder'] === 'true' || found['Is_Remainder'] === true,
         });
@@ -1424,7 +1428,8 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
           <DkRow label="Pack # / 포장 순번" value={String(record.pack_sequence)} />
           <DkRow label="总件数 / 총 수량" value={String(record.total_qty) + ' 件'} />
           <DkRow label="担当者 / 담당자" value={record.worker || '-'} />
-          <DkRow label="创建时间 / 생성 시간" value={formatDate(record.created_time)} />
+          <DkRow label="创建时间 / 생성 시간" value={formatDate(record.created_time) || '-'} />
+          <DkRow label="最近修改 / 최근 수정" value={formatDate(record.modified_time) || '-'} />
         </DkCard>
         {record.items && record.items.length > 0 && (
           <DkCard>
@@ -1481,6 +1486,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
           is_remainder: foundBag['Is_Remainder'] === 'true' || foundBag['Is_Remainder'] === true,
           worker: getField(foundBag, 'Worker'),
           created_time: getField(foundBag, 'Added_Time') || getField(foundBag, 'Created_Time'),
+          modified_time: getField(foundBag, 'Modified_Time'),
           bag_status: foundBag['Bag_Status'] || 'Created',
           received_at_mex: getField(foundBag, 'Received_At_MEX'),
         };
@@ -1560,7 +1566,8 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
           <DkRow label="内装包数 / 포장 수" value={String(bagRecord.inner_pack_count) + ' packs'} />
           <DkRow label="总件数 / 총 수량" value={String(bagRecord.total_qty) + ' 件'} />
           <DkRow label="担当者 / 담당자" value={bagRecord.worker || '-'} />
-          <DkRow label="创建时间 / 생성 시간" value={formatDate(bagRecord.created_time)} />
+          <DkRow label="创建时间 / 생성 시간" value={formatDate(bagRecord.created_time) || '-'} />
+          <DkRow label="最近修改 / 최근 수정" value={formatDate(bagRecord.modified_time) || '-'} />
           {bagRecord.received_at_mex && <DkRow label="Received At MEX" value={formatDate(bagRecord.received_at_mex)} />}
         </DkCard>
 
@@ -1880,7 +1887,8 @@ export default function App() {
         factory: found['Factory'] || '',
         assigned_to_bag: found['Assigned_To_Bag'] || '',
         pack_status: found['Pack_Status'] || 'Created',
-        created_time: found['Added_Time'] || found['Created_Time'] || ''
+        created_time: found['Added_Time'] || found['Created_Time'] || '',
+        modified_time: found['Modified_Time'] || ''
       });
       setCurrentScreen('pack_detail');
     } catch (err) {
@@ -2098,6 +2106,8 @@ export default function App() {
         factory: found['Factory'] || '',
         destination: found['Destination'] || '',
         bag_status: found['Bag_Status'] || 'Created',
+        created_time: found['Added_Time'] || found['Created_Time'] || '',
+        modified_time: found['Modified_Time'] || '',
         received_at_mex: found['Received_At_MEX'] || ''
       });
       setCurrentScreen('bag_detail');
