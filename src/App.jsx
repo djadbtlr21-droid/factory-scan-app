@@ -199,7 +199,7 @@ const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onManual, onBack
       </div>
       <button className="btn-scan-start" onClick={onScan}>SCAN START / 开始扫码</button>
       <button className="btn-upload-qr" onClick={onUpload}>QR UPLOAD / 上传二维码</button>
-      <button className="btn-manual-mo" onClick={onManual}>✏️ MANUAL / 수동 입력</button>
+      <button className="btn-manual-mo" onClick={onManual}>✏️ TEXT / 文字查询</button>
       <div className="scan-hint-wrap">
         <p>카메라가 자동으로 QR을 인식합니다</p>
         <p>摄像头将自动识别二维码</p>
