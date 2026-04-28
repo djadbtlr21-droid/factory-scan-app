@@ -708,9 +708,8 @@ const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInn
         <div style={{ width:60, height:1, background:G.border, margin:'20px auto 0' }} />
       </div>
       {card(onSelectProductionLog, IconFactory, '生产进度扫码', 'Production Log Scan')}
-      {card(onSelectInnerPack, IconInnerPack, '中间包装', 'Inner Pack · 12 pcs')}
-      {card(onSelectMasterBag, IconMasterBag, '麻袋', 'Master Bag · 10 packs · 120 pcs')}
-      {card(onSelectStatusScan, IconStatusScan, '状态扫描', 'Status Scan · Bag QR')}
+      {card(onSelectInnerPack, IconInnerPack, '中包袋', 'Inner Pack')}
+      {card(onSelectMasterBag, IconMasterBag, '麻袋包装', 'Master Bag')}
     </div>
   );
 });
@@ -791,12 +790,11 @@ const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQuery
       <div style={{ textAlign:'center', marginBottom:40 }}>
         <IconInnerPack />
         <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>INNER PACK</div>
-        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>중간포장</div>
-        <div style={{ fontSize:10, color:G.goldDim, marginTop:4, letterSpacing:2 }}>12 pcs / pack</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>中包袋 / 중간포장</div>
       </div>
       <DkBtn onClick={onCreate}>➕ 新建包装 / 새 포장 생성</DkBtn>
       <DkBtn onClick={onBatch}>📦 批量生成 / 일괄 생성</DkBtn>
-      <DkBtnOutline onClick={onQueryMenu}>🔍 QR 조회 / QR 查询</DkBtnOutline>
+      <DkBtnOutline onClick={onQueryMenu}>🔍 QR 查询 / QR 조회</DkBtnOutline>
     </DkScreen>
   );
 });
@@ -809,12 +807,11 @@ const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMe
       <div style={{ textAlign:'center', marginBottom:40 }}>
         <IconMasterBag />
         <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>MASTER BAG</div>
-        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>마대</div>
-        <div style={{ fontSize:10, color:G.goldDim, marginTop:4, letterSpacing:2 }}>10 packs · 120 pcs / bag</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>麻袋包装 / 마대</div>
       </div>
       <DkBtn onClick={onCreate}>➕ 新建麻袋 / 새 마대 생성</DkBtn>
-      <DkBtn onClick={onBatch}>📦 일괄 생성 / 批量生成</DkBtn>
-      <DkBtnOutline onClick={onQueryMenu}>🔍 QR 조회 / QR 查询</DkBtnOutline>
+      <DkBtn onClick={onBatch}>📦 批量生成 / 일괄 생성</DkBtn>
+      <DkBtnOutline onClick={onQueryMenu}>🔍 QR 查询 / QR 조회</DkBtnOutline>
     </DkScreen>
   );
 });
@@ -1524,9 +1521,9 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
             <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:G.gold, letterSpacing:1 }}>{statusLabel}</div>
           </div>
           {record.is_remainder && (
-            <div style={{ display:'inline-block', border:'1px solid rgba(212,175,55,0.4)', padding:'2px 10px', fontSize:10, color:G.goldDim, marginBottom:10, letterSpacing:1 }}>자투리 / 残余</div>
+            <div style={{ display:'inline-block', border:'1px solid rgba(212,175,55,0.4)', padding:'2px 10px', fontSize:10, color:G.goldDim, marginBottom:10, letterSpacing:1 }}>残余 / 자투리</div>
           )}
-          <DkRow label="MO 번호 / 订单号" value={record.mo_number} />
+          <DkRow label="订单号 / MO 번호" value={record.mo_number} />
           <DkRow label="SKU" value={record.sku || '-'} />
           <DkRow label="工厂 / 공장" value={record.factory || '-'} />
           <DkRow label="Pack # / 포장 순번" value={String(record.pack_sequence)} />
@@ -1661,9 +1658,9 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
             <div style={{ border:'1px solid rgba(212,175,55,0.4)', padding:'3px 10px', fontSize:10, color:G.gold, letterSpacing:1 }}>{statusLabel}</div>
           </div>
           {bagRecord.is_remainder && (
-            <div style={{ display:'inline-block', border:'1px solid rgba(212,175,55,0.4)', padding:'2px 10px', fontSize:10, color:G.goldDim, marginBottom:10, letterSpacing:1 }}>자투리 / 残余</div>
+            <div style={{ display:'inline-block', border:'1px solid rgba(212,175,55,0.4)', padding:'2px 10px', fontSize:10, color:G.goldDim, marginBottom:10, letterSpacing:1 }}>残余 / 자투리</div>
           )}
-          <DkRow label="MO 번호 / 订单号" value={bagRecord.mo_number} />
+          <DkRow label="订单号 / MO 번호" value={bagRecord.mo_number} />
           <DkRow label="工厂 / 공장" value={bagRecord.factory || '-'} />
           <DkRow label="目的地 / 목적지" value={bagRecord.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : (bagRecord.destination || '-')} />
           <DkRow label="Bag # / 마대 순번" value={String(bagRecord.bag_sequence)} />
@@ -1733,7 +1730,7 @@ const PinGate = memo(function PinGate({ onSuccess, onCancel }) {
           value={pinInput}
           onChange={(e) => { setPinInput(e.target.value); setPinError(''); }}
           onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-          placeholder="8자리 PIN / 8位PIN"
+          placeholder="8位PIN / 8자리 PIN"
           maxLength={8}
           autoFocus
           style={{ width: '100%', padding: 14, border: '2px solid #E2E8F0', borderRadius: 10, fontSize: 18, textAlign: 'center', letterSpacing: 6, boxSizing: 'border-box', marginBottom: 12 }}
@@ -2026,11 +2023,11 @@ const PackQuerySubMenu = memo(function PackQuerySubMenu({ onTextQuery, onScanQue
       <DkBack onClick={onBack} />
       <div style={{ textAlign:'center', marginBottom:40 }}>
         <IconInnerPack />
-        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 조회 / QR 查询</div>
+        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 查询 / QR 조회</div>
         <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>包装查询</div>
       </div>
-      <DkBtn onClick={onTextQuery}>📋 텍스트 조회 / 文字查询</DkBtn>
-      <DkBtn onClick={onScanQuery}>🔍 스캔 조회 / 扫码查询</DkBtn>
+      <DkBtn onClick={onTextQuery}>📋 文字查询 / 텍스트 조회</DkBtn>
+      <DkBtn onClick={onScanQuery}>🔍 扫码查询 / 스캔 조회</DkBtn>
     </DkScreen>
   );
 });
@@ -2041,11 +2038,11 @@ const BagQuerySubMenu = memo(function BagQuerySubMenu({ onTextQuery, onScanQuery
       <DkBack onClick={onBack} />
       <div style={{ textAlign:'center', marginBottom:40 }}>
         <IconMasterBag />
-        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 조회 / QR 查询</div>
+        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 查询 / QR 조회</div>
         <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>麻袋查询</div>
       </div>
-      <DkBtn onClick={onTextQuery}>📋 텍스트 조회 / 文字查询</DkBtn>
-      <DkBtn onClick={onScanQuery}>🔍 스캔 조회 / 扫码查询</DkBtn>
+      <DkBtn onClick={onTextQuery}>📋 文字查询 / 텍스트 조회</DkBtn>
+      <DkBtn onClick={onScanQuery}>🔍 扫码查询 / 스캔 조회</DkBtn>
     </DkScreen>
   );
 });
