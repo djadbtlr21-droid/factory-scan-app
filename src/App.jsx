@@ -17,20 +17,15 @@ const MO_REPORT = 'All_MO';
 const LOG_FORM = 'Add_Production_Log';
 const LOG_REPORT = 'Production_Log_Report';
 
-const PROCESS_MAP = {
-  'Cutting / 재단 / 裁剪':       { dateStart: 'Cutting_Start_Date',   dateEnd: 'Cutting_End_Date',       qty: 'Cut_Quantity' },
-  'Sewing / 봉제 / 缝制':        { dateStart: 'Sewing_Start_Date',    dateEnd: 'Sewing_Completion_Date', qty: null },
-  'Packing / 포장 / 包装':       { dateStart: 'Packing_Start_Date',   dateEnd: 'Packing_End_Date',       qty: null },
-  'Completed / 생산완료 / 生产完成': { dateStart: null,                dateEnd: null,                     qty: 'Finished_Quantity' },
-  'Shipped / 출고완료 / 已出货':  { dateStart: null,                   dateEnd: 'Ship_Date',              qty: null }
-};
-
-const PROCS = [
-  { key: 'Cutting / 재단 / 裁剪',         cn: '裁剪',     icon: '✂️', sub: 'Cutting' },
-  { key: 'Sewing / 봉제 / 缝制',          cn: '缝制',     icon: '🧵', sub: 'Sewing' },
-  { key: 'Packing / 포장 / 包装',         cn: '包装',     icon: '📦', sub: 'Packing' },
-  { key: 'Completed / 생산완료 / 生产完成', cn: '生产完成', icon: '✅', sub: 'Completed' },
-  { key: 'Shipped / 출고완료 / 已出货',    cn: '出货',     icon: '🚚', sub: 'Shipped', full: true }
+const PROCESSES = [
+  { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date' },
+  { code: 'Cutting_Start', zh: '裁剪开始', ko: '재단 시작', moField: 'Cutting_Start_Date' },
+  { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date' },
+  { code: 'Sewing_Start',  zh: '车缝开始', ko: '봉제 시작', moField: 'Sewing_Start_Date' },
+  { code: 'Sewing_End',    zh: '车缝完成', ko: '봉제 완료', moField: 'Sewing_Completion_Date' },
+  { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date' },
+  { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date' },
+  { code: 'Shipped',       zh: '出货',     ko: '출고',      moField: 'Ship_Date' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -99,6 +94,13 @@ function getTodayStr() {
   const pad = (n) => (n < 10 ? '0' + n : '' + n);
   return pad(d.getDate()) + '-' + months[d.getMonth()] + '-' + d.getFullYear()
     + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+function getTodayDateStr() {
+  const d = new Date();
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const pad = (n) => (n < 10 ? '0' + n : '' + n);
+  return pad(d.getDate()) + '-' + months[d.getMonth()] + '-' + d.getFullYear();
 }
 
 // ─── Camera overlay (full-screen, mounted only when active) ───────────
@@ -241,16 +243,15 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
 
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="process-title">请选择当前工序</div>
-        <div className="process-grid">
-          {PROCS.map((p) => (
+        <div className="process-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          {PROCESSES.map((p) => (
             <div
-              key={p.key}
-              className={'proc-btn' + (p.full ? ' proc-full' : '') + (selectedKey === p.key ? ' selected' : '')}
-              onClick={() => onSelectProcess(p.key, p.cn)}
+              key={p.code}
+              className={'proc-btn' + (selectedKey === p.code ? ' selected' : '')}
+              onClick={() => onSelectProcess(p.code, p.zh, p.ko, p.moField)}
             >
-              <span className="proc-icon">{p.icon}</span>
-              <div className="proc-name">{p.cn}</div>
-              <div className="proc-sub">{p.sub}</div>
+              <div className="proc-name">{p.zh}</div>
+              <div className="proc-sub">{p.ko}</div>
             </div>
           ))}
         </div>
@@ -416,17 +417,23 @@ const SuccessScreen = memo(function SuccessScreen({ result, onNextProcess, onNew
           </div>
           <div style={{ textAlign: 'center' }}>
             <div className="success-title">저장 완료 · 提交成功</div>
-            <div style={{ fontSize: 10, color: 'var(--text4)', letterSpacing: 1, marginTop: 6, fontWeight: 500 }}>공정 기록이 저장되었습니다</div>
+            <div style={{ fontSize: 10, color: 'var(--text4)', letterSpacing: 1, marginTop: 6, fontWeight: 500 }}>공정 기록이 저장되었습니다 · 일정 자동 업데이트</div>
           </div>
         </div>
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <ResultRow label="공정"      value={result.processCN + ' · ' + result.process} accent />
+          <ResultRow label="공정" value={(result.processCN || '') + (result.processKO ? ' / ' + result.processKO : '') + ' · ' + result.process} accent />
           <ResultRow label="완성수량"  value={result.completed.toLocaleString() + ' 件'} />
           {result.incomplete > 0 && <ResultRow label="미완성수량" value={result.incomplete.toLocaleString() + ' 件'} />}
           {result.defect > 0     && <ResultRow label="불량수량"  value={result.defect.toLocaleString() + ' 件'} danger />}
           <ResultRow label="담당자"    value={result.worker} />
           <ResultRow label="기록시간"  value={result.time} mute />
           {result.notes && <ResultRow label="메모" value={result.notes} mute />}
+          {result.moField && result.moFieldDate && (
+            <div style={{ background: 'linear-gradient(135deg,rgba(212,185,118,.1),rgba(212,185,118,.04))', border: '1px solid rgba(212,185,118,.3)', borderRadius: 'var(--radius-sm)', padding: '12px 18px', marginTop: 2 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#C9A84C', textTransform: 'uppercase', marginBottom: 6 }}>🎯 자동 갱신 / 自动更新</div>
+              <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{result.moField} → {result.moFieldDate}</div>
+            </div>
+          )}
         </div>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
           <button onClick={onNextProcess} style={{ padding: 16, border: 'none', background: 'linear-gradient(135deg,#D4B976,#C9A84C)', color: '#4A3510', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', width: '100%', boxShadow: '0 2px 8px rgba(201,168,76,.2)' }}>下一工序 / 다음 공정</button>
@@ -3018,13 +3025,14 @@ export default function App() {
     img.src = URL.createObjectURL(file);
   }, [handleQR]);
 
-  const handleSelectProcess = useCallback((procKey, procCN) => {
-    setSelectedProcess({ key: procKey, cn: procCN });
+  const handleSelectProcess = useCallback((procCode, procZH, procKO, procMoField) => {
+    setSelectedProcess({ key: procCode, cn: procZH, ko: procKO, moField: procMoField });
     setCurrentScreen('input');
   }, []);
 
   const handleSubmit = useCallback(async (form) => {
     const todayStr = getTodayStr();
+    const dateOnlyStr = getTodayDateStr();
     const logData = {
       'MO_Number':      moData.mo_number,
       'SKU':            moData.sku,
@@ -3043,12 +3051,9 @@ export default function App() {
       throw new Error('日志保存失败: ' + JSON.stringify(res));
     }
 
-    const map = PROCESS_MAP[selectedProcess.key];
     const updateData = { 'Production_Status': selectedProcess.key };
-    if (map) {
-      if (map.dateStart) updateData[map.dateStart] = todayStr;
-      if (map.dateEnd)   updateData[map.dateEnd]   = todayStr;
-      if (map.qty)       updateData[map.qty]       = form.completedQty;
+    if (selectedProcess.moField) {
+      updateData[selectedProcess.moField] = dateOnlyStr;
     }
     try {
       await updateRecord(MO_REPORT, moRecordId, updateData);
@@ -3068,6 +3073,9 @@ export default function App() {
       mo: moData.mo_number,
       process: selectedProcess.key,
       processCN: selectedProcess.cn,
+      processKO: selectedProcess.ko,
+      moField: selectedProcess.moField,
+      moFieldDate: dateOnlyStr,
       completed: form.completedQty,
       incomplete: form.incompleteQty,
       defect: form.defectQty,
