@@ -3118,7 +3118,7 @@ export default function App() {
       throw new Error('日志保存失败: ' + JSON.stringify(res));
     }
 
-    const updatePayload = { 'Production_Status': selectedProcess.zohoValue || selectedProcess.key };
+    const updatePayload = {};
     if (selectedProcess.moField) {
       updatePayload[selectedProcess.moField] = dateOnlyStr;
     }
