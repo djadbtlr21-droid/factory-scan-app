@@ -47,6 +47,18 @@ html { font-size: 110%; }
   --app-divider:rgba(139,105,20,0.14);
   --app-border-input:rgba(139,105,20,0.40);
 }
+/* Dark mode: override Production Log `:root` surface/text vars */
+[data-theme="dark"]{
+  --surface:#1E1E1E;--surface2:#161616;--surface3:#242424;
+  --text:#F0EDE8;--text2:#C4BFAE;--text3:#8A8278;--text4:#5C5648;
+  --dark:#0A0A0A;--dark2:#111111;
+}
+[data-theme="dark"] .card{background:var(--surface);border-color:rgba(255,255,255,0.06)}
+[data-theme="dark"] .proc-btn{background:var(--surface);border-color:rgba(255,255,255,0.08)}
+[data-theme="dark"] .proc-btn.selected{background:linear-gradient(135deg,rgba(201,168,76,0.14),rgba(201,168,76,0.06))}
+[data-theme="dark"] .success-banner{background:var(--surface)}
+[data-theme="dark"] .input-field{background:var(--surface);color:var(--text);border-color:rgba(255,255,255,0.1)}
+[data-theme="dark"] .btn-back{background:var(--surface);color:var(--text3);border-color:rgba(255,255,255,0.08)}
 /* Overlay headers: revert text CSS vars to bright dark-mode values in light mode */
 [data-theme="light"] .overlay-header,
 [data-theme="light"] .overlay-header *{
@@ -141,6 +153,16 @@ body{font-family:'Manrope','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Ping
 }
 .btn-upload-qr:active{transform:scale(.98);box-shadow:0 1px 4px rgba(201,168,76,.15)}
 
+.btn-manual-mo{
+  background:transparent;color:var(--gold-dim);
+  border:1px solid var(--gold-dim);padding:12px 0;
+  border-radius:var(--radius-xs);font-size:11px;font-weight:500;
+  letter-spacing:2px;text-transform:uppercase;
+  width:100%;max-width:260px;cursor:pointer;font-family:inherit;
+  transition:var(--transition);
+}
+.btn-manual-mo:active{transform:scale(.98);opacity:.8}
+
 .card{
   background:#fff;border-radius:var(--radius);padding:18px;
   margin-bottom:0;box-shadow:var(--shadow-sm);border:1px solid rgba(0,0,0,.03);
@@ -193,6 +215,11 @@ body{font-family:'Manrope','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Ping
 .proc-btn.selected .proc-name{color:#6B4D12}
 .proc-btn.selected .proc-sub{color:var(--accent)}
 .proc-full{grid-column:1/-1}
+.proc-status{font-size:10px;font-weight:600;letter-spacing:.3px;padding:3px 8px;border-radius:10px;margin-top:2px;display:inline-block}
+.proc-status-done{background:rgba(16,185,129,.12);color:#047857}
+.proc-status-pending{background:rgba(0,0,0,.05);color:var(--text4)}
+[data-theme="dark"] .proc-status-done{background:rgba(16,185,129,.18);color:#34d399}
+[data-theme="dark"] .proc-status-pending{background:rgba(255,255,255,.05);color:var(--text4)}
 
 .input-group{margin-bottom:14px}
 .input-group label{font-size:13px;font-weight:600;color:#374151;display:block;margin-bottom:6px}

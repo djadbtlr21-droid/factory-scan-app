@@ -18,14 +18,14 @@ const LOG_FORM = 'Add_Production_Log';
 const LOG_REPORT = 'Production_Log_Report';
 
 const PROCESSES = [
-  { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date' },
-  { code: 'Cutting_Start', zh: '裁剪开始', ko: '재단 시작', moField: 'Cutting_Start_Date' },
-  { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date' },
-  { code: 'Sewing_Start',  zh: '车缝开始', ko: '봉제 시작', moField: 'Sewing_Start_Date' },
-  { code: 'Sewing_End',    zh: '车缝完成', ko: '봉제 완료', moField: 'Sewing_Completion_Date' },
-  { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date' },
-  { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date' },
-  { code: 'Shipped',       zh: '出货',     ko: '출고',      moField: 'Ship_Date' },
+  { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date',  emoji: '📥' },
+  { code: 'Cutting_Start', zh: '裁剪开始', ko: '재단 시작', moField: 'Cutting_Start_Date',    emoji: '✂️' },
+  { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date',      emoji: '✅' },
+  { code: 'Sewing_Start',  zh: '车缝开始', ko: '봉제 시작', moField: 'Sewing_Start_Date',     emoji: '🧵' },
+  { code: 'Sewing_End',    zh: '车缝完成', ko: '봉제 완료', moField: 'Sewing_Completion_Date',emoji: '🪡' },
+  { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦' },
+  { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '🎁' },
+  { code: 'Shipped',       zh: '出货',     ko: '출고',      moField: 'Ship_Date',              emoji: '🚚' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -180,7 +180,7 @@ function CameraOverlay({ onResult, onCancel }) {
 }
 
 // ─── Existing Production Log screens ──────────────────────────────────
-const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onBack }) {
+const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onManual, onBack }) {
   return (
     <div className="screen active" id="screen-scan">
       <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'transparent', border:'1px solid #D4AF37', color:G.gold, fontSize:10, fontWeight:400, letterSpacing:2, padding:'7px 14px', cursor:'pointer', zIndex:10, fontFamily:'inherit' }}>← 返回</button>
@@ -199,6 +199,7 @@ const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onBack }) {
       </div>
       <button className="btn-scan-start" onClick={onScan}>SCAN START / 开始扫码</button>
       <button className="btn-upload-qr" onClick={onUpload}>QR UPLOAD / 上传二维码</button>
+      <button className="btn-manual-mo" onClick={onManual}>✏️ MANUAL / 수동 입력</button>
       <div className="scan-hint-wrap">
         <p>카메라가 자동으로 QR을 인식합니다</p>
         <p>摄像头将自动识别二维码</p>
@@ -222,6 +223,32 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
   const notesRows = useMemo(() => parsePlanNotes(moData && moData.plan_notes), [moData]);
   const orderQty = moData && moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-';
 
+  const processStatusMap = useMemo(() => {
+    const map = {};
+    if (!logs || !logs.length) return map;
+    logs.forEach(r => {
+      const code = r['Process'];
+      if (!code) return;
+      const qty = parseInt(r['Completed_Qty']) || 0;
+      map[code] = (map[code] || 0) + qty;
+    });
+    return map;
+  }, [logs]);
+
+  const ProcBtn = ({ p, full }) => (
+    <div
+      className={'proc-btn' + (full ? ' proc-full' : '') + (selectedKey === p.code ? ' selected' : '')}
+      onClick={() => onSelectProcess(p.code, p.zh, p.ko, p.moField)}
+    >
+      <span className="proc-icon">{p.emoji}</span>
+      <div className="proc-name">{p.zh}</div>
+      <div className="proc-sub">{p.ko}</div>
+      {processStatusMap[p.code] != null
+        ? <span className="proc-status proc-status-done">✅ {processStatusMap[p.code].toLocaleString()}件</span>
+        : <span className="proc-status proc-status-pending">⏳ 未记录</span>}
+    </div>
+  );
+
   return (
     <div className="screen active" id="screen-info" style={{ background: 'var(--surface2)', minHeight: '100vh', width: '100%', padding: 16 }}>
       <button className="back-link" onClick={onBack}>← 重新扫码</button>
@@ -244,16 +271,14 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="process-title">请选择当前工序</div>
         <div className="process-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          {PROCESSES.map((p) => (
-            <div
-              key={p.code}
-              className={'proc-btn' + (selectedKey === p.code ? ' selected' : '')}
-              onClick={() => onSelectProcess(p.code, p.zh, p.ko, p.moField)}
-            >
-              <div className="proc-name">{p.zh}</div>
-              <div className="proc-sub">{p.ko}</div>
-            </div>
-          ))}
+          <ProcBtn p={PROCESSES[0]} full />
+          <ProcBtn p={PROCESSES[1]} />
+          <ProcBtn p={PROCESSES[2]} />
+          <ProcBtn p={PROCESSES[3]} />
+          <ProcBtn p={PROCESSES[4]} />
+          <ProcBtn p={PROCESSES[5]} />
+          <ProcBtn p={PROCESSES[6]} />
+          <ProcBtn p={PROCESSES[7]} full />
         </div>
       </div>
 
@@ -395,7 +420,7 @@ const InputScreen = memo(function InputScreen({ moData, process, onSubmit, onBac
 const ResultRow = memo(function ResultRow({ label, value, accent, danger, mute }) {
   const valColor = danger ? 'var(--danger)' : (accent ? '#6B4D12' : 'var(--text)');
   return (
-    <div style={{ background: '#fff', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)', borderLeft: accent ? '3px solid var(--accent)' : undefined }}>
+    <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-sm)', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-sm)', borderLeft: accent ? '3px solid var(--accent)' : undefined }}>
       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: 'var(--text3)', textTransform: 'uppercase' }}>{label}</span>
       <span style={{ fontSize: accent ? 12 : 13, fontWeight: mute ? 500 : 700, color: mute ? 'var(--text2)' : valColor }}>{value}</span>
     </div>
@@ -460,7 +485,7 @@ const LogModal = memo(function LogModal({ log, onClose }) {
       onClick={onClose}
     >
       <div
-        style={{ background: '#fff', borderRadius: 16, width: '92%', maxWidth: 420, padding: 22, position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,.2)', animation: 'fadeIn .25s ease' }}
+        style={{ background: 'var(--surface)', borderRadius: 16, width: '92%', maxWidth: 420, padding: 22, position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,.2)', animation: 'fadeIn .25s ease' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
@@ -475,6 +500,44 @@ const LogModal = memo(function LogModal({ log, onClose }) {
         <div className="modal-row"><span className="modal-label">记录时间</span><span className="modal-value">{date}</span></div>
         <div className="modal-row"><span className="modal-label">备注</span><span className="modal-value">{notes}</span></div>
       </div>
+    </div>
+  );
+});
+
+// ─── Production Log: Manual MO Entry ─────────────────────────────────
+const LogManualMOScreen = memo(function LogManualMOScreen({ onSubmit, onBack }) {
+  const [moInput, setMoInput] = useState('');
+  const handleSubmit = () => {
+    const mo = moInput.trim().toUpperCase();
+    if (!mo) { alert('请输入订单号 / MO번호를 입력하세요'); return; }
+    onSubmit(mo);
+  };
+  return (
+    <div style={{ minHeight:'100vh', width:'100%', background:'var(--dark)', backgroundImage:'radial-gradient(ellipse at 50% -10%, rgba(212,175,55,0.07) 0%, transparent 55%)', padding:'80px 20px 40px', position:'relative', color:'var(--gold-light)' }}>
+      <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'transparent', border:'1px solid #D4AF37', color:'#D4AF37', fontSize:10, fontWeight:400, letterSpacing:2, padding:'7px 14px', cursor:'pointer', zIndex:10, fontFamily:'inherit' }}>← 返回</button>
+      <div style={{ textAlign:'center', marginBottom:36 }}>
+        <div style={{ fontSize:9, letterSpacing:4, color:'var(--gold-dim)', fontWeight:400 }}>PRODUCTION LOG</div>
+        <div style={{ fontSize:22, color:'var(--gold-light)', marginTop:10, fontWeight:300, letterSpacing:2 }}>手动输入订单号</div>
+        <div style={{ fontSize:10, color:'var(--gold-dim)', marginTop:6, letterSpacing:1.5 }}>수동으로 MO번호 입력</div>
+        <div style={{ width:40, height:1, background:'rgba(212,175,55,0.3)', margin:'16px auto 0' }} />
+      </div>
+      <div style={{ position:'relative', border:'1px solid rgba(212,175,55,0.2)', borderRadius:2, background:'rgba(255,255,255,0.04)', padding:20, marginBottom:14 }}>
+        <div style={{ fontSize:9, fontWeight:400, letterSpacing:2, color:'var(--gold-dim)', textTransform:'uppercase', marginBottom:10 }}>订单号 / MO번호</div>
+        <input
+          type="text"
+          value={moInput}
+          onChange={e => setMoInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
+          placeholder="例: GJ26-001"
+          style={{ width:'100%', padding:'10px 0', background:'transparent', border:'none', borderBottom:'1px solid rgba(212,175,55,0.3)', color:'var(--gold-light)', fontSize:18, outline:'none', fontFamily:'inherit', boxSizing:'border-box', letterSpacing:2 }}
+        />
+        <button onClick={handleSubmit} style={{ width:'100%', marginTop:20, padding:16, border:'1px solid #D4AF37', borderRadius:2, background:'rgba(212,175,55,0.12)', color:'#D4AF37', fontSize:12, fontWeight:400, letterSpacing:3, textTransform:'uppercase', cursor:'pointer', fontFamily:'inherit' }}>
+          확인 / 确认 →
+        </button>
+      </div>
+      <button onClick={onBack} style={{ width:'100%', padding:14, border:'1px solid rgba(212,175,55,0.2)', borderRadius:2, background:'transparent', color:'var(--gold-dim)', fontSize:11, fontWeight:400, letterSpacing:2, textTransform:'uppercase', cursor:'pointer', fontFamily:'inherit' }}>
+        ← 返回 / 돌아가기
+      </button>
     </div>
   );
 });
@@ -3120,7 +3183,13 @@ export default function App() {
         )}
 
         {/* Production Log screens */}
-        {currentScreen === 'scan' && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} onBack={() => { setScanMode('production_log'); setCurrentScreen('home'); }} />}
+        {currentScreen === 'scan' && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} onManual={() => setCurrentScreen('log_manual_mo')} onBack={() => { setScanMode('production_log'); setCurrentScreen('home'); }} />}
+        {currentScreen === 'log_manual_mo' && (
+          <LogManualMOScreen
+            onSubmit={(mo) => { setLoadingMsg('加载订单数据...'); setCurrentScreen('loading'); fetchMOData(mo); }}
+            onBack={() => setCurrentScreen('scan')}
+          />
+        )}
         {currentScreen === 'loading' && <LoadingScreen message={loadingMsg} />}
         {currentScreen === 'info' && (
           <InfoScreen
