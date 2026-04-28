@@ -224,13 +224,17 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
   const orderQty = moData && moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-';
 
   const processStatusMap = useMemo(() => {
+    if (!logs || !logs.length) return {};
+    const sorted = [...logs].sort((a, b) => {
+      const ta = a['Added_Time'] || a['Log_Date'] || '';
+      const tb = b['Added_Time'] || b['Log_Date'] || '';
+      return parseDateRaw(String(tb)) - parseDateRaw(String(ta));
+    });
     const map = {};
-    if (!logs || !logs.length) return map;
-    logs.forEach(r => {
+    sorted.forEach(r => {
       const proc = r['Process'];
-      if (!proc) return;
-      const qty = parseInt(r['Completed_Qty']) || 0;
-      map[proc] = (map[proc] || 0) + qty;
+      if (!proc || map[proc] != null) return;
+      map[proc] = parseInt(r['Completed_Qty']) || 0;
     });
     return map;
   }, [logs]);
