@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+html { font-size: 110%; }
+
 :root{
   --gold:#D4B976;--gold-light:#E8D5A0;--gold-dim:#A89058;--gold-glow:rgba(212,185,118,.15);
   --dark:#0F0F0F;--dark2:#1A1A1A;--dark3:#242424;--dark4:#2E2E2E;
