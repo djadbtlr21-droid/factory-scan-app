@@ -707,7 +707,7 @@ const StatusScanSuccessScreen = memo(function StatusScanSuccessScreen({ result, 
 });
 
 // ─── NEW: Pack Menu Screen ────────────────────────────────────────────
-const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onScan, onList, onBack }) {
+const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
   return (
     <DkScreen style={{ padding:'80px 20px 40px' }}>
       <DkBack onClick={onBack} />
@@ -719,14 +719,13 @@ const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onScan,
       </div>
       <DkBtn onClick={onCreate}>➕ 新建包装 / 새 포장 생성</DkBtn>
       <DkBtn onClick={onBatch}>📦 批量生成 / 일괄 생성</DkBtn>
-      <DkBtnOutline onClick={onList}>📋 查询包装 / 포장 조회</DkBtnOutline>
-      <DkBtnOutline onClick={onScan}>🔍 扫码查询 / 스캔 조회</DkBtnOutline>
+      <DkBtnOutline onClick={onQueryMenu}>🔍 QR 조회 / QR 查询</DkBtnOutline>
     </DkScreen>
   );
 });
 
 // ─── NEW: Bag Menu Screen ─────────────────────────────────────────────
-const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onScan, onList, onBack }) {
+const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
   return (
     <DkScreen style={{ padding:'80px 20px 40px' }}>
       <DkBack onClick={onBack} />
@@ -738,8 +737,7 @@ const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onScan, o
       </div>
       <DkBtn onClick={onCreate}>➕ 新建麻袋 / 새 마대 생성</DkBtn>
       <DkBtn onClick={onBatch}>📦 일괄 생성 / 批量生成</DkBtn>
-      <DkBtnOutline onClick={onList}>📋 查询麻袋 / 마대 조회</DkBtnOutline>
-      <DkBtnOutline onClick={onScan}>🔍 扫码查询 / 스캔 조회</DkBtnOutline>
+      <DkBtnOutline onClick={onQueryMenu}>🔍 QR 조회 / QR 查询</DkBtnOutline>
     </DkScreen>
   );
 });
@@ -894,7 +892,7 @@ const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, on
   const handleDownload = async () => {
     const label = `${pack.moNumber} / Inner Pack #${pack.packSequence} / ${pack.totalQty} pcs`;
     const dataURL = await generateQRDataURLWithLabel(pack.qrText, label);
-    downloadQRPNG(dataURL, sanitizeFilename(`${pack.moNumber}_Pack_${pack.packSequence}.png`));
+    downloadQRPNG(dataURL, sanitizeFilename(`${pack.moNumber}_InnerPack_${pack.packSequence}_${pack.totalQty}pcs.png`));
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
@@ -985,7 +983,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
           const qrUrl = window.location.origin + '/view/inner/' + detail.uuid;
           const label = `${detail.mo_number} / Inner Pack #${detail.pack_sequence} / ${detail.total_qty} pcs`;
           const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-          downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_Pack_${detail.pack_sequence}.png`));
+          downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_InnerPack_${detail.pack_sequence}_${detail.total_qty}pcs.png`));
         }}>📥 下载 QR / QR 다운로드</DkBtn>
         {onDelete && reqPin && (
           <button onClick={() => reqPin(() => onDelete())}
@@ -1081,7 +1079,7 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome 
   const handleDownload = async () => {
     const label = `${bag.moNumber} / Master Bag #${bag.bagSequence} / ${bag.totalQty} pcs`;
     const dataURL = await generateQRDataURLWithLabel(bag.qrText, label);
-    downloadQRPNG(dataURL, sanitizeFilename(`${bag.moNumber}_Bag_${bag.bagSequence}.png`));
+    downloadQRPNG(dataURL, sanitizeFilename(`${bag.moNumber}_MasterBag_${bag.bagSequence}_${bag.totalQty}pcs.png`));
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
@@ -1164,9 +1162,9 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
         )}
         <DkBtn onClick={async () => {
           const qrUrl = window.location.origin + '/view/bag/' + detail.uuid;
-          const label = `${detail.mo_number} / Master Bag #${detail.bag_sequence}`;
+          const label = `${detail.mo_number} / Master Bag #${detail.bag_sequence} / ${detail.total_qty} pcs`;
           const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-          downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_Bag_${detail.bag_sequence}.png`));
+          downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_MasterBag_${detail.bag_sequence}_${detail.total_qty}pcs.png`));
         }}>📥 下载 QR / QR 다운로드</DkBtn>
         {onDelete && reqPin && (
           <button onClick={() => reqPin(() => onDelete())}
@@ -1270,7 +1268,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
                 const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
                 const label = `${p.mo_number} / Inner Pack #${p.pack_sequence} / ${p.total_qty} pcs`;
                 const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-                downloadQRPNG(dataURL, sanitizeFilename(`${p.mo_number}_Pack_${p.pack_sequence}.png`));
+                downloadQRPNG(dataURL, sanitizeFilename(`${p.mo_number}_InnerPack_${p.pack_sequence}_${p.total_qty}pcs.png`));
               }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:G.goldDim, fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
             </div>
           </DkCard>
@@ -1355,9 +1353,9 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
               <button onClick={async e => {
                 e.stopPropagation();
                 const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
-                const label = `${b.mo_number} / Master Bag #${b.bag_sequence}`;
+                const label = `${b.mo_number} / Master Bag #${b.bag_sequence} / ${b.total_qty} pcs`;
                 const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-                downloadQRPNG(dataURL, sanitizeFilename(`${b.mo_number}_Bag_${b.bag_sequence}.png`));
+                downloadQRPNG(dataURL, sanitizeFilename(`${b.mo_number}_MasterBag_${b.bag_sequence}_${b.total_qty}pcs.png`));
               }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:G.goldDim, fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
             </div>
           </DkCard>
@@ -1746,28 +1744,29 @@ const BatchPackProgressScreen = memo(function BatchPackProgressScreen({ progress
   );
 });
 
-const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, onNextPack }) {
+const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, onNextPack, onRetryFailed }) {
   const [downloading, setDownloading] = useState(false);
+  const savedItems = result.items.filter(it => it.savedToZoho !== false);
   const handleZIP = async () => {
-    if (downloading || result.items.length === 0) return;
+    if (downloading || savedItems.length === 0) return;
     setDownloading(true);
     try {
-      const qrItems = result.items.map(it => ({
+      const qrItems = savedItems.map(it => ({
         text: it.qrText,
-        filename: sanitizeFilename(`${result.moNumber}_Pack_${it.seq}.png`)
+        filename: sanitizeFilename(`${result.moNumber}_InnerPack_${it.seq}_${it.totalQty}pcs.png`)
       }));
-      await downloadQRsAsZIP(qrItems, sanitizeFilename(`${result.moNumber}_Packs_Batch.zip`));
+      await downloadQRsAsZIP(qrItems, sanitizeFilename(`${result.moNumber}_InnerPacks_Batch.zip`));
     } finally { setDownloading(false); }
   };
   const handlePDF = async () => {
-    if (downloading || result.items.length === 0) return;
+    if (downloading || savedItems.length === 0) return;
     setDownloading(true);
     try {
-      const qrItems = result.items.map(it => ({
+      const qrItems = savedItems.map(it => ({
         text: it.qrText,
-        filename: sanitizeFilename(`${result.moNumber}_Pack_${it.seq}.png`)
+        filename: sanitizeFilename(`${result.moNumber}_InnerPack_${it.seq}_${it.totalQty}pcs.png`)
       }));
-      await downloadQRsAsPDF(qrItems, sanitizeFilename(`${result.moNumber}_Packs_Batch.pdf`));
+      await downloadQRsAsPDF(qrItems, sanitizeFilename(`${result.moNumber}_InnerPacks_Batch.pdf`));
     } finally { setDownloading(false); }
   };
   return (
@@ -1778,7 +1777,7 @@ const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, 
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
-          <DkRow label="已创建 / 생성 완료" value={String(result.items.length) + ' 包装'} />
+          <DkRow label="已创建 / 생성 완료" value={String(savedItems.length) + ' 包装'} />
           <DkRow label="失败 / 실패" value={String(result.errors.length) + ' 个'} />
           <DkRow label="担当者 / 담당자" value={result.worker} />
         </DkCard>
@@ -1790,12 +1789,15 @@ const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, 
             ))}
           </DkCard>
         )}
-        <DkBtn onClick={handleZIP} disabled={downloading || result.items.length === 0}>
+        <DkBtn onClick={handleZIP} disabled={downloading || savedItems.length === 0}>
           {downloading ? '生成中...' : '📦 ZIP 下载 QR / ZIP 다운로드'}
         </DkBtn>
-        <DkBtn onClick={handlePDF} disabled={downloading || result.items.length === 0}>
+        <DkBtn onClick={handlePDF} disabled={downloading || savedItems.length === 0}>
           {downloading ? '生成中...' : '📄 PDF 下载 QR / PDF 다운로드'}
         </DkBtn>
+        {result.errors.length > 0 && onRetryFailed && (
+          <DkBtn onClick={onRetryFailed}>🔄 重试失败 / 실패 재시도 ({result.errors.length})</DkBtn>
+        )}
         <DkBtnOutline onClick={onNextPack}>➕ 继续创建包装 / 포장 계속 생성</DkBtnOutline>
         <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
       </div>
@@ -1879,28 +1881,29 @@ const BatchBagProgressScreen = memo(function BatchBagProgressScreen({ progress }
   );
 });
 
-const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, onSingleBag }) {
+const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, onSingleBag, onRetryFailed }) {
   const [downloading, setDownloading] = useState(false);
+  const savedItems = result.items.filter(it => it.savedToZoho !== false);
   const handleZIP = async () => {
-    if (downloading || result.items.length === 0) return;
+    if (downloading || savedItems.length === 0) return;
     setDownloading(true);
     try {
-      const qrItems = result.items.map(it => ({
+      const qrItems = savedItems.map(it => ({
         text: it.qrText,
-        filename: sanitizeFilename(`${result.moNumber}_Bag_${it.bagSeq}.png`)
+        filename: sanitizeFilename(`${result.moNumber}_MasterBag_${it.bagSeq}_${it.totalQty}pcs.png`)
       }));
-      await downloadQRsAsZIP(qrItems, sanitizeFilename(`${result.moNumber}_Bags_Batch.zip`));
+      await downloadQRsAsZIP(qrItems, sanitizeFilename(`${result.moNumber}_MasterBags_Batch.zip`));
     } finally { setDownloading(false); }
   };
   const handlePDF = async () => {
-    if (downloading || result.items.length === 0) return;
+    if (downloading || savedItems.length === 0) return;
     setDownloading(true);
     try {
-      const qrItems = result.items.map(it => ({
+      const qrItems = savedItems.map(it => ({
         text: it.qrText,
-        filename: sanitizeFilename(`${result.moNumber}_Bag_${it.bagSeq}.png`)
+        filename: sanitizeFilename(`${result.moNumber}_MasterBag_${it.bagSeq}_${it.totalQty}pcs.png`)
       }));
-      await downloadQRsAsPDF(qrItems, sanitizeFilename(`${result.moNumber}_Bags_Batch.pdf`));
+      await downloadQRsAsPDF(qrItems, sanitizeFilename(`${result.moNumber}_MasterBags_Batch.pdf`));
     } finally { setDownloading(false); }
   };
   return (
@@ -1911,7 +1914,7 @@ const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, on
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
-          <DkRow label="已创建麻袋 / 생성 완료" value={String(result.items.length) + ' 麻袋'} />
+          <DkRow label="已创建麻袋 / 생성 완료" value={String(savedItems.length) + ' 麻袋'} />
           <DkRow label="失败 / 실패" value={String(result.errors.length) + ' 个'} />
           <DkRow label="担当者 / 담당자" value={result.worker} />
         </DkCard>
@@ -1923,15 +1926,49 @@ const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, on
             ))}
           </DkCard>
         )}
-        <DkBtn onClick={handleZIP} disabled={downloading || result.items.length === 0}>
+        <DkBtn onClick={handleZIP} disabled={downloading || savedItems.length === 0}>
           {downloading ? '生成中...' : '📦 ZIP 下载 QR / ZIP 다운로드'}
         </DkBtn>
-        <DkBtn onClick={handlePDF} disabled={downloading || result.items.length === 0}>
+        <DkBtn onClick={handlePDF} disabled={downloading || savedItems.length === 0}>
           {downloading ? '生成中...' : '📄 PDF 下载 QR / PDF 다운로드'}
         </DkBtn>
+        {result.errors.length > 0 && onRetryFailed && (
+          <DkBtn onClick={onRetryFailed}>🔄 重试失败 / 실패 재시도 ({result.errors.length})</DkBtn>
+        )}
         <DkBtnOutline onClick={onSingleBag}>➕ 继续单个装袋 / 단일 마대 계속</DkBtnOutline>
         <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
       </div>
+    </DkScreen>
+  );
+});
+
+// ─── FIX 6: Query sub-menus ──────────────────────────────────────────
+const PackQuerySubMenu = memo(function PackQuerySubMenu({ onTextQuery, onScanQuery, onBack }) {
+  return (
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:40 }}>
+        <IconInnerPack />
+        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 조회 / QR 查询</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>包装查询</div>
+      </div>
+      <DkBtn onClick={onTextQuery}>📋 텍스트 조회 / 文字查询</DkBtn>
+      <DkBtn onClick={onScanQuery}>🔍 스캔 조회 / 扫码查询</DkBtn>
+    </DkScreen>
+  );
+});
+
+const BagQuerySubMenu = memo(function BagQuerySubMenu({ onTextQuery, onScanQuery, onBack }) {
+  return (
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:40 }}>
+        <IconMasterBag />
+        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 조회 / QR 查询</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>麻袋查询</div>
+      </div>
+      <DkBtn onClick={onTextQuery}>📋 텍스트 조회 / 文字查询</DkBtn>
+      <DkBtn onClick={onScanQuery}>🔍 스캔 조회 / 扫码查询</DkBtn>
     </DkScreen>
   );
 });
@@ -2299,6 +2336,7 @@ export default function App() {
       'Pack_UUID':      uuid,
       'Brand':          BRAND,
       'MO_Number':      packMO.mo_number,
+      'SKU':            packMO.sku,
       'Pack_Sequence':  packSequence,
       'Total_Expected': totalExpected,
       'Total_Qty':      totalQty,
@@ -2422,6 +2460,8 @@ export default function App() {
       'Brand':            BRAND,
       'Bag_Sequence':     bagSequence,
       'MO_Number':        primaryMO,
+      'SKU':              bagMO.sku,
+      'Factory':          bagMO.factory,
       'Inner_Pack_Count': bagScannedPacks.length,
       'Inner_Pack_UUIDs': JSON.stringify(bagScannedPacks.map(p => p.uuid)),
       'Total_Qty':        totalQty,
@@ -2481,14 +2521,21 @@ export default function App() {
     const createOnePack = async (seq) => {
       const qrText = buildInnerPackQR();
       const uuid = qrText.split('/view/inner/')[1];
-      const res = await submitRecord(FORMS.INNER_PACK, {
-        'Pack_UUID': uuid, 'Brand': BRAND, 'MO_Number': packMO.mo_number,
-        'Pack_Sequence': seq, 'Total_Expected': totalExpected, 'Total_Qty': totalQty,
-        'Is_Remainder': false, 'Items_JSON': JSON.stringify(selectedItems),
-        'Worker': worker, 'Factory': packMO.factory, 'Pack_Status': 'Created'
-      });
-      if (!res || res.code !== 3000) throw new Error('保存失败');
-      return { seq, uuid, qrText, totalQty };
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await submitRecord(FORMS.INNER_PACK, {
+            'Pack_UUID': uuid, 'Brand': BRAND, 'MO_Number': packMO.mo_number,
+            'SKU': packMO.sku, 'Pack_Sequence': seq, 'Total_Expected': totalExpected, 'Total_Qty': totalQty,
+            'Is_Remainder': false, 'Items_JSON': JSON.stringify(selectedItems),
+            'Worker': worker, 'Factory': packMO.factory, 'Pack_Status': 'Created'
+          });
+          if (!res || res.code !== 3000) throw new Error('保存失败 code=' + (res && res.code));
+          return { seq, uuid, qrText, totalQty, savedToZoho: true };
+        } catch (e) {
+          if (attempt === 3) throw e;
+          await new Promise(r => setTimeout(r, 500 * attempt));
+        }
+      }
     };
     const createWorker = async () => {
       while (idx < seqs.length) {
@@ -2498,10 +2545,57 @@ export default function App() {
         setBatchProgress(p => ({ ...p, current: p.current + 1, items: [...items], errors: [...errors] }));
       }
     };
-    await Promise.all(Array.from({ length: 5 }, () => createWorker()));
+    await Promise.all(Array.from({ length: 3 }, () => createWorker()));
     setBatchResult({ items, errors, moNumber: packMO.mo_number, worker, lastSeq: endSeq });
     setCurrentScreen('batch_pack_done');
   }, [packMO]);
+
+  const handleRetryFailedPacks = useCallback(async () => {
+    if (!packMO || !batchResult || batchResult.errors.length === 0) return;
+    const failedSeqs = batchResult.errors.map(e => e.seq);
+    const prevItems = batchResult.items;
+    const worker = batchResult.worker;
+    const total = failedSeqs.length;
+    const newItems = [], newErrors = [];
+    setBatchProgress({ current: 0, total, items: [], errors: [] });
+    setCurrentScreen('batch_pack_progress');
+    const selectedItems = (packMO.standard_assortment || []).map(it => ({ color: it.color, size: it.size, qty: it.qty || 1 }));
+    const totalQty = selectedItems.reduce((s, it) => s + (parseInt(it.qty) || 1), 0);
+    const totalExpected = packMO.order_qty > 0 ? Math.ceil(packMO.order_qty / INNER_PACK_SIZE) : 0;
+    let idx = 0;
+    const createWorker = async () => {
+      while (idx < failedSeqs.length) {
+        const i = idx++;
+        const seq = failedSeqs[i];
+        try {
+          const qrText = buildInnerPackQR();
+          const uuid = qrText.split('/view/inner/')[1];
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              const res = await submitRecord(FORMS.INNER_PACK, {
+                'Pack_UUID': uuid, 'Brand': BRAND, 'MO_Number': packMO.mo_number,
+                'SKU': packMO.sku, 'Pack_Sequence': seq, 'Total_Expected': totalExpected, 'Total_Qty': totalQty,
+                'Is_Remainder': false, 'Items_JSON': JSON.stringify(selectedItems),
+                'Worker': worker, 'Factory': packMO.factory, 'Pack_Status': 'Created'
+              });
+              if (!res || res.code !== 3000) throw new Error('code=' + (res && res.code));
+              newItems.push({ seq, uuid, qrText, totalQty, savedToZoho: true });
+              break;
+            } catch (e) {
+              if (attempt === 3) throw e;
+              await new Promise(r => setTimeout(r, 500 * attempt));
+            }
+          }
+        } catch (e) {
+          newErrors.push({ seq, error: e.message || String(e) });
+        }
+        setBatchProgress(p => ({ ...p, current: p.current + 1, items: [...newItems], errors: [...newErrors] }));
+      }
+    };
+    await Promise.all(Array.from({ length: 3 }, () => createWorker()));
+    setBatchResult({ items: [...prevItems, ...newItems], errors: newErrors, moNumber: packMO.mo_number, worker, lastSeq: batchResult.lastSeq });
+    setCurrentScreen('batch_pack_done');
+  }, [packMO, batchResult]);
 
   const handleBatchCreateBags = useCallback(async ({ startPackSeq, endPackSeq, worker }) => {
     if (!bagMO) return;
@@ -2534,18 +2628,26 @@ export default function App() {
         const qrText = buildMasterBagQR();
         const uuid = qrText.split('/view/bag/')[1];
         const totalQty = packs.reduce((s, p) => s + (parseInt(p['Total_Qty']) || 12), 0);
-        const res = await submitRecord(FORMS.MASTER_BAG, {
-          'Bag_UUID': uuid, 'Brand': BRAND, 'Bag_Sequence': bagSeq, 'MO_Number': bagMO.mo_number,
-          'Inner_Pack_Count': packs.length, 'Inner_Pack_UUIDs': JSON.stringify(packs.map(p => p['Pack_UUID'])),
-          'Total_Qty': totalQty, 'Is_Remainder': isRemainder, 'Worker': worker,
-          'Destination': 'MEX-Guadalajara', 'Bag_Status': 'Created'
-        });
-        if (!res || res.code !== 3000) throw new Error('Save failed bagSeq=' + bagSeq);
-        await Promise.all(packs.map(p =>
-          updateRecord(REPORTS.INNER_PACK, p['ID'], { 'Assigned_To_Bag': uuid, 'Pack_Status': 'Bagged' })
-            .catch(e => console.warn('[batch-bag] pack update failed', p['Pack_UUID'], e))
-        ));
-        return { bagSeq, uuid, qrText, totalQty, packCount: packs.length, isRemainder };
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const res = await submitRecord(FORMS.MASTER_BAG, {
+              'Bag_UUID': uuid, 'Brand': BRAND, 'Bag_Sequence': bagSeq, 'MO_Number': bagMO.mo_number,
+              'SKU': bagMO.sku, 'Factory': bagMO.factory,
+              'Inner_Pack_Count': packs.length, 'Inner_Pack_UUIDs': JSON.stringify(packs.map(p => p['Pack_UUID'])),
+              'Total_Qty': totalQty, 'Is_Remainder': isRemainder, 'Worker': worker,
+              'Destination': 'MEX-Guadalajara', 'Bag_Status': 'Created'
+            });
+            if (!res || res.code !== 3000) throw new Error('Save failed bagSeq=' + bagSeq + ' code=' + (res && res.code));
+            await Promise.all(packs.map(p =>
+              updateRecord(REPORTS.INNER_PACK, p['ID'], { 'Assigned_To_Bag': uuid, 'Pack_Status': 'Bagged' })
+                .catch(e => console.warn('[batch-bag] pack update failed', p['Pack_UUID'], e))
+            ));
+            return { bagSeq, uuid, qrText, totalQty, packCount: packs.length, isRemainder, savedToZoho: true };
+          } catch (e) {
+            if (attempt === 3) throw e;
+            await new Promise(r => setTimeout(r, 500 * attempt));
+          }
+        }
       };
       let idx = 0;
       const createBagWorker = async () => {
@@ -2556,8 +2658,8 @@ export default function App() {
           setBatchBagProgress(p => ({ ...p, current: p.current + 1, items: [...items], errors: [...errors] }));
         }
       };
-      await Promise.all(Array.from({ length: 3 }, () => createBagWorker()));
-      setBatchBagResult({ items, errors, moNumber: bagMO.mo_number, worker });
+      await Promise.all(Array.from({ length: 2 }, () => createBagWorker()));
+      setBatchBagResult({ items, errors, moNumber: bagMO.mo_number, worker, startPackSeq, endPackSeq });
       setCurrentScreen('batch_bag_done');
     } catch (err) {
       setCurrentScreen('batch_bag_input');
@@ -3045,9 +3147,15 @@ export default function App() {
           <PackMenuScreen
             onCreate={() => requirePin(() => setCurrentScreen('pack_mo_select'))}
             onBatch={() => requirePin(() => setCurrentScreen('batch_pack_mo_select'))}
-            onScan={() => { setPackDetailFrom('pack_menu'); setScanMode('inner_pack_detail'); setCameraOpen(true); }}
-            onList={() => setCurrentScreen('pack_list')}
+            onQueryMenu={() => setCurrentScreen('pack_query_sub_menu')}
             onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
+          />
+        )}
+        {currentScreen === 'pack_query_sub_menu' && (
+          <PackQuerySubMenu
+            onTextQuery={() => setCurrentScreen('pack_list')}
+            onScanQuery={() => { setPackDetailFrom('pack_query_sub_menu'); setScanMode('inner_pack_detail'); setCameraOpen(true); }}
+            onBack={() => setCurrentScreen('pack_menu')}
           />
         )}
         {currentScreen === 'pack_mo_select' && (
@@ -3109,7 +3217,7 @@ export default function App() {
         )}
         {currentScreen === 'pack_list' && (
           <PackListScreen
-            onBack={() => setCurrentScreen('pack_menu')}
+            onBack={() => setCurrentScreen('pack_query_sub_menu')}
             onSelectPack={(uuid) => {
               setPackDetailFrom('pack_list');
               setLoadingMsg('查询包装信息...');
@@ -3150,6 +3258,7 @@ export default function App() {
               setPackIsRemainder(false);
               setCurrentScreen('pack_create');
             }}
+            onRetryFailed={batchResult.errors.length > 0 ? handleRetryFailedPacks : null}
           />
         )}
 
@@ -3162,9 +3271,15 @@ export default function App() {
               setCurrentScreen('bag_mo_select');
             })}
             onBatch={() => requirePin(() => { setBagMO(null); setCurrentScreen('batch_bag_mo_select'); })}
-            onScan={() => { setBagDetailFrom('bag_menu'); setScanMode('master_bag_detail'); setCameraOpen(true); }}
-            onList={() => setCurrentScreen('bag_list')}
+            onQueryMenu={() => setCurrentScreen('bag_query_sub_menu')}
             onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
+          />
+        )}
+        {currentScreen === 'bag_query_sub_menu' && (
+          <BagQuerySubMenu
+            onTextQuery={() => setCurrentScreen('bag_list')}
+            onScanQuery={() => { setBagDetailFrom('bag_query_sub_menu'); setScanMode('master_bag_detail'); setCameraOpen(true); }}
+            onBack={() => setCurrentScreen('bag_menu')}
           />
         )}
         {currentScreen === 'bag_mo_select' && (
@@ -3219,7 +3334,7 @@ export default function App() {
         )}
         {currentScreen === 'bag_list' && (
           <BagListScreen
-            onBack={() => setCurrentScreen('bag_menu')}
+            onBack={() => setCurrentScreen('bag_query_sub_menu')}
             onSelectBag={(uuid) => {
               setBagDetailFrom('bag_list');
               setLoadingMsg('查询麻袋信息...');
@@ -3256,6 +3371,10 @@ export default function App() {
               setBagScannedPacks([]); setBagIsRemainder(false); setBagWorker('');
               setCurrentScreen('bag_create');
             }}
+            onRetryFailed={batchBagResult.errors.length > 0 ? () => {
+              setBatchBagResult(null);
+              setCurrentScreen('batch_bag_input');
+            } : null}
           />
         )}
 
