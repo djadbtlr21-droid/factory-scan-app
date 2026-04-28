@@ -453,11 +453,18 @@ const SuccessScreen = memo(function SuccessScreen({ result, onNextProcess, onNew
           <ResultRow label="담당자"    value={result.worker} />
           <ResultRow label="기록시간"  value={result.time} mute />
           {result.notes && <ResultRow label="메모" value={result.notes} mute />}
-          {result.moField && result.moFieldDate && (
-            <div style={{ background: 'linear-gradient(135deg,rgba(212,185,118,.1),rgba(212,185,118,.04))', border: '1px solid rgba(212,185,118,.3)', borderRadius: 'var(--radius-sm)', padding: '12px 18px', marginTop: 2 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#C9A84C', textTransform: 'uppercase', marginBottom: 6 }}>🎯 자동 갱신 / 自动更新</div>
-              <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{result.moField} → {result.moFieldDate}</div>
-            </div>
+          {result.moField && (
+            result.moUpdateOk ? (
+              <div style={{ background: 'linear-gradient(135deg,rgba(212,185,118,.1),rgba(212,185,118,.04))', border: '1px solid rgba(212,185,118,.3)', borderRadius: 'var(--radius-sm)', padding: '12px 18px', marginTop: 2 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: '#C9A84C', textTransform: 'uppercase', marginBottom: 6 }}>✅ 자동 갱신 성공 / 自动更新</div>
+                <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{result.moField} → {result.moFieldDate}</div>
+              </div>
+            ) : (
+              <div style={{ background: 'rgba(196,92,82,.08)', border: '1px solid rgba(196,92,82,.35)', borderRadius: 'var(--radius-sm)', padding: '12px 18px', marginTop: 2 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: 'var(--danger)', textTransform: 'uppercase', marginBottom: 6 }}>❌ 자동 갱신 실패 / 更新失败</div>
+                <div style={{ fontSize: 11, color: 'var(--danger)', fontWeight: 500, wordBreak: 'break-all' }}>{result.moField}: {result.moUpdateError || 'Unknown error'}</div>
+              </div>
+            )
           )}
         </div>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
@@ -3114,18 +3121,27 @@ export default function App() {
       throw new Error('日志保存失败: ' + JSON.stringify(res));
     }
 
-    const updateData = { 'Production_Status': selectedProcess.zohoValue || selectedProcess.key };
+    const updatePayload = { 'Production_Status': selectedProcess.zohoValue || selectedProcess.key };
     if (selectedProcess.moField) {
-      updateData[selectedProcess.moField] = dateOnlyStr;
+      updatePayload[selectedProcess.moField] = dateOnlyStr;
     }
+    let moUpdateOk = false;
+    let moUpdateError = '';
+    console.log('[MO_PATCH] Starting — recordId:', moRecordId, 'report:', MO_REPORT);
+    console.log('[MO_PATCH] Payload:', JSON.stringify(updatePayload));
     try {
-      await updateRecord(MO_REPORT, moRecordId, updateData);
+      const patchRes = await updateRecord(MO_REPORT, moRecordId, updatePayload);
+      console.log('[MO_PATCH] Response:', JSON.stringify(patchRes));
+      if (patchRes && patchRes.code === 3000) {
+        moUpdateOk = true;
+        console.log('[MO_PATCH] ✅ Success');
+      } else {
+        moUpdateError = patchRes ? JSON.stringify(patchRes) : 'No response';
+        console.error('[MO_PATCH] ❌ Non-3000 response:', moUpdateError);
+      }
     } catch (updErr) {
-      console.warn('[submit] MO update failed (log was saved)', {
-        fields: Object.keys(updateData),
-        status: updErr && updErr.status,
-        body: updErr && updErr.body
-      });
+      moUpdateError = (updErr && (updErr.message || JSON.stringify(updErr.body))) || String(updErr);
+      console.error('[MO_PATCH] ❌ Exception:', updErr, 'body:', updErr && updErr.body);
     }
 
     const now = new Date();
@@ -3139,6 +3155,8 @@ export default function App() {
       processKO: selectedProcess.ko,
       moField: selectedProcess.moField,
       moFieldDate: dateOnlyStr,
+      moUpdateOk,
+      moUpdateError,
       completed: form.completedQty,
       incomplete: form.incompleteQty,
       defect: form.defectQty,
