@@ -18,14 +18,14 @@ const LOG_FORM = 'Add_Production_Log';
 const LOG_REPORT = 'Production_Log_Report';
 
 const PROCESSES = [
-  { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date',  emoji: '📥' },
-  { code: 'Cutting_Start', zh: '裁剪开始', ko: '재단 시작', moField: 'Cutting_Start_Date',    emoji: '✂️' },
-  { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date',      emoji: '✅' },
-  { code: 'Sewing_Start',  zh: '车缝开始', ko: '봉제 시작', moField: 'Sewing_Start_Date',     emoji: '🧵' },
-  { code: 'Sewing_End',    zh: '车缝完成', ko: '봉제 완료', moField: 'Sewing_Completion_Date',emoji: '🪡' },
-  { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦' },
-  { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '🎁' },
-  { code: 'Shipped',       zh: '出货',     ko: '출고',      moField: 'Ship_Date',              emoji: '🚚' },
+  { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date',  emoji: '📥', zohoValue: 'Fabric In / 원단입고 / 面料入库' },
+  { code: 'Cutting_Start', zh: '裁剪开始', ko: '재단 시작', moField: 'Cutting_Start_Date',    emoji: '✂️', zohoValue: 'Cutting Start / 재단 시작 / 裁剪开始' },
+  { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date',      emoji: '✅', zohoValue: 'Cutting End / 재단 완료 / 裁剪完成' },
+  { code: 'Sewing_Start',  zh: '车缝开始', ko: '봉제 시작', moField: 'Sewing_Start_Date',     emoji: '🧵', zohoValue: 'Sewing Start / 봉제 시작 / 车缝开始' },
+  { code: 'Sewing_End',    zh: '车缝完成', ko: '봉제 완료', moField: 'Sewing_Completion_Date',emoji: '🪡', zohoValue: 'Sewing End / 봉제 완료 / 车缝完成' },
+  { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦', zohoValue: 'Packing Start / 포장 시작 / 包装开始' },
+  { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '🎁', zohoValue: 'Packing End / 포장 완료 / 包装完成' },
+  { code: 'Shipped',       zh: '出货',     ko: '출고',      moField: 'Ship_Date',              emoji: '🚚', zohoValue: 'Shipped / 출고 / 出货' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -227,10 +227,10 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
     const map = {};
     if (!logs || !logs.length) return map;
     logs.forEach(r => {
-      const code = r['Process'];
-      if (!code) return;
+      const proc = r['Process'];
+      if (!proc) return;
       const qty = parseInt(r['Completed_Qty']) || 0;
-      map[code] = (map[code] || 0) + qty;
+      map[proc] = (map[proc] || 0) + qty;
     });
     return map;
   }, [logs]);
@@ -238,13 +238,13 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
   const ProcBtn = ({ p, full }) => (
     <div
       className={'proc-btn' + (full ? ' proc-full' : '') + (selectedKey === p.code ? ' selected' : '')}
-      onClick={() => onSelectProcess(p.code, p.zh, p.ko, p.moField)}
+      onClick={() => onSelectProcess(p.code, p.zh, p.ko, p.moField, p.zohoValue)}
     >
       <span className="proc-icon">{p.emoji}</span>
       <div className="proc-name">{p.zh}</div>
       <div className="proc-sub">{p.ko}</div>
-      {processStatusMap[p.code] != null
-        ? <span className="proc-status proc-status-done">✅ {processStatusMap[p.code].toLocaleString()}件</span>
+      {processStatusMap[p.zohoValue] != null
+        ? <span className="proc-status proc-status-done">✅ {processStatusMap[p.zohoValue].toLocaleString()}件</span>
         : <span className="proc-status proc-status-pending">⏳ 未记录</span>}
     </div>
   );
@@ -3088,8 +3088,8 @@ export default function App() {
     img.src = URL.createObjectURL(file);
   }, [handleQR]);
 
-  const handleSelectProcess = useCallback((procCode, procZH, procKO, procMoField) => {
-    setSelectedProcess({ key: procCode, cn: procZH, ko: procKO, moField: procMoField });
+  const handleSelectProcess = useCallback((procCode, procZH, procKO, procMoField, procZohoValue) => {
+    setSelectedProcess({ key: procCode, cn: procZH, ko: procKO, moField: procMoField, zohoValue: procZohoValue });
     setCurrentScreen('input');
   }, []);
 
@@ -3100,7 +3100,7 @@ export default function App() {
       'MO_Number':      moData.mo_number,
       'SKU':            moData.sku,
       'Factory':        moData.factory,
-      'Process':        selectedProcess.key,
+      'Process':        selectedProcess.zohoValue || selectedProcess.key,
       'Completed_Qty':  form.completedQty,
       'Incomplete_Qty': form.incompleteQty,
       'Defect_Qty':     form.defectQty,
@@ -3114,7 +3114,7 @@ export default function App() {
       throw new Error('日志保存失败: ' + JSON.stringify(res));
     }
 
-    const updateData = { 'Production_Status': selectedProcess.key };
+    const updateData = { 'Production_Status': selectedProcess.zohoValue || selectedProcess.key };
     if (selectedProcess.moField) {
       updateData[selectedProcess.moField] = dateOnlyStr;
     }
