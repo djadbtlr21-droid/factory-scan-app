@@ -13,6 +13,25 @@
   --shadow-md:0 4px 12px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.08);
   --shadow-lg:0 12px 40px rgba(0,0,0,.10),0 4px 12px rgba(0,0,0,.06);
   --transition:all .2s cubic-bezier(.4,0,.2,1);
+  /* App dark theme (default) */
+  --app-bg:#0D0A06;
+  --app-card:rgba(255,255,255,0.04);
+  --app-gold:#D4AF37;
+  --app-gold-dim:#A89060;
+  --app-cream:#F5E6D3;
+  --app-cream-dim:#C4A882;
+  --app-border:rgba(212,175,55,0.2);
+  --app-border-hover:rgba(212,175,55,0.5);
+}
+[data-theme="light"]{
+  --app-bg:#F7F3ED;
+  --app-card:rgba(0,0,0,0.04);
+  --app-gold:#8B6914;
+  --app-gold-dim:#6B5010;
+  --app-cream:#1A1208;
+  --app-cream-dim:#3A2810;
+  --app-border:rgba(139,105,20,0.3);
+  --app-border-hover:rgba(139,105,20,0.6);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:'Manrope','Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;background:var(--surface2);min-height:100vh;-webkit-font-smoothing:antialiased}

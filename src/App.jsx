@@ -472,7 +472,7 @@ const LogModal = memo(function LogModal({ log, onClose }) {
 });
 
 // ─── Design System helpers ────────────────────────────────────────────
-const G = { bg:'#0D0A06', card:'rgba(255,255,255,0.04)', gold:'#D4AF37', goldDim:'#A89060', cream:'#F5E6D3', creamDim:'#C4A882', border:'rgba(212,175,55,0.2)', borderHover:'rgba(212,175,55,0.5)' };
+const G = { bg:'var(--app-bg)', card:'var(--app-card)', gold:'var(--app-gold)', goldDim:'var(--app-gold-dim)', cream:'var(--app-cream)', creamDim:'var(--app-cream-dim)', border:'var(--app-border)', borderHover:'var(--app-border-hover)' };
 
 function DkBack({ onClick }) {
   return (
@@ -599,35 +599,38 @@ const IconStatusScan = () => (
 );
 
 // ─── NEW: Home Screen ─────────────────────────────────────────────────
-const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan }) {
+const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan, theme, onToggleTheme }) {
   const card = (onClick, Icon, label, sub) => (
-    <div onClick={onClick} style={{ position:'relative', border:'1px solid rgba(212,175,55,0.25)', borderRadius:2, background:'rgba(255,255,255,0.03)', padding:'20px 20px 20px 24px', marginBottom:14, display:'flex', alignItems:'center', gap:20, cursor:'pointer', transition:'all .2s' }}
-      onMouseEnter={e => { e.currentTarget.style.border='1px solid rgba(212,175,55,0.6)'; e.currentTarget.style.background='rgba(212,175,55,0.06)'; }}
-      onMouseLeave={e => { e.currentTarget.style.border='1px solid rgba(212,175,55,0.25)'; e.currentTarget.style.background='rgba(255,255,255,0.03)'; }}
+    <div onClick={onClick} style={{ position:'relative', border:'1px solid '+G.border, borderRadius:2, background:G.card, padding:'20px 20px 20px 24px', marginBottom:14, display:'flex', alignItems:'center', gap:20, cursor:'pointer', transition:'all .2s' }}
+      onMouseEnter={e => { e.currentTarget.style.border='1px solid '+G.borderHover; e.currentTarget.style.background='rgba(212,175,55,0.06)'; }}
+      onMouseLeave={e => { e.currentTarget.style.border='1px solid '+G.border; e.currentTarget.style.background=G.card; }}
     >
       {[{t:'-1px',l:'-1px'},{t:'-1px',r:'-1px'},{b:'-1px',l:'-1px'},{b:'-1px',r:'-1px'}].map((pos, i) => {
         const isRight = pos.r !== undefined; const isBottom = pos.b !== undefined;
         return (
           <div key={i} style={{ position:'absolute', width:14, height:14, top:pos.t, bottom:pos.b, left:pos.l, right:pos.r }}>
-            <div style={{ position:'absolute', background:'#D4AF37', [isBottom?'bottom':'top']:0, [isRight?'right':'left']:0, width:14, height:1.5 }} />
-            <div style={{ position:'absolute', background:'#D4AF37', [isBottom?'bottom':'top']:0, [isRight?'right':'left']:0, width:1.5, height:14 }} />
+            <div style={{ position:'absolute', background:G.gold, [isBottom?'bottom':'top']:0, [isRight?'right':'left']:0, width:14, height:1.5 }} />
+            <div style={{ position:'absolute', background:G.gold, [isBottom?'bottom':'top']:0, [isRight?'right':'left']:0, width:1.5, height:14 }} />
           </div>
         );
       })}
       <Icon />
       <div>
-        <div style={{ fontSize:16, fontWeight:300, letterSpacing:2, color:'#F5E6D3' }}>{label}</div>
-        <div style={{ fontSize:10, color:'#A89060', letterSpacing:1.5, marginTop:4, fontWeight:300 }}>{sub}</div>
+        <div style={{ fontSize:16, fontWeight:300, letterSpacing:2, color:G.cream }}>{label}</div>
+        <div style={{ fontSize:10, color:G.goldDim, letterSpacing:1.5, marginTop:4, fontWeight:300 }}>{sub}</div>
       </div>
     </div>
   );
   return (
-    <div style={{ minHeight:'100vh', width:'100%', background:'#0D0A06', backgroundImage:'radial-gradient(ellipse at 50% -10%, rgba(212,175,55,0.07) 0%, transparent 55%)', padding:'0 20px 40px', display:'flex', flexDirection:'column' }}>
+    <div style={{ minHeight:'100vh', width:'100%', background:G.bg, backgroundImage:'radial-gradient(ellipse at 50% -10%, rgba(212,175,55,0.07) 0%, transparent 55%)', padding:'0 20px 40px', display:'flex', flexDirection:'column', position:'relative' }}>
+      <button onClick={onToggleTheme} style={{ position:'absolute', top:16, right:16, background:'transparent', border:'1px solid '+G.border, color:G.goldDim, fontSize:11, letterSpacing:1, padding:'6px 12px', cursor:'pointer', fontFamily:'inherit', zIndex:10, lineHeight:1 }}>
+        {theme === 'dark' ? '☀' : '🌙'}
+      </button>
       <div style={{ textAlign:'center', padding:'60px 0 48px' }}>
-        <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:52, letterSpacing:12, color:'#D4AF37', lineHeight:1 }}>IKU</div>
-        <div style={{ fontSize:9, color:'#A89060', letterSpacing:6, marginTop:8, fontWeight:300 }}>PRODUCTION SYSTEM</div>
-        <div style={{ fontSize:10, color:'rgba(168,144,96,0.6)', letterSpacing:2, marginTop:6, fontWeight:300 }}>生产管理系统</div>
-        <div style={{ width:60, height:1, background:'rgba(212,175,55,0.2)', margin:'20px auto 0' }} />
+        <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:52, letterSpacing:12, color:G.gold, lineHeight:1 }}>IKU</div>
+        <div style={{ fontSize:9, color:G.goldDim, letterSpacing:6, marginTop:8, fontWeight:300 }}>PRODUCTION SYSTEM</div>
+        <div style={{ fontSize:10, color:G.goldDim, letterSpacing:2, marginTop:6, fontWeight:300 }}>生产管理系统</div>
+        <div style={{ width:60, height:1, background:G.border, margin:'20px auto 0' }} />
       </div>
       {card(onSelectProductionLog, IconFactory, '生产进度扫码', 'Production Log Scan')}
       {card(onSelectInnerPack, IconInnerPack, '中间包装', 'Inner Pack · 12 pcs')}
@@ -741,6 +744,33 @@ const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onScan, onList, on
   );
 });
 
+// ─── NEW: Bag MO Select Screen ────────────────────────────────────────
+const BagMOSelectScreen = memo(function BagMOSelectScreen({ onScan, onManual, onBack }) {
+  const [manualMO, setManualMO] = useState('');
+  const handleManualSubmit = () => {
+    const mo = manualMO.trim().toUpperCase();
+    if (!mo) { alert('请输入订单号'); return; }
+    onManual(mo);
+  };
+  return (
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:36 }}>
+        <div style={{ fontSize:9, letterSpacing:4, color:'#A89060', fontWeight:300 }}>STEP 1 / 2</div>
+        <div style={{ fontSize:20, color:'#F5E6D3', marginTop:10, fontWeight:300, letterSpacing:1 }}>选择订单 / MO 선택</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:4 }}>Which MO is this bag for?</div>
+      </div>
+      <DkBtn onClick={onScan}>📷 扫描 MO QR / QR 스캔</DkBtn>
+      <div style={{ textAlign:'center', color:'rgba(168,144,96,0.5)', fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
+      <DkCard>
+        <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:12, fontWeight:300 }}>手动输入 / 수동 입력</div>
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" />
+        <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
+      </DkCard>
+    </DkScreen>
+  );
+});
+
 // ─── NEW: Pack MO Select Screen ───────────────────────────────────────
 const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, onBack }) {
   const [manualMO, setManualMO] = useState('');
@@ -761,7 +791,7 @@ const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, 
       <div style={{ textAlign:'center', color:'rgba(168,144,96,0.5)', fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
       <DkCard>
         <div style={{ fontSize:9, letterSpacing:2, color:'#A89060', marginBottom:12, fontWeight:300 }}>手动输入 / 수동 입력</div>
-        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: TS26-105" />
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" />
         <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
       </DkCard>
     </DkScreen>
@@ -797,7 +827,7 @@ const PackCreateScreen = memo(function PackCreateScreen({
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
-      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>INNER PACK #{packSequence}</div>
         <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{packMO.mo_number}</div>
@@ -986,17 +1016,17 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
 
 // ─── NEW: Bag Create Screen ───────────────────────────────────────────
 const BagCreateScreen = memo(function BagCreateScreen({
-  scannedPacks, isRemainder, setIsRemainder, worker, setWorker, destination, setDestination,
+  bagMO, scannedPacks, isRemainder, setIsRemainder, worker, setWorker,
   onScanNext, onRemovePack, onSubmit, onBack, submitting
 }) {
   const count = scannedPacks.length;
   const totalQty = scannedPacks.reduce((s, p) => s + (parseInt(p.total_qty) || 12), 0);
   return (
     <DkScreen style={{ paddingTop:0 }}>
-      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>MASTER BAG</div>
-        <div style={{ fontSize:20, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{count} / {MASTER_BAG_SIZE} 包装</div>
+        <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{bagMO ? bagMO.mo_number : '—'} · {count} / {MASTER_BAG_SIZE} 包装</div>
         <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{totalQty} 件 · Total pieces</div>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:12 }}>
           <div style={{ flex:1, height:2, background:'rgba(212,175,55,0.15)', borderRadius:1 }}>
@@ -1036,7 +1066,6 @@ const BagCreateScreen = memo(function BagCreateScreen({
         </DkCard>
         <DkCard>
           <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" />
-          <DkInput label="目的地 / 목적지" value={destination} onChange={e => setDestination(e.target.value)} placeholder="例: ZLO-Manzanillo" />
         </DkCard>
         <DkBtn onClick={onSubmit} disabled={submitting || count === 0} style={{ padding:18, fontSize:11, letterSpacing:3 }}>
           {submitting ? '保存中...' : `✅ ${count}包装 装袋完成 / 마대 완료`}
@@ -1118,7 +1147,7 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
           <DkRow label="Total Qty / 총 수량" value={String(detail.total_qty) + ' 件'} />
           <DkRow label="Is Remainder / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
           <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
-          <DkRow label="Destination / 출고지" value={detail.destination || '-'} />
+          <DkRow label="Destination / 출고지" value={detail.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : (detail.destination || '-')} />
           <DkRow label="Received At MEX / 멕시코 도착" value={detail.received_at_mex || '-'} />
           <DkRow label="Created Time / 생성 시간" value={formatDate(detail.created_time) || '-'} />
           <DkRow label="Last Modified / 최근 수정" value={formatDate(detail.modified_time) || '-'} />
@@ -1212,14 +1241,14 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
 
   return (
     <DkScreen style={{ paddingTop:0 }}>
-      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>PACK QUERY</div>
         <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>查询包装 / 포장 조회</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
-          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: TS26-105" />
+          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" />
           <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
         </DkCard>
         {searched && !loading && packs.length === 0 && (
@@ -1299,14 +1328,14 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
 
   return (
     <DkScreen style={{ paddingTop:0 }}>
-      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'50px 20px 18px', position:'relative' }}>
+      <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>BAG QUERY</div>
         <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>查询麻袋 / 마대 조회</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
-          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: TS26-105" />
+          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" />
           <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
         </DkCard>
         {searched && !loading && bags.length === 0 && (
@@ -1548,7 +1577,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
       <div style={{ background:'rgba(0,0,0,0.6)', borderBottom:'1px solid rgba(212,175,55,0.15)', padding:'20px 20px 18px' }}>
         <div style={{ fontSize:9, letterSpacing:4, color:'#D4AF37', fontWeight:300 }}>麻袋详情 / 마대 상세</div>
         <div style={{ fontSize:18, color:'#F5E6D3', marginTop:6, fontWeight:300 }}>{bagRecord.mo_number} · Bag #{bagRecord.bag_sequence}</div>
-        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{bagRecord.factory}{bagRecord.destination ? ' → ' + bagRecord.destination : ''}</div>
+        <div style={{ fontSize:10, color:'#A89060', marginTop:2 }}>{bagRecord.factory}{bagRecord.destination ? ' → ' + (bagRecord.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : bagRecord.destination) : ''}</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
@@ -1561,7 +1590,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
           )}
           <DkRow label="MO 번호 / 订单号" value={bagRecord.mo_number} />
           <DkRow label="工厂 / 공장" value={bagRecord.factory || '-'} />
-          <DkRow label="目的地 / 목적지" value={bagRecord.destination || '-'} />
+          <DkRow label="目的地 / 목적지" value={bagRecord.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : (bagRecord.destination || '-')} />
           <DkRow label="Bag # / 마대 순번" value={String(bagRecord.bag_sequence)} />
           <DkRow label="内装包数 / 포장 수" value={String(bagRecord.inner_pack_count) + ' packs'} />
           <DkRow label="总件数 / 총 수량" value={String(bagRecord.total_qty) + ' 件'} />
@@ -1673,7 +1702,7 @@ export default function App() {
   const [bagScannedPacks, setBagScannedPacks] = useState([]);
   const [bagIsRemainder, setBagIsRemainder] = useState(false);
   const [bagWorker, setBagWorker] = useState('');
-  const [bagDestination, setBagDestination] = useState('');
+  const [bagMO, setBagMO] = useState(null);
   const [createdBag, setCreatedBag] = useState(null);
   const [scannedBagDetail, setScannedBagDetail] = useState(null);
 
@@ -1691,6 +1720,14 @@ export default function App() {
   // ── Status Scan state ──
   const [statusScanTargetStatus, setStatusScanTargetStatus] = useState('');
   const [statusScanResult, setStatusScanResult] = useState(null);
+
+  // ── Theme state ──
+  const [theme, setTheme] = useState(() => localStorage.getItem('factoryapp_theme') || 'dark');
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('factoryapp_theme', theme);
+  }, [theme]);
+  const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
 
   // ── Toast state ──
   const [toastMsg, setToastMsg] = useState('');
@@ -1855,6 +1892,34 @@ export default function App() {
     }
   }, []);
 
+  const fetchMODataForBag = useCallback(async (moNumber) => {
+    try {
+      const res = await getRecords(REPORTS.MO);
+      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+      const found = list.find((r) => r['MO_Number'] === moNumber);
+      if (!found) {
+        setCurrentScreen('bag_mo_select');
+        alert('未找到订单: ' + moNumber);
+        return;
+      }
+      let skuStr = '-';
+      const skuRaw = found['Style_SKU'];
+      if (skuRaw) {
+        if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || '-';
+        else skuStr = String(skuRaw);
+      }
+      setBagMO({
+        mo_number: found['MO_Number'] || moNumber,
+        sku: skuStr,
+        factory: String(found['Factory'] || '-'),
+      });
+      setCurrentScreen('bag_create');
+    } catch (err) {
+      setCurrentScreen('bag_mo_select');
+      alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
   const fetchInnerPackDetail = useCallback(async (uuid) => {
     try {
       const res = await getRecords(REPORTS.INNER_PACK);
@@ -1997,6 +2062,10 @@ export default function App() {
   }, []);
 
   const handleCreateBag = useCallback(async () => {
+    if (!bagMO) {
+      alert('请先选择订单号 / MO를 먼저 선택하세요');
+      return;
+    }
     if (bagScannedPacks.length === 0) {
       alert('请至少扫描一个包装');
       return;
@@ -2009,7 +2078,7 @@ export default function App() {
       return;
     }
 
-    const primaryMO = bagScannedPacks[0].mo_number;
+    const primaryMO = bagMO.mo_number;
     const qrText = buildMasterBagQR();
     const uuid = qrText.split('/view/bag/')[1];
     const totalQty = bagScannedPacks.reduce((s, p) => s + (parseInt(p.total_qty) || 12), 0);
@@ -2037,7 +2106,7 @@ export default function App() {
       'Total_Qty':        totalQty,
       'Is_Remainder':     bagIsRemainder,
       'Worker':           bagWorker.trim(),
-      'Destination':      bagDestination.trim(),
+      'Destination':      'MEX-Guadalajara',
       'Bag_Status':       'Created'
     };
 
@@ -2075,7 +2144,7 @@ export default function App() {
       setCurrentScreen('bag_create');
       alert('保存失败: ' + (err?.message || String(err)));
     }
-  }, [bagScannedPacks, bagIsRemainder, bagWorker, bagDestination]);
+  }, [bagMO, bagScannedPacks, bagIsRemainder, bagWorker]);
 
   const fetchMasterBagDetail = useCallback(async (uuid) => {
     try {
@@ -2278,6 +2347,34 @@ export default function App() {
       return;
     }
 
+    if (scanMode === 'bag_mo') {
+      if (qrType !== 'production_log') {
+        setCameraOpen(false);
+        alert('请扫描生产进度QR (MO QR)\n생산 진척 QR을 스캔하세요');
+        return;
+      }
+      let moNumber = '';
+      text.split(/[|\n\r]+/).forEach((part) => {
+        const idx = part.indexOf(':');
+        if (idx < 0) return;
+        const key = part.substring(0, idx).trim().toUpperCase();
+        if (key === 'MO') moNumber = part.substring(idx + 1).trim();
+      });
+      if (!moNumber && /^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
+      if (!moNumber) {
+        setCameraOpen(false);
+        alert('未能识别订单号');
+        return;
+      }
+      flushSync(() => {
+        setCameraOpen(false);
+        setLoadingMsg('加载订单数据...');
+        setCurrentScreen('loading');
+      });
+      fetchMODataForBag(moNumber);
+      return;
+    }
+
     if (scanMode === 'inner_pack_detail') {
       const uuid = parseInnerPackQR(text);
       if (!uuid) {
@@ -2342,7 +2439,7 @@ export default function App() {
       handleStatusScanUpdate(uuid);
       return;
     }
-  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate]);
+  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchMODataForBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate]);
 
   // ── Existing handlers (unchanged except handleBackToScan goes to 'home') ──
   const handleScanRequest = useCallback(() => setCameraOpen(true), []);
@@ -2468,6 +2565,8 @@ export default function App() {
             onSelectInnerPack={() => setCurrentScreen('pack_menu')}
             onSelectMasterBag={() => setCurrentScreen('bag_menu')}
             onSelectStatusScan={() => setCurrentScreen('status_scan_mode')}
+            theme={theme}
+            onToggleTheme={toggleTheme}
           />
         )}
 
@@ -2585,27 +2684,37 @@ export default function App() {
           <BagMenuScreen
             onCreate={() => requirePin(() => {
               setBagScannedPacks([]); setBagIsRemainder(false);
-              setBagWorker(''); setBagDestination('');
-              setCurrentScreen('bag_create');
+              setBagWorker(''); setBagMO(null);
+              setCurrentScreen('bag_mo_select');
             })}
             onScan={() => { setBagDetailFrom('bag_menu'); setScanMode('master_bag_detail'); setCameraOpen(true); }}
             onList={() => setCurrentScreen('bag_list')}
             onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
           />
         )}
+        {currentScreen === 'bag_mo_select' && (
+          <BagMOSelectScreen
+            onScan={() => { setScanMode('bag_mo'); setCameraOpen(true); }}
+            onManual={(mo) => {
+              setLoadingMsg('加载订单数据...');
+              setCurrentScreen('loading');
+              fetchMODataForBag(mo);
+            }}
+            onBack={() => setCurrentScreen('bag_menu')}
+          />
+        )}
         {currentScreen === 'bag_create' && (
           <BagCreateScreen
+            bagMO={bagMO}
             scannedPacks={bagScannedPacks}
             isRemainder={bagIsRemainder}
             setIsRemainder={setBagIsRemainder}
             worker={bagWorker}
             setWorker={setBagWorker}
-            destination={bagDestination}
-            setDestination={setBagDestination}
             onScanNext={() => { setScanMode('master_bag_compose'); setCameraOpen(true); }}
             onRemovePack={handleRemovePackFromBag}
             onSubmit={handleCreateBag}
-            onBack={() => setCurrentScreen('bag_menu')}
+            onBack={() => setCurrentScreen('bag_mo_select')}
             submitting={false}
           />
         )}
@@ -2614,12 +2723,12 @@ export default function App() {
             bag={createdBag}
             onNewBag={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
-              setBagWorker(''); setBagDestination('');
-              setCurrentScreen('bag_create');
+              setBagWorker(''); setBagMO(null);
+              setCurrentScreen('bag_mo_select');
             }}
             onHome={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
-              setBagWorker(''); setBagDestination('');
+              setBagWorker(''); setBagMO(null);
               setCurrentScreen('home');
             }}
           />
