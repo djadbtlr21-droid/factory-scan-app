@@ -24,6 +24,12 @@ html { font-size: 110%; }
   --app-cream-dim:#C4A882;
   --app-border:rgba(212,175,55,0.2);
   --app-border-hover:rgba(212,175,55,0.5);
+  --app-header-overlay:rgba(0,0,0,0.6);
+  --app-progress-track:rgba(212,175,55,0.15);
+  --app-btn-bg:rgba(212,175,55,0.12);
+  --app-btn-bg-disabled:rgba(212,175,55,0.08);
+  --app-divider:rgba(212,175,55,0.08);
+  --app-border-input:rgba(212,175,55,0.3);
 }
 [data-theme="light"]{
   --app-bg:#F7F3ED;
@@ -34,6 +40,20 @@ html { font-size: 110%; }
   --app-cream-dim:#3A2810;
   --app-border:rgba(139,105,20,0.3);
   --app-border-hover:rgba(139,105,20,0.6);
+  --app-header-overlay:rgba(0,0,0,0.82);
+  --app-progress-track:rgba(139,105,20,0.18);
+  --app-btn-bg:rgba(139,105,20,0.14);
+  --app-btn-bg-disabled:rgba(139,105,20,0.07);
+  --app-divider:rgba(139,105,20,0.14);
+  --app-border-input:rgba(139,105,20,0.40);
+}
+/* Overlay headers: revert text CSS vars to bright dark-mode values in light mode */
+[data-theme="light"] .overlay-header,
+[data-theme="light"] .overlay-header *{
+  --app-gold:#D4AF37;
+  --app-gold-dim:#A89060;
+  --app-cream:#F5E6D3;
+  --app-cream-dim:#C4A882;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:'Manrope','Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif;background:var(--surface2);min-height:100vh;-webkit-font-smoothing:antialiased}
