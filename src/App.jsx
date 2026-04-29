@@ -2395,6 +2395,24 @@ const BagQuerySubMenu = memo(function BagQuerySubMenu({ onTextQuery, onScanQuery
   );
 });
 
+async function updatePackToBagged(packId, bagUUID, packUUID, maxRetries = 5) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await updateRecord(REPORTS.INNER_PACK, packId, { 'Pack_Status': 'Bagged', 'Assigned_To_Bag': bagUUID });
+      if (result && result.code === 3000) {
+        console.log(`[Pack Update] ✅ Pack #${String(packUUID).slice(0,8)} → Bagged (attempt ${attempt})`);
+        return { success: true, packUUID, packId };
+      }
+      console.warn(`[Pack Update] ⚠️ Pack ${packUUID} attempt ${attempt} non-3000:`, result?.code);
+    } catch (err) {
+      console.warn(`[Pack Update] ⚠️ Pack ${packUUID} attempt ${attempt} threw:`, err.message);
+    }
+    if (attempt < maxRetries) await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt - 1)));
+  }
+  console.error(`[Pack Update] ❌ Pack ${packUUID} FAILED after ${maxRetries} attempts`);
+  return { success: false, packUUID, packId };
+}
+
 // ─── App: orchestration only ──────────────────────────────────────────
 export default function App() {
   // ── Existing Production Log state ──
@@ -2955,24 +2973,22 @@ export default function App() {
       }
 
       setLoadingMsg('状态更新中...');
-      const updatePackWithRetry = async (p) => {
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            const result = await updateRecord(REPORTS.INNER_PACK, p.record_id, { 'Assigned_To_Bag': uuid, 'Pack_Status': 'Bagged' });
-            if (result && result.code === 3000) return { success: true };
-            console.warn(`[bag] Pack #${p.uuid} attempt ${attempt} non-3000:`, result?.code);
-          } catch (updErr) {
-            console.warn(`[bag] Pack #${p.uuid} attempt ${attempt} error:`, updErr);
-          }
-          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
-        }
-        return { success: false, uuid: p.uuid };
-      };
-      const updateResults = await Promise.all(bagScannedPacks.map(updatePackWithRetry));
-      const failures = updateResults.filter(r => !r.success);
+      const updateResults = [];
+      for (const p of bagScannedPacks) {
+        updateResults.push(await updatePackToBagged(p.record_id, uuid, p.uuid));
+      }
+      let failures = updateResults.filter(r => !r.success);
       if (failures.length > 0) {
-        console.error('[bag] Failed to update Pack_Status for:', failures.map(f => f.uuid));
-        alert(`마대는 생성됐지만 ${failures.length}개 Pack 상태 업데이트 실패. 관리자 확인 필요.`);
+        console.error('[bag] Failed pack updates:', failures.map(f => f.packUUID));
+        const retry = window.confirm(`⚠ 마대 생성됐지만 ${failures.length}개 Pack 상태 갱신 실패\n재시도하시겠습니까? / 再试?`);
+        if (retry) {
+          for (const f of failures) {
+            await updatePackToBagged(f.packId, uuid, f.packUUID, 5);
+          }
+          failures = [];
+        } else {
+          alert(`경고: ${failures.length}개 Pack의 Pack_Status가 Bagged로 갱신되지 않았습니다. 다음 마대 생성 시 잘못 노출될 수 있습니다.`);
+        }
       }
 
       const qrDataURL = await generateQRDataURL(qrText, 512);
@@ -3164,11 +3180,16 @@ export default function App() {
             }
           }
           if (saved) {
-            await Promise.all(bPacks.map(p =>
-              updateRecord(REPORTS.INNER_PACK, p['ID'], { 'Assigned_To_Bag': uuid, 'Pack_Status': 'Bagged' })
-                .catch(e => console.warn('[Batch Bag] pack update failed', p['Pack_UUID'], e))
-            ));
-            items.push({ bagSeq, uuid, qrText, totalQty, packCount: bPacks.length, isRemainder, savedToZoho: true });
+            const packUpdateResults = [];
+            for (const p of bPacks) {
+              packUpdateResults.push(await updatePackToBagged(p['ID'], uuid, p['Pack_UUID']));
+            }
+            const packFailures = packUpdateResults.filter(r => !r.success);
+            if (packFailures.length > 0) {
+              console.error(`[Batch Bag] Bag #${bagSeq}: ${packFailures.length} pack updates failed:`, packFailures.map(f => f.packUUID));
+              errors.push({ bagSeq, error: `Bag created but ${packFailures.length} pack status updates failed` });
+            }
+            items.push({ bagSeq, uuid, qrText, totalQty, packCount: bPacks.length, isRemainder, savedToZoho: true, packUpdateFailures: packFailures.length });
           }
         } catch (e) {
           console.error(`[Batch Bag] Bag #${bagGroups[i].bagSeq} failed:`, e);
