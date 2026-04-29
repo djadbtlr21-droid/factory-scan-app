@@ -1112,10 +1112,13 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
 // ─── NEW: Bag Create Screen ───────────────────────────────────────────
 const BagCreateScreen = memo(function BagCreateScreen({
   bagMO, scannedPacks, isRemainder, setIsRemainder, worker, setWorker,
-  onScanNext, onRemovePack, onSubmit, onBack, submitting
+  onScanNext, onRemovePack, onSubmit, onBack, submitting,
+  availablePacks, availablePacksLoading, onSelectPack, onSelectFirst10, onClearAll
 }) {
   const count = scannedPacks.length;
   const totalQty = scannedPacks.reduce((s, p) => s + (parseInt(p.total_qty) || 12), 0);
+  const selectedUUIDs = useMemo(() => new Set(scannedPacks.map(p => p.uuid)), [scannedPacks]);
+  const maxReached = count >= MASTER_BAG_SIZE;
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
@@ -1131,23 +1134,38 @@ const BagCreateScreen = memo(function BagCreateScreen({
         </div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
-        <DkBtn onClick={onScanNext}>📷 扫描包装 QR / 포장 QR 스캔 ({count} 已扫描)</DkBtn>
-        {count > 0 && (
-          <DkCard>
-            <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>已扫描包装 / 스캔된 포장</div>
-            {scannedPacks.map((p, i) => (
-              <div key={p.uuid} style={{ display:'flex', alignItems:'center', padding:'8px 0', borderBottom: i < scannedPacks.length - 1 ? '1px solid var(--app-divider)' : 'none' }}>
-                <div style={{ width:22, height:22, border:'1px solid rgba(212,175,55,0.4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:G.gold, marginRight:12, flexShrink:0 }}>{i + 1}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:12, color:G.cream, fontWeight:400 }}>{p.mo_number}</div>
-                  <div style={{ fontSize:9, color:G.goldDim, fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.uuid.substring(0, 13)}...</div>
-                </div>
-                <div style={{ fontSize:11, color:G.goldDim, marginRight:10 }}>{p.total_qty}件</div>
-                <button onClick={() => onRemovePack(p.uuid)} style={{ background:'transparent', border:'none', color:G.goldDim, fontSize:16, cursor:'pointer', padding:4 }}>✕</button>
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>选择中包袋 / 중간포장 선택</div>
+          {availablePacksLoading ? (
+            <div style={{ display:'flex', justifyContent:'center', padding:'20px 0' }}><div className="spinner" style={{ width:24, height:24 }} /></div>
+          ) : !availablePacks || availablePacks.length === 0 ? (
+            <div style={{ textAlign:'center', color:G.goldDim, fontSize:11, padding:'16px 0', letterSpacing:1 }}>所有包装已分配 / 모든 포장이 마대에 할당됨</div>
+          ) : (
+            <>
+              <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                <button onClick={() => onSelectFirst10(availablePacks)} style={{ flex:1, padding:'8px 0', background:G.btnBg, border:'1px solid '+G.borderHover, color:G.gold, fontSize:10, letterSpacing:1, cursor:'pointer', fontFamily:'inherit', borderRadius:2 }}>⚡ 前{MASTER_BAG_SIZE}个 / 처음 {MASTER_BAG_SIZE}개</button>
+                <button onClick={onClearAll} style={{ flex:1, padding:'8px 0', background:'transparent', border:'1px solid '+G.border, color:G.goldDim, fontSize:10, letterSpacing:1, cursor:'pointer', fontFamily:'inherit', borderRadius:2 }}>✕ 清除 / 전체 해제</button>
               </div>
-            ))}
-          </DkCard>
-        )}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:5, maxHeight:260, overflowY:'auto' }}>
+                {availablePacks.map(p => {
+                  const uuid = p['Pack_UUID'];
+                  const seq = p['Pack_Sequence'];
+                  const isSelected = selectedUUIDs.has(uuid);
+                  const isDisabled = maxReached && !isSelected;
+                  return (
+                    <button key={uuid} onClick={() => !isDisabled && onSelectPack(p)}
+                      style={{ padding:'9px 2px', background:isSelected ? G.btnBg : 'transparent', border:'1px solid '+(isSelected ? G.borderHover : isDisabled ? 'rgba(212,175,55,0.15)' : G.border), color:isSelected ? G.gold : isDisabled ? 'rgba(212,175,55,0.25)' : G.goldDim, fontSize:10, letterSpacing:.5, cursor:isDisabled?'default':'pointer', fontFamily:'inherit', borderRadius:2, textAlign:'center', fontWeight:isSelected?700:400 }}
+                    >#{seq}</button>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:10, fontSize:10, color:G.goldDim, textAlign:'right' }}>
+                已选 / 선택: <span style={{ color:G.gold, fontWeight:700 }}>{count}</span> / {MASTER_BAG_SIZE}
+              </div>
+            </>
+          )}
+        </DkCard>
+        <DkBtn onClick={onScanNext} style={{ marginTop:4 }}>📷 扫描包装 QR / 포장 QR 스캔 ({count} 已扫描)</DkBtn>
         <DkCard>
           <div style={{ display:'flex', alignItems:'center', gap:12, cursor:'pointer' }} onClick={() => setIsRemainder(!isRemainder)}>
             <div style={{ width:16, height:16, border:'1px solid '+(isRemainder?G.gold:G.border), borderRadius:2, background:isRemainder?G.btnBg:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -2104,6 +2122,8 @@ export default function App() {
   const [bagMO, setBagMO] = useState(null);
   const [createdBag, setCreatedBag] = useState(null);
   const [scannedBagDetail, setScannedBagDetail] = useState(null);
+  const [availablePacks, setAvailablePacks] = useState([]);
+  const [availablePacksLoading, setAvailablePacksLoading] = useState(false);
 
   // ── Scan mode ──
   const [scanMode, setScanMode] = useState('production_log');
@@ -2310,6 +2330,20 @@ export default function App() {
         factory: getField(found, 'Factory') || '-',
       });
       setCurrentScreen('bag_create');
+      setAvailablePacksLoading(true);
+      setAvailablePacks([]);
+      getRecordsByCriteria(REPORTS.INNER_PACK, `MO_Number == "${moNumber}" && Pack_Status == "Created"`)
+        .then(pr => {
+          if (pr && pr.code === 3000 && Array.isArray(pr.data)) {
+            setAvailablePacks(
+              pr.data
+                .filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '')
+                .sort((a, b) => (parseInt(a['Pack_Sequence']) || 0) - (parseInt(b['Pack_Sequence']) || 0))
+            );
+          }
+          setAvailablePacksLoading(false);
+        })
+        .catch(() => setAvailablePacksLoading(false));
     } catch (err) {
       setCurrentScreen('bag_mo_select');
       alert('加载失败: ' + (err?.message || String(err)));
@@ -2498,6 +2532,31 @@ export default function App() {
 
   const handleRemovePackFromBag = useCallback((uuid) => {
     setBagScannedPacks(prev => prev.filter(p => p.uuid !== uuid));
+  }, []);
+
+  const handleSelectPackFromList = useCallback((rawPack) => {
+    const uuid = rawPack['Pack_UUID'];
+    if (!uuid) return;
+    setBagScannedPacks(prev => {
+      if (prev.find(p => p.uuid === uuid)) return prev.filter(p => p.uuid !== uuid);
+      if (prev.length >= MASTER_BAG_SIZE) return prev;
+      let moNum = rawPack['MO_Number'];
+      if (typeof moNum === 'object') moNum = moNum.display_value || '';
+      let items = [];
+      try { items = JSON.parse(rawPack['Items_JSON'] || '[]'); } catch (e) {}
+      return [...prev, { uuid, qrText: '', mo_number: moNum, items, total_qty: rawPack['Total_Qty'] || 12, record_id: rawPack['ID'] }];
+    });
+  }, []);
+
+  const handleSelectFirst10Packs = useCallback((packs) => {
+    const first10 = packs.slice(0, MASTER_BAG_SIZE).map(rawPack => {
+      let moNum = rawPack['MO_Number'];
+      if (typeof moNum === 'object') moNum = moNum.display_value || '';
+      let items = [];
+      try { items = JSON.parse(rawPack['Items_JSON'] || '[]'); } catch (e) {}
+      return { uuid: rawPack['Pack_UUID'], qrText: '', mo_number: moNum, items, total_qty: rawPack['Total_Qty'] || 12, record_id: rawPack['ID'] };
+    });
+    setBagScannedPacks(first10);
   }, []);
 
   const handleCreateBag = useCallback(async () => {
@@ -3402,8 +3461,13 @@ export default function App() {
             onScanNext={() => { setScanMode('master_bag_compose'); setCameraOpen(true); }}
             onRemovePack={handleRemovePackFromBag}
             onSubmit={handleCreateBag}
-            onBack={() => setCurrentScreen('bag_mo_select')}
+            onBack={() => { setAvailablePacks([]); setCurrentScreen('bag_mo_select'); }}
             submitting={false}
+            availablePacks={availablePacks}
+            availablePacksLoading={availablePacksLoading}
+            onSelectPack={handleSelectPackFromList}
+            onSelectFirst10={handleSelectFirst10Packs}
+            onClearAll={() => setBagScannedPacks([])}
           />
         )}
         {currentScreen === 'bag_success' && (
