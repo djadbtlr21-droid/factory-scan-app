@@ -1430,14 +1430,18 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
     setLoading(true);
     setSearched(true);
     try {
-      const res = await getRecords(REPORTS.MASTER_BAG);
-      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
-      const filtered = list
-        .filter(r => {
-          let m = r['MO_Number'];
-          if (typeof m === 'object') m = m.display_value || '';
-          return String(m).toUpperCase() === moNum;
-        })
+      const allBags = [];
+      let cursor = null;
+      let safety = 0;
+      while (safety++ < 20) {
+        const res = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${moNum}"`, cursor ? { record_cursor: cursor } : {});
+        const data = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+        if (data.length === 0) break;
+        allBags.push(...data);
+        cursor = res?.record_cursor || null;
+        if (!cursor) break;
+      }
+      const filtered = allBags
         .map(r => {
           let moN = r['MO_Number'];
           if (typeof moN === 'object') moN = moN.display_value || '';
@@ -2375,6 +2379,8 @@ export default function App() {
           const unassigned = unique
             .filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '')
             .sort((a, b) => (parseInt(a['Pack_Sequence']) || 0) - (parseInt(b['Pack_Sequence']) || 0));
+          const nonCreated = unique.filter(p => p['Pack_Status'] && p['Pack_Status'] !== 'Created');
+          if (nonCreated.length > 0) console.warn('[Master Bag] Non-Created packs in result:', nonCreated.map(p => `#${p['Pack_Sequence']} (${p['Pack_Status']})`));
           console.log('[Master Bag] Total fetched:', allPacks.length, '| Unique unassigned:', unassigned.length);
           console.log('[Master Bag] First Pack:', unassigned[0]?.['Pack_Sequence']);
           console.log('[Master Bag] Last Pack:', unassigned[unassigned.length - 1]?.['Pack_Sequence']);
@@ -2623,14 +2629,9 @@ export default function App() {
 
     let bagSequence = 1;
     try {
-      const bagRes = await getRecords(REPORTS.MASTER_BAG);
+      const bagRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${primaryMO}"`);
       if (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) {
-        const existing = bagRes.data.filter(b => {
-          let m = b['MO_Number'];
-          if (typeof m === 'object') m = m.display_value || '';
-          return m === primaryMO;
-        });
-        bagSequence = existing.length + 1;
+        bagSequence = bagRes.data.length + 1;
       }
     } catch (e) {}
 
@@ -2660,12 +2661,25 @@ export default function App() {
       }
 
       setLoadingMsg('状态更新中...');
-      await Promise.all(bagScannedPacks.map(p =>
-        updateRecord(REPORTS.INNER_PACK, p.record_id, {
-          'Assigned_To_Bag': uuid,
-          'Pack_Status': 'Bagged'
-        }).catch(updErr => console.warn('[bag] pack update failed', p.uuid, updErr))
-      ));
+      const updatePackWithRetry = async (p) => {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const result = await updateRecord(REPORTS.INNER_PACK, p.record_id, { 'Assigned_To_Bag': uuid, 'Pack_Status': 'Bagged' });
+            if (result && result.code === 3000) return { success: true };
+            console.warn(`[bag] Pack #${p.uuid} attempt ${attempt} non-3000:`, result?.code);
+          } catch (updErr) {
+            console.warn(`[bag] Pack #${p.uuid} attempt ${attempt} error:`, updErr);
+          }
+          if (attempt < 3) await new Promise(r => setTimeout(r, 500 * attempt));
+        }
+        return { success: false, uuid: p.uuid };
+      };
+      const updateResults = await Promise.all(bagScannedPacks.map(updatePackWithRetry));
+      const failures = updateResults.filter(r => !r.success);
+      if (failures.length > 0) {
+        console.error('[bag] Failed to update Pack_Status for:', failures.map(f => f.uuid));
+        alert(`마대는 생성됐지만 ${failures.length}개 Pack 상태 업데이트 실패. 관리자 확인 필요.`);
+      }
 
       const qrDataURL = await generateQRDataURL(qrText, 512);
       setCreatedBag({
