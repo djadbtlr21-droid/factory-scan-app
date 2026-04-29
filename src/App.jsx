@@ -794,16 +794,23 @@ const StatusScanSuccessScreen = memo(function StatusScanSuccessScreen({ result, 
 // ─── NEW: Pack Menu Screen ────────────────────────────────────────────
 const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
   return (
-    <DkScreen style={{ padding:'80px 20px 40px' }}>
+    <DkScreen style={{ padding:'80px 20px 40px', display:'flex', flexDirection:'column', alignItems:'center' }}>
       <DkBack onClick={onBack} />
-      <div style={{ textAlign:'center', marginBottom:40 }}>
-        <IconInnerPack />
+      <div style={{ textAlign:'center', marginBottom:32 }}>
+        <div className="scan-frame-wrap">
+          <div className="sc-corner sc-tl"></div>
+          <div className="sc-corner sc-tr"></div>
+          <div className="sc-corner sc-bl"></div>
+          <div className="sc-corner sc-br"></div>
+          <div className="sc-inner"><div className="sc-dot"></div></div>
+          <div className="sc-line"></div>
+        </div>
         <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>INNER PACK</div>
         <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>中包袋 / 중간포장</div>
       </div>
-      <DkBtn onClick={onCreate}>➕ 新建包装 / 새 포장 생성</DkBtn>
-      <DkBtn onClick={onBatch}>📦 批量生成 / 일괄 생성</DkBtn>
-      <DkBtnOutline onClick={onQueryMenu}>🔍 QR 查询 / QR 조회</DkBtnOutline>
+      <button className="btn-upload-qr" onClick={onCreate}>➕ 新建包装 / 새 포장 생성</button>
+      <button className="btn-scan-start" onClick={onBatch} style={{ marginTop:12 }}>📦 批量生成 / 일괄 생성</button>
+      <button className="btn-manual-mo" onClick={onQueryMenu} style={{ marginTop:12 }}>🔍 QR 查询 / QR 조회</button>
     </DkScreen>
   );
 });
@@ -811,16 +818,23 @@ const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQuery
 // ─── NEW: Bag Menu Screen ─────────────────────────────────────────────
 const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
   return (
-    <DkScreen style={{ padding:'80px 20px 40px' }}>
+    <DkScreen style={{ padding:'80px 20px 40px', display:'flex', flexDirection:'column', alignItems:'center' }}>
       <DkBack onClick={onBack} />
-      <div style={{ textAlign:'center', marginBottom:40 }}>
-        <IconMasterBag />
+      <div style={{ textAlign:'center', marginBottom:32 }}>
+        <div className="scan-frame-wrap">
+          <div className="sc-corner sc-tl"></div>
+          <div className="sc-corner sc-tr"></div>
+          <div className="sc-corner sc-bl"></div>
+          <div className="sc-corner sc-br"></div>
+          <div className="sc-inner"><div className="sc-dot"></div></div>
+          <div className="sc-line"></div>
+        </div>
         <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>MASTER BAG</div>
         <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>麻袋包装 / 마대</div>
       </div>
-      <DkBtn onClick={onCreate}>➕ 新建麻袋 / 새 마대 생성</DkBtn>
-      <DkBtn onClick={onBatch}>📦 批量生成 / 일괄 생성</DkBtn>
-      <DkBtnOutline onClick={onQueryMenu}>🔍 QR 查询 / QR 조회</DkBtnOutline>
+      <button className="btn-upload-qr" onClick={onCreate}>➕ 新建麻袋 / 새 마대 생성</button>
+      <button className="btn-scan-start" onClick={onBatch} style={{ marginTop:12 }}>📦 批量生成 / 일괄 생성</button>
+      <button className="btn-manual-mo" onClick={onQueryMenu} style={{ marginTop:12 }}>🔍 QR 查询 / QR 조회</button>
     </DkScreen>
   );
 });
@@ -903,7 +917,7 @@ const PackCreateScreen = memo(function PackCreateScreen({
     if (!isRemainder && selectedCount !== INNER_PACK_SIZE) {
       if (!window.confirm(`당 상 ${INNER_PACK_SIZE}개가 아닙니다 (${selectedCount}개). 계속? / Not ${INNER_PACK_SIZE} items (${selectedCount}). Continue?`)) return;
     }
-    if (!worker.trim()) { alert('请输入担当者 / 담당자를 입력하세요'); return; }
+    if (!worker.trim()) { alert('请输入负责人 / 담당자를 입력하세요'); return; }
     onSubmit();
   };
   return (
@@ -959,7 +973,7 @@ const PackCreateScreen = memo(function PackCreateScreen({
           </label>
         </DkCard>
         <DkCard>
-          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
         <DkBtn onClick={handleSubmit} disabled={submitting} style={{ marginTop:8, padding:18, fontSize:11, letterSpacing:3 }}>
           {submitting ? '保存中...' : `✅ ${selectedCount}件 打包完成 / 포장 완료`}
@@ -1146,7 +1160,7 @@ const BagCreateScreen = memo(function BagCreateScreen({
           </div>
         </DkCard>
         <DkCard>
-          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter' && !submitting && count > 0) onSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter' && !submitting && count > 0) onSubmit(); }} />
         </DkCard>
         <DkBtn onClick={onSubmit} disabled={submitting || count === 0} style={{ padding:18, fontSize:11, letterSpacing:3 }}>
           {submitting ? '保存中...' : `✅ ${count}包装 装袋完成 / 마대 완료`}
@@ -1535,9 +1549,9 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
           <DkRow label="订单号 / MO 번호" value={record.mo_number} />
           <DkRow label="SKU" value={record.sku || '-'} />
           <DkRow label="工厂 / 공장" value={record.factory || '-'} />
-          <DkRow label="Pack # / 포장 순번" value={String(record.pack_sequence)} />
+          <DkRow label="中包袋编号 / 포장 순번" value={String(record.pack_sequence)} />
           <DkRow label="总件数 / 총 수량" value={String(record.total_qty) + ' 件'} />
-          <DkRow label="担当者 / 담당자" value={record.worker || '-'} />
+          <DkRow label="负责人 / 담당자" value={record.worker || '-'} />
           <DkRow label="创建时间 / 생성 시간" value={formatDate(record.created_time) || '-'} />
           <DkRow label="最近修改 / 최근 수정" value={formatDate(record.modified_time) || '-'} />
         </DkCard>
@@ -1675,7 +1689,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
           <DkRow label="Bag # / 마대 순번" value={String(bagRecord.bag_sequence)} />
           <DkRow label="内装包数 / 포장 수" value={String(bagRecord.inner_pack_count) + ' packs'} />
           <DkRow label="总件数 / 총 수량" value={String(bagRecord.total_qty) + ' 件'} />
-          <DkRow label="担当者 / 담당자" value={bagRecord.worker || '-'} />
+          <DkRow label="负责人 / 담당자" value={bagRecord.worker || '-'} />
           <DkRow label="创建时间 / 생성 시간" value={formatDate(bagRecord.created_time) || '-'} />
           <DkRow label="最近修改 / 최근 수정" value={formatDate(bagRecord.modified_time) || '-'} />
           {bagRecord.received_at_mex && <DkRow label="Received At MEX" value={formatDate(bagRecord.received_at_mex)} />}
@@ -1761,7 +1775,7 @@ const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, defaul
   const handleSubmit = () => {
     const s = parseInt(startSeq), e = parseInt(endSeq);
     if (!s || !e || s > e || s < 1) { alert('请输入有效的序号范围'); return; }
-    if (!worker.trim()) { alert('请输入担当者 / 담당자'); return; }
+    if (!worker.trim()) { alert('请输入负责人 / 담당자'); return; }
     onSubmit({ startSeq: s, endSeq: e, worker: worker.trim() });
   };
   return (
@@ -1780,7 +1794,7 @@ const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, defaul
           <div style={{ fontSize:12, color:G.gold, marginTop:4, fontWeight:400 }}>共 {count} 包 / 총 {count} 포장</div>
         </DkCard>
         <DkCard>
-          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
         {packMO && packMO.standard_assortment && packMO.standard_assortment.length > 0 && (
           <DkCard>
@@ -1862,7 +1876,7 @@ const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, 
         <DkCard>
           <DkRow label="已创建 / 생성 완료" value={String(savedItems.length) + ' 包装'} />
           <DkRow label="失败 / 실패" value={String(result.errors.length) + ' 个'} />
-          <DkRow label="担当者 / 담당자" value={result.worker} />
+          <DkRow label="负责人 / 담당자" value={result.worker} />
         </DkCard>
         {result.errors.length > 0 && (
           <DkCard>
@@ -1898,7 +1912,7 @@ const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit,
   const handleSubmit = () => {
     const s = parseInt(startSeq), e = parseInt(endSeq);
     if (!s || !e || s > e || s < 1) { alert('请输入有效的包装序号范围'); return; }
-    if (!worker.trim()) { alert('请输入担当者 / 담당자'); return; }
+    if (!worker.trim()) { alert('请输入负责人 / 담당자'); return; }
     onSubmit({ startPackSeq: s, endPackSeq: e, worker: worker.trim() });
   };
   return (
@@ -1921,7 +1935,7 @@ const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit,
           </div>
         </DkCard>
         <DkCard>
-          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
         <DkCard style={{ fontSize:10, color:G.goldDim, lineHeight:1.8 }}>
           <div style={{ fontWeight:400, color:G.gold, marginBottom:6 }}>注意 / 주의사항</div>
@@ -1999,7 +2013,7 @@ const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, on
         <DkCard>
           <DkRow label="已创建麻袋 / 생성 완료" value={String(savedItems.length) + ' 麻袋'} />
           <DkRow label="失败 / 실패" value={String(result.errors.length) + ' 个'} />
-          <DkRow label="担当者 / 담당자" value={result.worker} />
+          <DkRow label="负责人 / 담당자" value={result.worker} />
         </DkCard>
         {result.errors.length > 0 && (
           <DkCard>
@@ -2499,7 +2513,7 @@ export default function App() {
       if (!window.confirm(`不是 ${MASTER_BAG_SIZE} 个 (${bagScannedPacks.length}个). 继续?`)) return;
     }
     if (!bagWorker.trim()) {
-      alert('请输入担当者 / 담당자');
+      alert('请输入负责人 / 담당자');
       return;
     }
 
