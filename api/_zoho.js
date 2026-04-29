@@ -15,7 +15,11 @@ function accountsDomain() {
 
 export async function getAccessToken() {
   const now = Date.now();
-  if (cachedToken && now < cachedExp) return cachedToken;
+  if (cachedToken && now < cachedExp - 5 * 60 * 1000) {
+    console.log('[ZOHO Token] Using cached token, expires in', Math.round((cachedExp - now) / 60000), 'min');
+    return cachedToken;
+  }
+  console.log('[ZOHO Token] Refreshing — cache expired or empty');
 
   const { ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET, ZOHO_REFRESH_TOKEN } = process.env;
   if (!ZOHO_CLIENT_ID || !ZOHO_CLIENT_SECRET || !ZOHO_REFRESH_TOKEN) {
