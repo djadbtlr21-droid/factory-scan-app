@@ -623,7 +623,12 @@ function DkRow({ label, value, mono }) {
 function getField(rec, key) {
   const v = rec?.[key];
   if (v == null) return '';
-  if (typeof v === 'object' && v.display_value !== undefined) return v.display_value;
+  if (typeof v === 'object') {
+    if (v.display_value !== undefined) return String(v.display_value);
+    if (v.zc_display_value !== undefined) return String(v.zc_display_value);
+    if (v[key] !== undefined) return String(v[key]); // e.g. Style_SKU.Style_SKU
+    return '-';
+  }
   return String(v);
 }
 
@@ -2221,12 +2226,7 @@ export default function App() {
         return;
       }
 
-      let skuStr = '-';
-      const skuRaw = found['Style_SKU'];
-      if (skuRaw) {
-        if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || '-';
-        else skuStr = String(skuRaw);
-      }
+      const skuStr = getField(found, 'Style_SKU') || getField(found, 'SKU') || '-';
 
       let standardAssortment = [];
       const jsonStr = found['Standard_Assortment_JSON'];
@@ -2259,7 +2259,7 @@ export default function App() {
       setPackMO({
         mo_number: found['MO_Number'] || moNumber,
         sku: skuStr,
-        factory: String(found['Factory'] || '-'),
+        factory: getField(found, 'Factory') || '-',
         order_qty: parseInt(found['Plan_Total_Quantity']) || 0,
         plan_notes: found['Plan_Notes'] || '',
         standard_assortment: standardAssortment,
@@ -2290,16 +2290,10 @@ export default function App() {
         alert('未找到订单: ' + moNumber);
         return;
       }
-      let skuStr = '-';
-      const skuRaw = found['Style_SKU'];
-      if (skuRaw) {
-        if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || '-';
-        else skuStr = String(skuRaw);
-      }
       setBagMO({
         mo_number: found['MO_Number'] || moNumber,
-        sku: skuStr,
-        factory: String(found['Factory'] || '-'),
+        sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-',
+        factory: getField(found, 'Factory') || '-',
       });
       setCurrentScreen('bag_create');
     } catch (err) {
@@ -2314,9 +2308,6 @@ export default function App() {
       const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
       const found = list.find((r) => r['MO_Number'] === moNumber);
       if (!found) { setCurrentScreen('batch_pack_mo_select'); alert('未找到订单: ' + moNumber); return; }
-      let skuStr = '-';
-      const skuRaw = found['Style_SKU'];
-      if (skuRaw) { if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || '-'; else skuStr = String(skuRaw); }
       let standardAssortment = [];
       const jsonStr = found['Standard_Assortment_JSON'];
       if (jsonStr && typeof jsonStr === 'string') {
@@ -2330,7 +2321,7 @@ export default function App() {
           nextSequence = existing.length + 1;
         }
       } catch (e) {}
-      setPackMO({ mo_number: found['MO_Number'] || moNumber, sku: skuStr, factory: String(found['Factory'] || '-'), order_qty: parseInt(found['Plan_Total_Quantity']) || 0, plan_notes: found['Plan_Notes'] || '', standard_assortment: standardAssortment, record_id: found['ID'] });
+      setPackMO({ mo_number: found['MO_Number'] || moNumber, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-', order_qty: parseInt(found['Plan_Total_Quantity']) || 0, plan_notes: found['Plan_Notes'] || '', standard_assortment: standardAssortment, record_id: found['ID'] });
       setPackSequence(nextSequence);
       setCurrentScreen('batch_pack_input');
     } catch (err) {
@@ -2345,10 +2336,7 @@ export default function App() {
       const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
       const found = list.find((r) => r['MO_Number'] === moNumber);
       if (!found) { setCurrentScreen('batch_bag_mo_select'); alert('未找到订单: ' + moNumber); return; }
-      let skuStr = '-';
-      const skuRaw = found['Style_SKU'];
-      if (skuRaw) { if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || '-'; else skuStr = String(skuRaw); }
-      setBagMO({ mo_number: found['MO_Number'] || moNumber, sku: skuStr, factory: String(found['Factory'] || '-') });
+      setBagMO({ mo_number: found['MO_Number'] || moNumber, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-' });
       setCurrentScreen('batch_bag_input');
     } catch (err) {
       setCurrentScreen('batch_bag_mo_select');
