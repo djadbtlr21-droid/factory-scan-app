@@ -8,7 +8,7 @@ export const REPORTS = {
   MO: 'All_MO',
   LOG: 'Production_Log_Report',
   INNER_PACK: 'All_Inner_Pack',
-  MASTER_BAG: 'All_Master_Bag',
+  MASTER_BAG: 'All_Master_Bags',
 };
 
 export const FORMS = {
