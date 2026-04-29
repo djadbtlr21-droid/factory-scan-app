@@ -386,29 +386,29 @@ const InputScreen = memo(function InputScreen({ moData, process, onSubmit, onBac
       <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
         <div className="qty-card">
           <div className="qty-card-label">完成 *</div>
-          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={completed} onChange={(e) => setCompleted(e.target.value)} />
+          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={completed} onChange={(e) => setCompleted(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
         <div className="qty-card muted">
           <div className="qty-card-label">未完成</div>
-          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={incomplete} onChange={(e) => setIncomplete(e.target.value)} />
+          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={incomplete} onChange={(e) => setIncomplete(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
         <div className="qty-card danger">
           <div className="qty-card-label">不良</div>
-          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={defect} onChange={(e) => setDefect(e.target.value)} />
+          <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={defect} onChange={(e) => setDefect(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
         {showBag && (
           <div className="qty-card muted">
             <div className="qty-card-label">麻袋数量</div>
-            <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={bag} onChange={(e) => setBag(e.target.value)} />
+            <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={bag} onChange={(e) => setBag(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
           </div>
         )}
         <div className="field-card">
           <div className="field-card-label">负责人 / 담당자 *</div>
-          <input className="input-field text-field" type="text" placeholder="이름을 입력하세요" value={worker} onChange={(e) => setWorker(e.target.value)} />
+          <input className="input-field text-field" type="text" placeholder="이름을 입력하세요" value={worker} onChange={(e) => setWorker(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
         <div className="field-card">
           <div className="field-card-label">备注 / 메모</div>
-          <input className="input-field text-field" type="text" placeholder="선택사항" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <input className="input-field text-field" type="text" placeholder="선택사항" value={notes} onChange={(e) => setNotes(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
       </div>
 
@@ -600,11 +600,11 @@ function DkBtnOutline({ onClick, children, style }) {
   );
 }
 
-function DkInput({ label, value, onChange, placeholder, type='text', inputMode }) {
+function DkInput({ label, value, onChange, placeholder, type='text', inputMode, onKeyDown }) {
   return (
     <div style={{ marginBottom:14 }}>
       {label && <div style={{ fontSize:9, fontWeight:400, letterSpacing:2, color:G.goldDim, textTransform:'uppercase', marginBottom:6 }}>{label}</div>}
-      <input type={type} value={value} onChange={onChange} placeholder={placeholder} inputMode={inputMode}
+      <input type={type} value={value} onChange={onChange} placeholder={placeholder} inputMode={inputMode} onKeyDown={onKeyDown}
         style={{ width:'100%', padding:'10px 0', background:'transparent', border:'none', borderBottom:'1px solid var(--app-border-input)', color:G.cream, fontSize:14, outline:'none', fontFamily:'inherit', boxSizing:'border-box' }}
       />
     </div>
@@ -845,7 +845,7 @@ const BagMOSelectScreen = memo(function BagMOSelectScreen({ onScan, onManual, on
       <div style={{ textAlign:'center', color:G.goldDim, fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
       <DkCard>
         <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>手动输入 / 수동 입력</div>
-        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" />
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
         <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
       </DkCard>
     </DkScreen>
@@ -872,7 +872,7 @@ const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, 
       <div style={{ textAlign:'center', color:G.goldDim, fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
       <DkCard>
         <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>手动输入 / 수동 입력</div>
-        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" />
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
         <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
       </DkCard>
     </DkScreen>
@@ -959,7 +959,7 @@ const PackCreateScreen = memo(function PackCreateScreen({
           </label>
         </DkCard>
         <DkCard>
-          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" />
+          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
         <DkBtn onClick={handleSubmit} disabled={submitting} style={{ marginTop:8, padding:18, fontSize:11, letterSpacing:3 }}>
           {submitting ? '保存中...' : `✅ ${selectedCount}件 打包完成 / 포장 완료`}
@@ -1146,7 +1146,7 @@ const BagCreateScreen = memo(function BagCreateScreen({
           </div>
         </DkCard>
         <DkCard>
-          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" />
+          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter' && !submitting && count > 0) onSubmit(); }} />
         </DkCard>
         <DkBtn onClick={onSubmit} disabled={submitting || count === 0} style={{ padding:18, fontSize:11, letterSpacing:3 }}>
           {submitting ? '保存中...' : `✅ ${count}包装 装袋完成 / 마대 완료`}
@@ -1329,7 +1329,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
-          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" />
+          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter' && !loading) search(); }} />
           <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
         </DkCard>
         {searched && !loading && packs.length === 0 && (
@@ -1416,7 +1416,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
-          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" />
+          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter' && !loading) search(); }} />
           <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
         </DkCard>
         {searched && !loading && bags.length === 0 && (
@@ -1775,12 +1775,12 @@ const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, defaul
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
           <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:14, fontWeight:400 }}>序号范围 / 시퀀스 범위</div>
-          <DkInput label="开始序号 / 시작 번호" value={startSeq} onChange={e => setStartSeq(e.target.value)} type="number" inputMode="numeric" />
-          <DkInput label="结束序号 / 종료 번호" value={endSeq} onChange={e => setEndSeq(e.target.value)} type="number" inputMode="numeric" />
+          <DkInput label="开始序号 / 시작 번호" value={startSeq} onChange={e => setStartSeq(e.target.value)} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="结束序号 / 종료 번호" value={endSeq} onChange={e => setEndSeq(e.target.value)} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
           <div style={{ fontSize:12, color:G.gold, marginTop:4, fontWeight:400 }}>共 {count} 包 / 총 {count} 포장</div>
         </DkCard>
         <DkCard>
-          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" />
+          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
         {packMO && packMO.standard_assortment && packMO.standard_assortment.length > 0 && (
           <DkCard>
@@ -1911,8 +1911,8 @@ const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit,
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
           <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:14, fontWeight:400 }}>包装序号范围 / 포장 범위</div>
-          <DkInput label="开始包装序号 / 시작 포장 번호" value={startSeq} onChange={e => setStartSeq(e.target.value)} type="number" inputMode="numeric" />
-          <DkInput label="结束包装序号 / 종료 포장 번호" value={endSeq} onChange={e => setEndSeq(e.target.value)} type="number" inputMode="numeric" />
+          <DkInput label="开始包装序号 / 시작 포장 번호" value={startSeq} onChange={e => setStartSeq(e.target.value)} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="结束包装序号 / 종료 포장 번호" value={endSeq} onChange={e => setEndSeq(e.target.value)} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
           <div style={{ fontSize:12, color:G.gold, marginTop:4, fontWeight:400 }}>
             {packCount} 包装 → {bagCount} 麻袋 / {bagCount} 마대
             {packCount % MASTER_BAG_SIZE !== 0 && packCount > 0 && (
@@ -1921,7 +1921,7 @@ const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit,
           </div>
         </DkCard>
         <DkCard>
-          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" />
+          <DkInput label="担当者 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
         <DkCard style={{ fontSize:10, color:G.goldDim, lineHeight:1.8 }}>
           <div style={{ fontWeight:400, color:G.gold, marginBottom:6 }}>注意 / 주의사항</div>
