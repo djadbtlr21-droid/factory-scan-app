@@ -2336,22 +2336,23 @@ export default function App() {
       (async () => {
         try {
           const allPacks = [];
-          let from = 1;
-          const limit = 200;
+          let cursor = null;
           let safety = 0;
           while (safety++ < 50) {
-            const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${moNumber}" && Pack_Status == "Created"`, { from, limit });
+            const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${moNumber}" && Pack_Status == "Created"`, cursor ? { record_cursor: cursor } : {});
             const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
-            console.log(`[Master Bag] Page from=${from}: got ${data.length} records`);
+            console.log(`[Master Bag] Page ${safety}: got ${data.length} records, cursor=${pr?.record_cursor || 'none'}`);
             if (data.length === 0) break;
             allPacks.push(...data);
-            if (data.length < limit) break;
-            from += limit;
+            cursor = pr?.record_cursor || null;
+            if (!cursor) break;
           }
-          const unassigned = allPacks
+          const seen = new Set();
+          const unique = allPacks.filter(p => { const id = p['Pack_UUID']; if (seen.has(id)) return false; seen.add(id); return true; });
+          const unassigned = unique
             .filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '')
             .sort((a, b) => (parseInt(a['Pack_Sequence']) || 0) - (parseInt(b['Pack_Sequence']) || 0));
-          console.log('[Master Bag] Total unassigned packs:', unassigned.length);
+          console.log('[Master Bag] Total fetched:', allPacks.length, '| Unique unassigned:', unassigned.length);
           console.log('[Master Bag] First Pack:', unassigned[0]?.['Pack_Sequence']);
           console.log('[Master Bag] Last Pack:', unassigned[unassigned.length - 1]?.['Pack_Sequence']);
           setAvailablePacks(unassigned);
@@ -2759,17 +2760,16 @@ export default function App() {
       setCurrentScreen('loading');
       const bCriteria = `MO_Number == "${bagMO.mo_number}" && Pack_Status == "Created" && Pack_Sequence >= ${startPackSeq} && Pack_Sequence <= ${endPackSeq}`;
       const allPacks = [];
-      let bFrom = 1;
-      const bLimit = 200;
+      let bCursor = null;
       let bSafety = 0;
       while (bSafety++ < 50) {
-        const pr = await getRecords(REPORTS.INNER_PACK, bCriteria, { from: bFrom, limit: bLimit });
+        const pr = await getRecords(REPORTS.INNER_PACK, bCriteria, bCursor ? { record_cursor: bCursor } : {});
         const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
-        console.log(`[Batch Bag] Page from=${bFrom}: got ${data.length} records`);
+        console.log(`[Batch Bag] Page ${bSafety}: got ${data.length} records, cursor=${pr?.record_cursor || 'none'}`);
         if (data.length === 0) break;
         allPacks.push(...data);
-        if (data.length < bLimit) break;
-        bFrom += bLimit;
+        bCursor = pr?.record_cursor || null;
+        if (!bCursor) break;
       }
       const moPacks = allPacks.sort((a, b) => parseInt(a['Pack_Sequence']) - parseInt(b['Pack_Sequence']));
       if (moPacks.length === 0) { setCurrentScreen('batch_bag_input'); alert('未找到指定范围内的包装 / 해당 범위의 포장 없음'); return; }
