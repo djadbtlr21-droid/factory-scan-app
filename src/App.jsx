@@ -292,6 +292,17 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
   return (
     <div className="screen active" id="screen-info" style={{ background: 'var(--surface2)', minHeight: '100vh', width: '100%', padding: 16 }}>
       <button className="back-link" onClick={onBack}>← 重新扫码</button>
+      {moData?.is_shipped && (
+        <div style={{ background:'rgba(220,38,38,0.12)', border:'1px solid rgba(220,38,38,0.4)', borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:12, color:'#FCA5A5' }}>
+          ⚠ 此订单已出货 / 이 오더는 이미 출고되었습니다<br />
+          <span style={{ fontSize:11, opacity:.8 }}>继续操作可能产生异常记录 / 추가 작업 시 비정상 기록 발생 가능</span>
+        </div>
+      )}
+      {moData?.is_completed && (
+        <div style={{ background:'rgba(16,185,129,0.1)', border:'1px solid rgba(16,185,129,0.35)', borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:12, color:'#6EE7B7' }}>
+          ℹ 此订单生产已完成 / 이 오더 생산이 완료되었습니다
+        </div>
+      )}
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-title">订单信息确认</div>
         <div className="info-row"><span className="info-label">订单号 (MO)</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
@@ -2293,31 +2304,45 @@ export default function App() {
   }, []);
 
   const fetchMOData = useCallback(async (moNumber, sku, factory) => {
-    console.log('[scan] fetchMOData start mo=' + moNumber);
+    console.log('[MO Fetch] Querying:', moNumber);
     try {
-      const res = await getRecords(MO_REPORT);
-      console.log('[scan] fetchMOData got ' + (res && res.data ? res.data.length : 0) + ' records, code=' + (res && res.code));
+      const res = await getRecords(MO_REPORT, `MO_Number == "${moNumber}"`);
+      console.log('[MO Fetch] code=' + (res && res.code) + ', count=' + (res && res.data ? res.data.length : 0));
       const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
-      const found = list.find((r) => r['MO_Number'] === moNumber);
-      if (!found) {
+      if (list.length === 0) {
         setCurrentScreen('scan');
         alert('未找到订单号: ' + moNumber + '\n请确认后重新扫描');
         return;
       }
-      const r = found;
+      const r = list[0];
+      const status = r['Production_Status'] || '-';
+      console.log('[MO Fetch] Production_Status:', status);
+      console.log('[MO Fetch] Inner_Pack_Count:', r['Inner_Pack_Count']);
+      console.log('[MO Fetch] Master_Bag_Count:', r['Master_Bag_Count']);
       let skuStr = sku || '-';
       const skuRaw = r['Style_SKU'];
       if (skuRaw) {
         if (typeof skuRaw === 'object') skuStr = skuRaw.display_value || skuRaw.Style_SKU || skuStr;
         else if (skuRaw !== '-') skuStr = skuRaw;
       }
+      const sl = status.toLowerCase();
+      const isShipped = sl.includes('ship') || status.includes('출고') || status.includes('已出货');
+      const isCompleted = !isShipped && (sl.includes('complet') || status.includes('완료') || status.includes('完成'));
+      if (isShipped) {
+        const proceed = window.confirm(
+          '⚠ 此订单已出货 / 이 오더는 이미 출고되었습니다\n继续操作可能产生异常记录 / 추가 작업 시 비정상 기록 발생 가능\n\n确认 = 继续 / 계속    取消 = 返回 / 취소'
+        );
+        if (!proceed) { setCurrentScreen('scan'); return; }
+      }
       const next = {
         mo_number: r['MO_Number'] || moNumber,
         sku: skuStr,
         factory: factory || '-',
         order_qty: parseInt(r['Plan_Total_Quantity']) || 0,
-        current_status: r['Production_Status'] || '-',
-        plan_notes: r['Plan_Notes'] || ''
+        current_status: status,
+        plan_notes: r['Plan_Notes'] || '',
+        is_shipped: isShipped,
+        is_completed: isCompleted,
       };
       setMoData(next);
       setMoRecordId(r['ID']);
