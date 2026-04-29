@@ -11,12 +11,14 @@ async function jfetch(url, opts) {
   return body;
 }
 
-export function getRecords(report) {
-  return jfetch('/api/get-records?report=' + encodeURIComponent(report));
+export function getRecords(report, criteria = '', { from = 1, limit = 200 } = {}) {
+  let url = '/api/get-records?report=' + encodeURIComponent(report) + '&from=' + encodeURIComponent(from) + '&limit=' + encodeURIComponent(limit);
+  if (criteria) url += '&criteria=' + encodeURIComponent(criteria);
+  return jfetch(url);
 }
 
-export function getRecordsByCriteria(report, criteria, { from = 1, limit = 200 } = {}) {
-  return jfetch('/api/get-records?report=' + encodeURIComponent(report) + '&criteria=' + encodeURIComponent(criteria) + '&from=' + encodeURIComponent(from) + '&limit=' + encodeURIComponent(limit));
+export function getRecordsByCriteria(report, criteria, opts = {}) {
+  return getRecords(report, criteria, opts);
 }
 
 export function submitRecord(form, data) {
