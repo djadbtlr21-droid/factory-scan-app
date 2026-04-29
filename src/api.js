@@ -11,9 +11,10 @@ async function jfetch(url, opts) {
   return body;
 }
 
-export function getRecords(report, criteria = '', { from = 1, limit = 200 } = {}) {
-  let url = '/api/get-records?report=' + encodeURIComponent(report) + '&from=' + encodeURIComponent(from) + '&limit=' + encodeURIComponent(limit);
+export function getRecords(report, criteria = '', { record_cursor } = {}) {
+  let url = '/api/get-records?report=' + encodeURIComponent(report);
   if (criteria) url += '&criteria=' + encodeURIComponent(criteria);
+  if (record_cursor) url += '&record_cursor=' + encodeURIComponent(record_cursor);
   return jfetch(url);
 }
 
