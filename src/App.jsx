@@ -792,50 +792,73 @@ const StatusScanSuccessScreen = memo(function StatusScanSuccessScreen({ result, 
 });
 
 // ─── NEW: Pack Menu Screen ────────────────────────────────────────────
+// ─── Shared scan-style menu layout (Inner Pack & Master Bag menus) ────
+const ScanMenuScreen = memo(function ScanMenuScreen({
+  onBack, typeLabel, typeSublabel,
+  btn1Label, btn2Label, btn3Label,
+  onBtn1, onBtn2, onBtn3,
+}) {
+  return (
+    <div className="screen active scan-screen">
+      <button onClick={onBack} className="scan-back-btn">← 返回</button>
+      <div className="scan-wordmark">IKU Production System</div>
+      <div style={{ textAlign:'center' }}>
+        <div className="scan-frame-wrap">
+          <div className="sc-corner sc-tl" />
+          <div className="sc-corner sc-tr" />
+          <div className="sc-corner sc-bl" />
+          <div className="sc-corner sc-br" />
+          <div className="sc-inner"><div className="sc-dot" /></div>
+          <div className="sc-line" />
+        </div>
+        <div style={{ fontSize:11, letterSpacing:4, color:'var(--gold)', marginTop:16, fontWeight:400, textTransform:'uppercase' }}>{typeLabel}</div>
+        <div style={{ fontSize:18, color:'var(--text)', marginTop:4, fontWeight:400, letterSpacing:1 }}>{typeSublabel}</div>
+      </div>
+      <div className="scan-label-wrap">
+        <p>QR코드를 프레임 안에 맞춰주세요</p>
+        <p>请将二维码对准框内</p>
+      </div>
+      <button className="btn-upload-qr" onClick={onBtn1}>{btn1Label}</button>
+      <button className="btn-scan-start" onClick={onBtn2}>{btn2Label}</button>
+      <button className="btn-manual-mo" onClick={onBtn3}>{btn3Label}</button>
+      <div className="scan-hint-wrap">
+        <p>카메라가 자동으로 QR을 인식합니다</p>
+        <p>摄像头将自动识别二维码</p>
+      </div>
+    </div>
+  );
+});
+
 const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
   return (
-    <DkScreen style={{ padding:'80px 20px 40px', display:'flex', flexDirection:'column', alignItems:'center' }}>
-      <DkBack onClick={onBack} />
-      <div style={{ textAlign:'center', marginBottom:32 }}>
-        <div className="scan-frame-wrap">
-          <div className="sc-corner sc-tl"></div>
-          <div className="sc-corner sc-tr"></div>
-          <div className="sc-corner sc-bl"></div>
-          <div className="sc-corner sc-br"></div>
-          <div className="sc-inner"><div className="sc-dot"></div></div>
-          <div className="sc-line"></div>
-        </div>
-        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>INNER PACK</div>
-        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>中包袋 / 중간포장</div>
-      </div>
-      <button className="btn-upload-qr" onClick={onCreate}>➕ 新建包装 / 새 포장 생성</button>
-      <button className="btn-scan-start" onClick={onBatch} style={{ marginTop:12 }}>📦 批量生成 / 일괄 생성</button>
-      <button className="btn-manual-mo" onClick={onQueryMenu} style={{ marginTop:12 }}>🔍 QR 查询 / QR 조회</button>
-    </DkScreen>
+    <ScanMenuScreen
+      onBack={onBack}
+      typeLabel="INNER PACK"
+      typeSublabel="中包袋 / 중간포장"
+      btn1Label="➕ 新建包装 / 새 포장 생성"
+      btn2Label="📦 批量生成 / 일괄 생성"
+      btn3Label="🔍 QR 查询 / QR 조회"
+      onBtn1={onCreate}
+      onBtn2={onBatch}
+      onBtn3={onQueryMenu}
+    />
   );
 });
 
 // ─── NEW: Bag Menu Screen ─────────────────────────────────────────────
 const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
   return (
-    <DkScreen style={{ padding:'80px 20px 40px', display:'flex', flexDirection:'column', alignItems:'center' }}>
-      <DkBack onClick={onBack} />
-      <div style={{ textAlign:'center', marginBottom:32 }}>
-        <div className="scan-frame-wrap">
-          <div className="sc-corner sc-tl"></div>
-          <div className="sc-corner sc-tr"></div>
-          <div className="sc-corner sc-bl"></div>
-          <div className="sc-corner sc-br"></div>
-          <div className="sc-inner"><div className="sc-dot"></div></div>
-          <div className="sc-line"></div>
-        </div>
-        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>MASTER BAG</div>
-        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>麻袋包装 / 마대</div>
-      </div>
-      <button className="btn-upload-qr" onClick={onCreate}>➕ 新建麻袋 / 새 마대 생성</button>
-      <button className="btn-scan-start" onClick={onBatch} style={{ marginTop:12 }}>📦 批量生成 / 일괄 생성</button>
-      <button className="btn-manual-mo" onClick={onQueryMenu} style={{ marginTop:12 }}>🔍 QR 查询 / QR 조회</button>
-    </DkScreen>
+    <ScanMenuScreen
+      onBack={onBack}
+      typeLabel="MASTER BAG"
+      typeSublabel="麻袋包装 / 마대"
+      btn1Label="➕ 新建麻袋 / 새 마대 생성"
+      btn2Label="📦 批量生成 / 일괄 생성"
+      btn3Label="🔍 QR 查询 / QR 조회"
+      onBtn1={onCreate}
+      onBtn2={onBatch}
+      onBtn3={onQueryMenu}
+    />
   );
 });
 
