@@ -473,7 +473,7 @@ const SuccessScreen = memo(function SuccessScreen({ result, onNextProcess, onNew
         </div>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
           <button onClick={onNextProcess} style={{ padding: 16, border: 'none', background: 'linear-gradient(135deg,#D4B976,#C9A84C)', color: '#4A3510', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', width: '100%', boxShadow: '0 2px 8px rgba(201,168,76,.2)' }}>下一工序 / 다음 공정</button>
-          <button onClick={onNewScan} style={{ padding: 16, border: 'none', background: 'var(--dark2)', color: 'var(--gold)', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', width: '100%', transition: 'var(--transition)' }}>← NEW SCAN / 새 스캔</button>
+          <button onClick={onNewScan} style={{ padding: 16, border: 'none', background: 'var(--dark2)', color: 'var(--gold)', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 700, letterSpacing: 3, textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit', width: '100%', transition: 'var(--transition)' }}>← 重新扫码 / 새 스캔</button>
         </div>
       </div>
     </div>
@@ -1055,13 +1055,13 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
               )}
             </div>
           </div>
-          <DkRow label="Pack UUID" value={detail.uuid} mono />
-          <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
-          <DkRow label="Total Qty / 총 수량" value={String(detail.total_qty) + ' 件'} />
-          <DkRow label="Is Remainder / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
-          <DkRow label="Assigned To Bag / 마대 소속" value={detail.assigned_to_bag || '-'} />
-          <DkRow label="Created Time / 생성 시간" value={formatDate(detail.created_time) || '-'} />
-          <DkRow label="Last Modified / 최근 수정" value={formatDate(detail.modified_time) || '-'} />
+          <DkRow label="包装UUID" value={detail.uuid} mono />
+          <DkRow label="负责人 / 담당자" value={detail.worker || '-'} />
+          <DkRow label="总数量 / 총 수량" value={String(detail.total_qty) + ' 件'} />
+          <DkRow label="是否剩余 / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
+          <DkRow label="所属麻袋 / 마대 소속" value={detail.assigned_to_bag || '-'} />
+          <DkRow label="创建时间 / 생성 시간" value={formatDate(detail.created_time) || '-'} />
+          <DkRow label="最近修改 / 최근 수정" value={formatDate(detail.modified_time) || '-'} />
         </DkCard>
         {detail.items && detail.items.length > 0 && (
           <DkCard>
@@ -1237,15 +1237,15 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
               )}
             </div>
           </div>
-          <DkRow label="Bag UUID" value={detail.uuid} mono />
-          <DkRow label="Inner Packs / 포장 수" value={String(detail.inner_pack_count) + ' packs'} />
-          <DkRow label="Total Qty / 총 수량" value={String(detail.total_qty) + ' 件'} />
-          <DkRow label="Is Remainder / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
-          <DkRow label="Worker / 담당자" value={detail.worker || '-'} />
-          <DkRow label="Destination / 출고지" value={detail.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : (detail.destination || '-')} />
-          <DkRow label="Received At MEX / 멕시코 도착" value={detail.received_at_mex || '-'} />
-          <DkRow label="Created Time / 생성 시간" value={formatDate(detail.created_time) || '-'} />
-          <DkRow label="Last Modified / 최근 수정" value={formatDate(detail.modified_time) || '-'} />
+          <DkRow label="麻袋UUID" value={detail.uuid} mono />
+          <DkRow label="内包数量 / 포장 수" value={String(detail.inner_pack_count) + ' packs'} />
+          <DkRow label="总数量 / 총 수량" value={String(detail.total_qty) + ' 件'} />
+          <DkRow label="是否剩余 / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
+          <DkRow label="负责人 / 담당자" value={detail.worker || '-'} />
+          <DkRow label="目的地 / 출고지" value={detail.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : (detail.destination || '-')} />
+          <DkRow label="到达MEX / 멕시코 도착" value={detail.received_at_mex || '-'} />
+          <DkRow label="创建时间 / 생성 시간" value={formatDate(detail.created_time) || '-'} />
+          <DkRow label="最近修改 / 최근 수정" value={formatDate(detail.modified_time) || '-'} />
         </DkCard>
         {detail.inner_pack_uuids && detail.inner_pack_uuids.length > 0 && (
           <DkCard>
@@ -1686,13 +1686,13 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
           <DkRow label="订单号 / MO 번호" value={bagRecord.mo_number} />
           <DkRow label="工厂 / 공장" value={bagRecord.factory || '-'} />
           <DkRow label="目的地 / 목적지" value={bagRecord.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : (bagRecord.destination || '-')} />
-          <DkRow label="Bag # / 마대 순번" value={String(bagRecord.bag_sequence)} />
+          <DkRow label="麻袋编号 / 마대 순번" value={String(bagRecord.bag_sequence)} />
           <DkRow label="内装包数 / 포장 수" value={String(bagRecord.inner_pack_count) + ' packs'} />
           <DkRow label="总件数 / 총 수량" value={String(bagRecord.total_qty) + ' 件'} />
           <DkRow label="负责人 / 담당자" value={bagRecord.worker || '-'} />
           <DkRow label="创建时间 / 생성 시간" value={formatDate(bagRecord.created_time) || '-'} />
           <DkRow label="最近修改 / 최근 수정" value={formatDate(bagRecord.modified_time) || '-'} />
-          {bagRecord.received_at_mex && <DkRow label="Received At MEX" value={formatDate(bagRecord.received_at_mex)} />}
+          {bagRecord.received_at_mex && <DkRow label="到达MEX / 멕시코 도착" value={formatDate(bagRecord.received_at_mex)} />}
         </DkCard>
 
         {innerPacks.length > 0 && (
