@@ -15,8 +15,8 @@ export function getRecords(report) {
   return jfetch('/api/get-records?report=' + encodeURIComponent(report));
 }
 
-export function getRecordsByCriteria(report, criteria) {
-  return jfetch('/api/get-records?report=' + encodeURIComponent(report) + '&criteria=' + encodeURIComponent(criteria));
+export function getRecordsByCriteria(report, criteria, { from = 1, limit = 200 } = {}) {
+  return jfetch('/api/get-records?report=' + encodeURIComponent(report) + '&criteria=' + encodeURIComponent(criteria) + '&from=' + encodeURIComponent(from) + '&limit=' + encodeURIComponent(limit));
 }
 
 export function submitRecord(form, data) {
