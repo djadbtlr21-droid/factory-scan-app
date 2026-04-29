@@ -56,10 +56,46 @@ export function downloadQRPNG(dataURL, filename) {
   document.body.removeChild(link);
 }
 
+async function compositeQRWithLabels(qrText, labels) {
+  const qrDataURL = await generateQRDataURL(qrText, 512);
+  const width = 600, qrSize = 512, qrX = (width - qrSize) / 2, qrY = 44;
+  const lineHeights = [34, 28, 24];
+  const totalTextH = labels.reduce((sum, _, i) => sum + (lineHeights[i] ?? 24), 0) + 44;
+  const height = qrY + qrSize + totalTextH;
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
+      ctx.textAlign = 'center';
+      let y = qrY + qrSize + 40;
+      labels.forEach((line, i) => {
+        if (i === 0) { ctx.font = 'bold 24px sans-serif'; ctx.fillStyle = '#000000'; }
+        else if (i === 1) { ctx.font = '18px sans-serif'; ctx.fillStyle = '#333333'; }
+        else { ctx.font = '14px sans-serif'; ctx.fillStyle = '#888888'; }
+        ctx.fillText(line, width / 2, y);
+        y += lineHeights[i] ?? 24;
+      });
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = reject;
+    img.src = qrDataURL;
+  });
+}
+
 export async function downloadQRsAsZIP(qrItems, zipFilename) {
   const zip = new JSZip();
   for (const item of qrItems) {
-    const dataURL = await generateQRDataURL(item.text);
+    let dataURL;
+    if (item.labels && item.labels.length > 0) {
+      dataURL = await compositeQRWithLabels(item.text, item.labels);
+    } else {
+      dataURL = await generateQRDataURL(item.text);
+    }
     const base64 = dataURL.split(',')[1];
     zip.file(item.filename, base64, { base64: true });
   }

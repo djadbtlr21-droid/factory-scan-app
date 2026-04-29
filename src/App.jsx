@@ -1910,7 +1910,8 @@ const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, 
     try {
       const qrItems = savedItems.map(it => ({
         text: it.qrText,
-        filename: sanitizeFilename(`${result.moNumber}_InnerPack_${it.seq}_${it.totalQty}pcs.png`)
+        filename: sanitizeFilename(`${result.moNumber}_InnerPack_${it.seq}_${it.totalQty}pcs.png`),
+        labels: [`${result.moNumber} / Inner Pack #${it.seq}`, `${it.totalQty} 件`]
       }));
       await downloadQRsAsZIP(qrItems, sanitizeFilename(`${result.moNumber}_InnerPacks_Batch.zip`));
     } finally { setDownloading(false); }
@@ -2187,7 +2188,12 @@ const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, on
     try {
       const qrItems = savedItems.map(it => ({
         text: it.qrText,
-        filename: sanitizeFilename(`${result.moNumber}_MasterBag_${it.bagSeq}_${it.totalQty}pcs.png`)
+        filename: sanitizeFilename(`${result.moNumber}_MasterBag_${it.bagSeq}_${it.totalQty}pcs.png`),
+        labels: [
+          `${result.moNumber} / Master Bag #${it.bagSeq}`,
+          `${it.totalQty} 件 (${it.packCount} packs)`,
+          ...(it.isRemainder ? ['(剩余 / 자투리)'] : [])
+        ]
       }));
       await downloadQRsAsZIP(qrItems, sanitizeFilename(`${result.moNumber}_MasterBags_Batch.zip`));
     } finally { setDownloading(false); }
