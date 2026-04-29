@@ -1159,8 +1159,9 @@ const BagCreateScreen = memo(function BagCreateScreen({
                   );
                 })}
               </div>
-              <div style={{ marginTop:10, fontSize:10, color:G.goldDim, textAlign:'right' }}>
-                已选 / 선택: <span style={{ color:G.gold, fontWeight:700 }}>{count}</span> / {MASTER_BAG_SIZE}
+              <div style={{ marginTop:10, fontSize:10, color:G.goldDim, display:'flex', justifyContent:'space-between' }}>
+                <span>可用 / 사용 가능: <span style={{ color:G.gold, fontWeight:700 }}>{availablePacks.length}</span></span>
+                <span>已选 / 선택: <span style={{ color:G.gold, fontWeight:700 }}>{count}</span> / {MASTER_BAG_SIZE}</span>
               </div>
             </>
           )}
@@ -2332,18 +2333,32 @@ export default function App() {
       setCurrentScreen('bag_create');
       setAvailablePacksLoading(true);
       setAvailablePacks([]);
-      getRecordsByCriteria(REPORTS.INNER_PACK, `MO_Number == "${moNumber}" && Pack_Status == "Created"`)
-        .then(pr => {
-          if (pr && pr.code === 3000 && Array.isArray(pr.data)) {
-            setAvailablePacks(
-              pr.data
-                .filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '')
-                .sort((a, b) => (parseInt(a['Pack_Sequence']) || 0) - (parseInt(b['Pack_Sequence']) || 0))
-            );
+      (async () => {
+        try {
+          const allPacks = [];
+          let from = 1;
+          const limit = 200;
+          while (true) {
+            const pr = await getRecordsByCriteria(REPORTS.INNER_PACK, `MO_Number == "${moNumber}" && Pack_Status == "Created"`, { from, limit });
+            const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
+            if (data.length === 0) break;
+            allPacks.push(...data);
+            if (data.length < limit) break;
+            from += limit;
+            if (from > 10000) break;
           }
+          const unassigned = allPacks
+            .filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '')
+            .sort((a, b) => (parseInt(a['Pack_Sequence']) || 0) - (parseInt(b['Pack_Sequence']) || 0));
+          console.log('[Master Bag] Total unassigned packs:', unassigned.length);
+          console.log('[Master Bag] First Pack:', unassigned[0]?.['Pack_Sequence']);
+          console.log('[Master Bag] Last Pack:', unassigned[unassigned.length - 1]?.['Pack_Sequence']);
+          setAvailablePacks(unassigned);
           setAvailablePacksLoading(false);
-        })
-        .catch(() => setAvailablePacksLoading(false));
+        } catch {
+          setAvailablePacksLoading(false);
+        }
+      })();
     } catch (err) {
       setCurrentScreen('bag_mo_select');
       alert('加载失败: ' + (err?.message || String(err)));
