@@ -2338,14 +2338,15 @@ export default function App() {
           const allPacks = [];
           let from = 1;
           const limit = 200;
-          while (true) {
-            const pr = await getRecordsByCriteria(REPORTS.INNER_PACK, `MO_Number == "${moNumber}" && Pack_Status == "Created"`, { from, limit });
+          let safety = 0;
+          while (safety++ < 50) {
+            const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${moNumber}" && Pack_Status == "Created"`, { from, limit });
             const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
+            console.log(`[Master Bag] Page from=${from}: got ${data.length} records`);
             if (data.length === 0) break;
             allPacks.push(...data);
             if (data.length < limit) break;
             from += limit;
-            if (from > 10000) break;
           }
           const unassigned = allPacks
             .filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '')
@@ -2756,17 +2757,27 @@ export default function App() {
     try {
       setLoadingMsg('加载包装数据...');
       setCurrentScreen('loading');
-      const packRes = await getRecords(REPORTS.INNER_PACK);
-      const allPacks = (packRes && packRes.code === 3000 && Array.isArray(packRes.data)) ? packRes.data : [];
-      const moPacks = allPacks
-        .filter(p => { let m = p['MO_Number']; if (typeof m === 'object') m = m.display_value || ''; const seq = parseInt(p['Pack_Sequence']) || 0; return m === bagMO.mo_number && seq >= startPackSeq && seq <= endPackSeq; })
-        .sort((a, b) => parseInt(a['Pack_Sequence']) - parseInt(b['Pack_Sequence']));
+      const bCriteria = `MO_Number == "${bagMO.mo_number}" && Pack_Status == "Created" && Pack_Sequence >= ${startPackSeq} && Pack_Sequence <= ${endPackSeq}`;
+      const allPacks = [];
+      let bFrom = 1;
+      const bLimit = 200;
+      let bSafety = 0;
+      while (bSafety++ < 50) {
+        const pr = await getRecords(REPORTS.INNER_PACK, bCriteria, { from: bFrom, limit: bLimit });
+        const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
+        console.log(`[Batch Bag] Page from=${bFrom}: got ${data.length} records`);
+        if (data.length === 0) break;
+        allPacks.push(...data);
+        if (data.length < bLimit) break;
+        bFrom += bLimit;
+      }
+      const moPacks = allPacks.sort((a, b) => parseInt(a['Pack_Sequence']) - parseInt(b['Pack_Sequence']));
       if (moPacks.length === 0) { setCurrentScreen('batch_bag_input'); alert('未找到指定范围内的包装 / 해당 범위의 포장 없음'); return; }
       const alreadyBagged = moPacks.filter(p => p['Assigned_To_Bag'] && p['Assigned_To_Bag'] !== '');
       if (alreadyBagged.length > 0) { setCurrentScreen('batch_bag_input'); alert(alreadyBagged.length + ' 个包装已经装袋'); return; }
-      const bagListRes = await getRecords(REPORTS.MASTER_BAG);
+      const bagListRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${bagMO.mo_number}"`);
       const existingBagsForMO = (bagListRes && bagListRes.code === 3000 && Array.isArray(bagListRes.data))
-        ? bagListRes.data.filter(b => { let m = b['MO_Number']; if (typeof m === 'object') m = m.display_value || ''; return m === bagMO.mo_number; })
+        ? bagListRes.data
         : [];
       let nextBagSeq = existingBagsForMO.length + 1;
       const bagGroups = [];
