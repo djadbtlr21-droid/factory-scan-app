@@ -2088,6 +2088,55 @@ const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, on
   );
 });
 
+const BatchBagPreviewScreen = memo(function BatchBagPreviewScreen({ preview, bagMO, onConfirm, onBack }) {
+  const { packs, skippedPacks, expectedRange, startPackSeq, endPackSeq, worker } = preview;
+  const fullBags = Math.floor(packs.length / MASTER_BAG_SIZE);
+  const remainder = packs.length % MASTER_BAG_SIZE;
+  const totalBags = fullBags + (remainder > 0 ? 1 : 0);
+  const missingCount = expectedRange - (packs.length + skippedPacks.length);
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>PREVIEW · BATCH BAGS</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagMO?.mo_number || '—'}</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>装袋预览 / 마대 미리보기</div>
+          <div style={{ fontSize:15, color:G.gold, fontWeight:400, marginBottom:6 }}>
+            {packs.length} 包装 → {fullBags > 0 ? `${fullBags} 麻袋` : ''}{remainder > 0 ? (fullBags > 0 ? ' + ' : '') + `1 剩余麻袋 (${remainder}包)` : ''}
+          </div>
+          <div style={{ fontSize:10, color:G.goldDim }}>负责人: {worker} · 序号 {startPackSeq}–{endPackSeq}</div>
+          {skippedPacks.length > 0 && (
+            <div style={{ fontSize:10, color:'#F59E0B', marginTop:8 }}>
+              ⚠ 跳过 {skippedPacks.length} 个已装袋包装 / {skippedPacks.length}개 이미 마대됨 (건너뜀)
+            </div>
+          )}
+          {missingCount > 0 && (
+            <div style={{ fontSize:10, color:'#EF4444', marginTop:4 }}>
+              ⚠ 范围内仅找到 {packs.length + skippedPacks.length} 个包装, 缺少 {missingCount} 个
+            </div>
+          )}
+        </DkCard>
+        <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:8, fontWeight:400 }}>包装列表 / 포장 목록 ({packs.length})</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:5, maxHeight:300, overflowY:'auto', marginBottom:16, paddingRight:4 }}>
+          {packs.map(p => (
+            <div key={p['Pack_Sequence']} style={{ border:'1px solid var(--app-border)', borderRadius:2, padding:'6px 4px', textAlign:'center', background:G.card }}>
+              <div style={{ fontSize:11, color:G.gold }}>#{p['Pack_Sequence']}</div>
+              <div style={{ fontSize:9, color:G.goldDim }}>{p['Total_Qty'] || 12}件</div>
+            </div>
+          ))}
+        </div>
+        <DkBtn onClick={onConfirm} disabled={packs.length === 0}>
+          ▶ 开始批量装袋 / 일괄 마대 생성 ({totalBags} 麻袋)
+        </DkBtn>
+        <DkBtnOutline onClick={onBack}>← 返回修改 / 수정</DkBtnOutline>
+      </div>
+    </DkScreen>
+  );
+});
+
 // ─── FIX 6: Query sub-menus ──────────────────────────────────────────
 const PackQuerySubMenu = memo(function PackQuerySubMenu({ onTextQuery, onScanQuery, onBack }) {
   return (
@@ -2186,6 +2235,7 @@ export default function App() {
   // ── Batch Bag state ──
   const [batchBagProgress, setBatchBagProgress] = useState({ current: 0, total: 0, items: [], errors: [] });
   const [batchBagResult, setBatchBagResult] = useState(null);
+  const [batchBagPreview, setBatchBagPreview] = useState(null);
 
   // ── Toast state ──
   const [toastMsg, setToastMsg] = useState('');
@@ -2793,84 +2843,105 @@ export default function App() {
     setCurrentScreen('batch_pack_done');
   }, [packMO, batchResult]);
 
-  const handleBatchCreateBags = useCallback(async ({ startPackSeq, endPackSeq, worker }) => {
+  const handlePreviewBatchBags = useCallback(async ({ startPackSeq, endPackSeq, worker }) => {
     if (!bagMO) return;
     try {
       setLoadingMsg('加载包装数据...');
       setCurrentScreen('loading');
-      const bCriteria = `MO_Number == "${bagMO.mo_number}" && Pack_Status == "Created" && Pack_Sequence >= ${startPackSeq} && Pack_Sequence <= ${endPackSeq}`;
+      const bCriteria = `MO_Number == "${bagMO.mo_number}" && Pack_Sequence >= ${startPackSeq} && Pack_Sequence <= ${endPackSeq}`;
       const allPacks = [];
       let bCursor = null;
       let bSafety = 0;
       while (bSafety++ < 50) {
         const pr = await getRecords(REPORTS.INNER_PACK, bCriteria, bCursor ? { record_cursor: bCursor } : {});
         const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
-        console.log(`[Batch Bag] Page ${bSafety}: got ${data.length} records, cursor=${pr?.record_cursor || 'none'}`);
+        console.log(`[Batch Bag Preview] Page ${bSafety}: got ${data.length} records, cursor=${pr?.record_cursor || 'none'}`);
         if (data.length === 0) break;
         allPacks.push(...data);
         bCursor = pr?.record_cursor || null;
         if (!bCursor) break;
       }
-      const moPacks = allPacks.sort((a, b) => parseInt(a['Pack_Sequence']) - parseInt(b['Pack_Sequence']));
-      if (moPacks.length === 0) { setCurrentScreen('batch_bag_input'); alert('未找到指定范围内的包装 / 해당 범위의 포장 없음'); return; }
-      const alreadyBagged = moPacks.filter(p => p['Assigned_To_Bag'] && p['Assigned_To_Bag'] !== '');
-      if (alreadyBagged.length > 0) { setCurrentScreen('batch_bag_input'); alert(alreadyBagged.length + ' 个包装已经装袋'); return; }
+      const sorted = allPacks.sort((a, b) => parseInt(a['Pack_Sequence']) - parseInt(b['Pack_Sequence']));
+      const unassigned = sorted.filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '');
+      const skippedPacks = sorted.filter(p => p['Assigned_To_Bag'] && p['Assigned_To_Bag'] !== '');
+      console.log(`[Batch Bag Preview] Total: ${sorted.length}, Unassigned: ${unassigned.length}, Skipped: ${skippedPacks.length}`);
+      if (unassigned.length === 0) {
+        setCurrentScreen('batch_bag_input');
+        alert('范围内无未装袋包装 / 범위 내 미할당 포장 없음');
+        return;
+      }
+      const expectedRange = endPackSeq - startPackSeq + 1;
+      setBatchBagPreview({ packs: unassigned, skippedPacks, expectedRange, startPackSeq, endPackSeq, worker });
+      setCurrentScreen('batch_bag_preview');
+    } catch (err) {
+      setCurrentScreen('batch_bag_input');
+      alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, [bagMO]);
+
+  const handleConfirmBatchBags = useCallback(async () => {
+    if (!bagMO || !batchBagPreview) return;
+    const { packs, worker, startPackSeq, endPackSeq } = batchBagPreview;
+    try {
       const bagListRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${bagMO.mo_number}"`);
-      const existingBagsForMO = (bagListRes && bagListRes.code === 3000 && Array.isArray(bagListRes.data))
-        ? bagListRes.data
-        : [];
-      let nextBagSeq = existingBagsForMO.length + 1;
+      const existingBags = (bagListRes && bagListRes.code === 3000 && Array.isArray(bagListRes.data))
+        ? bagListRes.data : [];
+      let nextBagSeq = existingBags.length + 1;
       const bagGroups = [];
-      for (let i = 0; i < moPacks.length; i += MASTER_BAG_SIZE) {
-        const group = moPacks.slice(i, i + MASTER_BAG_SIZE);
+      for (let i = 0; i < packs.length; i += MASTER_BAG_SIZE) {
+        const group = packs.slice(i, i + MASTER_BAG_SIZE);
         bagGroups.push({ packs: group, bagSeq: nextBagSeq++, isRemainder: group.length < MASTER_BAG_SIZE });
       }
       const items = [], errors = [];
       setBatchBagProgress({ current: 0, total: bagGroups.length, items: [], errors: [] });
       setCurrentScreen('batch_bag_progress');
-      const createOneBag = async (bagDef) => {
-        const { packs, bagSeq, isRemainder } = bagDef;
-        const qrText = buildMasterBagQR();
-        const uuid = qrText.split('/view/bag/')[1];
-        const totalQty = packs.reduce((s, p) => s + (parseInt(p['Total_Qty']) || 12), 0);
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            const res = await submitRecord(FORMS.MASTER_BAG, {
-              'Bag_UUID': uuid, 'Brand': BRAND, 'Bag_Sequence': bagSeq, 'MO_Number': bagMO.mo_number,
-              'SKU': bagMO.sku, 'Factory': bagMO.factory,
-              'Inner_Pack_Count': packs.length, 'Inner_Pack_UUIDs': JSON.stringify(packs.map(p => p['Pack_UUID'])),
-              'Total_Qty': totalQty, 'Is_Remainder': isRemainder, 'Worker': worker,
-              'Destination': 'MEX-Guadalajara', 'Bag_Status': 'Created'
-            });
-            if (!res || res.code !== 3000) throw new Error('Save failed bagSeq=' + bagSeq + ' code=' + (res && res.code));
-            await Promise.all(packs.map(p =>
-              updateRecord(REPORTS.INNER_PACK, p['ID'], { 'Assigned_To_Bag': uuid, 'Pack_Status': 'Bagged' })
-                .catch(e => console.warn('[batch-bag] pack update failed', p['Pack_UUID'], e))
-            ));
-            return { bagSeq, uuid, qrText, totalQty, packCount: packs.length, isRemainder, savedToZoho: true };
-          } catch (e) {
-            if (attempt === 3) throw e;
-            await new Promise(r => setTimeout(r, 500 * attempt));
+      for (let i = 0; i < bagGroups.length; i++) {
+        const { packs: bPacks, bagSeq, isRemainder } = bagGroups[i];
+        try {
+          const qrText = buildMasterBagQR();
+          const uuid = qrText.split('/view/bag/')[1];
+          const totalQty = bPacks.reduce((s, p) => s + (parseInt(p['Total_Qty']) || 12), 0);
+          let saved = false;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              console.log(`[Batch Bag] Bag #${bagSeq} attempt ${attempt}: submitting ${bPacks.length} packs`);
+              const res = await submitRecord(FORMS.MASTER_BAG, {
+                'Bag_UUID': uuid, 'Brand': BRAND, 'Bag_Sequence': bagSeq, 'MO_Number': bagMO.mo_number,
+                'SKU': bagMO.sku, 'Factory': bagMO.factory,
+                'Inner_Pack_Count': bPacks.length, 'Inner_Pack_UUIDs': JSON.stringify(bPacks.map(p => p['Pack_UUID'])),
+                'Total_Qty': totalQty, 'Is_Remainder': isRemainder, 'Worker': worker,
+                'Destination': 'MEX-Guadalajara', 'Bag_Status': 'Created'
+              });
+              if (!res || res.code !== 3000) throw new Error('code=' + (res && res.code) + ' ' + JSON.stringify(res));
+              saved = true;
+              console.log(`[Batch Bag] Bag #${bagSeq} saved OK, updating ${bPacks.length} packs...`);
+              break;
+            } catch (e) {
+              console.error(`[Batch Bag] Bag #${bagSeq} attempt ${attempt} failed:`, e.message);
+              if (attempt === 3) throw e;
+              await new Promise(r => setTimeout(r, 500 * attempt));
+            }
           }
+          if (saved) {
+            await Promise.all(bPacks.map(p =>
+              updateRecord(REPORTS.INNER_PACK, p['ID'], { 'Assigned_To_Bag': uuid, 'Pack_Status': 'Bagged' })
+                .catch(e => console.warn('[Batch Bag] pack update failed', p['Pack_UUID'], e))
+            ));
+            items.push({ bagSeq, uuid, qrText, totalQty, packCount: bPacks.length, isRemainder, savedToZoho: true });
+          }
+        } catch (e) {
+          console.error(`[Batch Bag] Bag #${bagGroups[i].bagSeq} failed:`, e);
+          errors.push({ bagSeq: bagGroups[i].bagSeq, error: e.message || String(e) });
         }
-      };
-      let idx = 0;
-      const createBagWorker = async () => {
-        while (idx < bagGroups.length) {
-          const i = idx++;
-          try { const r = await createOneBag(bagGroups[i]); items.push(r); }
-          catch (e) { errors.push({ bagSeq: bagGroups[i].bagSeq, error: e.message || String(e) }); }
-          setBatchBagProgress(p => ({ ...p, current: p.current + 1, items: [...items], errors: [...errors] }));
-        }
-      };
-      await Promise.all(Array.from({ length: 2 }, () => createBagWorker()));
+        setBatchBagProgress(p => ({ ...p, current: p.current + 1, items: [...items], errors: [...errors] }));
+      }
       setBatchBagResult({ items, errors, moNumber: bagMO.mo_number, worker, startPackSeq, endPackSeq });
       setCurrentScreen('batch_bag_done');
     } catch (err) {
-      setCurrentScreen('batch_bag_input');
+      setCurrentScreen('batch_bag_preview');
       alert('批量装袋失败: ' + (err?.message || String(err)));
     }
-  }, [bagMO]);
+  }, [bagMO, batchBagPreview]);
 
   const fetchMasterBagDetail = useCallback(async (uuid) => {
     try {
@@ -3583,8 +3654,16 @@ export default function App() {
         {currentScreen === 'batch_bag_input' && bagMO && (
           <BatchBagInputScreen
             bagMO={bagMO}
-            onSubmit={handleBatchCreateBags}
+            onSubmit={handlePreviewBatchBags}
             onBack={() => setCurrentScreen('batch_bag_mo_select')}
+          />
+        )}
+        {currentScreen === 'batch_bag_preview' && batchBagPreview && (
+          <BatchBagPreviewScreen
+            preview={batchBagPreview}
+            bagMO={bagMO}
+            onConfirm={handleConfirmBatchBags}
+            onBack={() => setCurrentScreen('batch_bag_input')}
           />
         )}
         {currentScreen === 'batch_bag_progress' && (
