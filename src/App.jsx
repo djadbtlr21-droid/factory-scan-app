@@ -179,12 +179,25 @@ function CameraOverlay({ onResult, onCancel }) {
   );
 }
 
-// ─── Existing Production Log screens ──────────────────────────────────
-const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onManual, onBack }) {
+// ─── Shared scan-style layout (Production Log / Inner Pack / Master Bag menus) ─
+const ScanStyleScreen = memo(function ScanStyleScreen({
+  onBack,
+  systemLabel = 'IKU PRODUCTION SYSTEM',
+  pageLabel,
+  pageTitle,
+  buttons = [],
+  showInstruction = true,
+  showBottomHint = true,
+}) {
+  const buttonClasses = buttons.map((btn, i) =>
+    btn.variant === 'filled' ? 'btn-upload-qr'
+    : buttons.slice(0, i).filter(b => b.variant !== 'filled').length === 0 ? 'btn-scan-start'
+    : 'btn-manual-mo'
+  );
   return (
-    <div className="screen active" id="screen-scan">
+    <div className="scan-screen">
       <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'transparent', border:'1px solid #D4AF37', color:G.gold, fontSize:10, fontWeight:400, letterSpacing:2, padding:'7px 14px', cursor:'pointer', zIndex:10, fontFamily:'inherit' }}>← 返回</button>
-      <div className="scan-wordmark">IKU Production System</div>
+      <div className="scan-wordmark">{systemLabel}</div>
       <div className="scan-frame-wrap">
         <div className="sc-corner sc-tl"></div>
         <div className="sc-corner sc-tr"></div>
@@ -193,18 +206,41 @@ const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onManual, onBack
         <div className="sc-inner"><div className="sc-dot"></div></div>
         <div className="sc-line"></div>
       </div>
-      <div className="scan-label-wrap">
-        <p>QR코드를 프레임 안에 맞춰주세요</p>
-        <p>请将二维码对准框内</p>
-      </div>
-      <button className="btn-scan-start" onClick={onScan}>SCAN START / 开始扫码</button>
-      <button className="btn-upload-qr" onClick={onUpload}>QR UPLOAD / 上传二维码</button>
-      <button className="btn-manual-mo" onClick={onManual}>✏️ TEXT / 文字查询</button>
-      <div className="scan-hint-wrap">
-        <p>카메라가 자동으로 QR을 인식합니다</p>
-        <p>摄像头将自动识别二维码</p>
-      </div>
+      {pageLabel && <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:11, letterSpacing:8, color:'var(--gold-dim)', textTransform:'uppercase', opacity:.7, textAlign:'center' }}>{pageLabel}</div>}
+      {pageTitle && <div style={{ fontSize:13, color:'rgba(200,196,188,.8)', lineHeight:2, fontWeight:300, letterSpacing:.3, textAlign:'center' }}>{pageTitle}</div>}
+      {showInstruction && (
+        <div className="scan-label-wrap">
+          <p>QR코드를 프레임 안에 맞춰주세요</p>
+          <p>请将二维码对准框内</p>
+        </div>
+      )}
+      {buttons.map((btn, i) => (
+        <button key={i} className={buttonClasses[i]} onClick={btn.onClick}>{btn.label}</button>
+      ))}
+      {showBottomHint && (
+        <div className="scan-hint-wrap">
+          <p>카메라가 자동으로 QR을 인식합니다</p>
+          <p>摄像头将自动识别二维码</p>
+        </div>
+      )}
     </div>
+  );
+});
+
+// ─── Existing Production Log screens ──────────────────────────────────
+const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onManual, onBack }) {
+  return (
+    <ScanStyleScreen
+      onBack={onBack}
+      systemLabel="IKU PRODUCTION SYSTEM"
+      buttons={[
+        { label: 'SCAN START / 开始扫码', variant: 'outlined', onClick: onScan },
+        { label: 'QR UPLOAD / 上传二维码', variant: 'filled', onClick: onUpload },
+        { label: '✏️ TEXT / 文字查询', variant: 'outlined', onClick: onManual },
+      ]}
+      showInstruction={true}
+      showBottomHint={true}
+    />
   );
 });
 
@@ -792,72 +828,39 @@ const StatusScanSuccessScreen = memo(function StatusScanSuccessScreen({ result, 
 });
 
 // ─── NEW: Pack Menu Screen ────────────────────────────────────────────
-// ─── Shared scan-style menu layout (Inner Pack & Master Bag menus) ────
-const ScanMenuScreen = memo(function ScanMenuScreen({
-  onBack, typeLabel, typeSublabel,
-  btn1Label, btn2Label, btn3Label,
-  onBtn1, onBtn2, onBtn3,
-}) {
-  return (
-    <div className="screen active scan-screen">
-      <button onClick={onBack} className="scan-back-btn">← 返回</button>
-      <div className="scan-wordmark">IKU Production System</div>
-      <div style={{ textAlign:'center' }}>
-        <div className="scan-frame-wrap">
-          <div className="sc-corner sc-tl" />
-          <div className="sc-corner sc-tr" />
-          <div className="sc-corner sc-bl" />
-          <div className="sc-corner sc-br" />
-          <div className="sc-inner"><div className="sc-dot" /></div>
-          <div className="sc-line" />
-        </div>
-        <div style={{ fontSize:11, letterSpacing:4, color:'var(--gold)', marginTop:16, fontWeight:400, textTransform:'uppercase' }}>{typeLabel}</div>
-        <div style={{ fontSize:18, color:'var(--text)', marginTop:4, fontWeight:400, letterSpacing:1 }}>{typeSublabel}</div>
-      </div>
-      <div className="scan-label-wrap">
-        <p>QR코드를 프레임 안에 맞춰주세요</p>
-        <p>请将二维码对准框内</p>
-      </div>
-      <button className="btn-upload-qr" onClick={onBtn1}>{btn1Label}</button>
-      <button className="btn-scan-start" onClick={onBtn2}>{btn2Label}</button>
-      <button className="btn-manual-mo" onClick={onBtn3}>{btn3Label}</button>
-      <div className="scan-hint-wrap">
-        <p>카메라가 자동으로 QR을 인식합니다</p>
-        <p>摄像头将自动识别二维码</p>
-      </div>
-    </div>
-  );
-});
-
 const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
   return (
-    <ScanMenuScreen
+    <ScanStyleScreen
       onBack={onBack}
-      typeLabel="INNER PACK"
-      typeSublabel="中包袋 / 중간포장"
-      btn1Label="➕ 新建包装 / 새 포장 생성"
-      btn2Label="📦 批量生成 / 일괄 생성"
-      btn3Label="🔍 QR 查询 / QR 조회"
-      onBtn1={onCreate}
-      onBtn2={onBatch}
-      onBtn3={onQueryMenu}
+      systemLabel="IKU PRODUCTION SYSTEM"
+      pageLabel="INNER PACK"
+      pageTitle="中包袋 / 중간포장"
+      buttons={[
+        { label: '新建包装 / 새 포장 생성', variant: 'filled', onClick: onCreate },
+        { label: '批量生成 / 일괄 생성', variant: 'outlined', onClick: onBatch },
+        { label: 'QR 查询 / QR 조회', variant: 'outlined', onClick: onQueryMenu },
+      ]}
+      showInstruction={true}
+      showBottomHint={true}
     />
   );
 });
 
-// ─── NEW: Bag Menu Screen ─────────────────────────────────────────────
+// ─── Bag Menu Screen ──────────────────────────────────────────────────
 const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
   return (
-    <ScanMenuScreen
+    <ScanStyleScreen
       onBack={onBack}
-      typeLabel="MASTER BAG"
-      typeSublabel="麻袋包装 / 마대"
-      btn1Label="➕ 新建麻袋 / 새 마대 생성"
-      btn2Label="📦 批量生成 / 일괄 생성"
-      btn3Label="🔍 QR 查询 / QR 조회"
-      onBtn1={onCreate}
-      onBtn2={onBatch}
-      onBtn3={onQueryMenu}
+      systemLabel="IKU PRODUCTION SYSTEM"
+      pageLabel="MASTER BAG"
+      pageTitle="麻袋包装 / 마대"
+      buttons={[
+        { label: '新建麻袋 / 새 마대 생성', variant: 'filled', onClick: onCreate },
+        { label: '批量生成 / 일괄 생성', variant: 'outlined', onClick: onBatch },
+        { label: 'QR 查询 / QR 조회', variant: 'outlined', onClick: onQueryMenu },
+      ]}
+      showInstruction={true}
+      showBottomHint={true}
     />
   );
 });
