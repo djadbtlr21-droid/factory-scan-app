@@ -1964,17 +1964,72 @@ const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, 
 
 // ─── Batch Bag Screens ────────────────────────────────────────────────
 const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit, onBack }) {
-  const [startSeq, setStartSeq] = useState('1');
-  const [endSeq, setEndSeq] = useState('10');
+  const [startSeq, setStartSeq] = useState('');
+  const [endSeq, setEndSeq] = useState('');
   const [worker, setWorker] = useState('');
-  const packCount = Math.max(0, (parseInt(endSeq) || 0) - (parseInt(startSeq) || 0) + 1);
-  const bagCount = Math.ceil(packCount / MASTER_BAG_SIZE);
+  const [packs, setPacks] = useState(null);
+  const [packsLoading, setPacksLoading] = useState(false);
+
+  useEffect(() => {
+    if (!bagMO?.mo_number) return;
+    let cancelled = false;
+    async function load() {
+      setPacksLoading(true);
+      setPacks(null);
+      try {
+        const all = [];
+        let cursor = null;
+        let safety = 0;
+        while (safety++ < 50) {
+          const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${bagMO.mo_number}"`, cursor ? { record_cursor: cursor } : {});
+          const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
+          if (data.length === 0) break;
+          all.push(...data);
+          cursor = pr?.record_cursor || null;
+          if (!cursor) break;
+        }
+        if (cancelled) return;
+        const sorted = all.sort((a, b) => parseInt(a['Pack_Sequence']) - parseInt(b['Pack_Sequence']));
+        const created = sorted.filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '');
+        console.log('[Batch Bag] Total:', sorted.length, 'Available:', created.length, 'Bagged:', sorted.length - created.length);
+        setPacks(sorted);
+        if (created.length > 0) {
+          setStartSeq(String(parseInt(created[0]['Pack_Sequence'])));
+          setEndSeq(String(parseInt(created[created.length - 1]['Pack_Sequence'])));
+        }
+      } catch (e) {
+        console.error('[Batch Bag] loadPacks error:', e);
+        if (!cancelled) setPacks([]);
+      } finally {
+        if (!cancelled) setPacksLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [bagMO?.mo_number]);
+
+  const s = parseInt(startSeq) || 0;
+  const e = parseInt(endSeq) || 0;
+
+  const createdPacks = useMemo(() => packs ? packs.filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '') : [], [packs]);
+  const baggedPacks  = useMemo(() => packs ? packs.filter(p => p['Assigned_To_Bag'] && p['Assigned_To_Bag'] !== '') : [], [packs]);
+
+  const inRangeAvailable = useMemo(() => createdPacks.filter(p => { const seq = parseInt(p['Pack_Sequence']); return s > 0 && e >= s && seq >= s && seq <= e; }), [createdPacks, s, e]);
+  const inRangeBagged    = useMemo(() => baggedPacks.filter(p => { const seq = parseInt(p['Pack_Sequence']); return s > 0 && e >= s && seq >= s && seq <= e; }), [baggedPacks, s, e]);
+
+  const totalBags = inRangeAvailable.length > 0 ? Math.ceil(inRangeAvailable.length / MASTER_BAG_SIZE) : 0;
+  const remainder = inRangeAvailable.length % MASTER_BAG_SIZE;
+  const minAvail = createdPacks.length > 0 ? parseInt(createdPacks[0]['Pack_Sequence']) : null;
+  const maxAvail = createdPacks.length > 0 ? parseInt(createdPacks[createdPacks.length - 1]['Pack_Sequence']) : null;
+
+  const canSubmit = !!(worker.trim() && s > 0 && e >= s && (packs ? inRangeAvailable.length > 0 : e - s + 1 > 0));
+
   const handleSubmit = () => {
-    const s = parseInt(startSeq), e = parseInt(endSeq);
     if (!s || !e || s > e || s < 1) { alert('请输入有效的包装序号范围'); return; }
     if (!worker.trim()) { alert('请输入负责人 / 담당자'); return; }
     onSubmit({ startPackSeq: s, endPackSeq: e, worker: worker.trim() });
   };
+
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
@@ -1983,29 +2038,114 @@ const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit,
         <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagMO ? bagMO.mo_number : '—'}</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
+
+        {/* Overview */}
+        {packsLoading ? (
+          <DkCard><div style={{ fontSize:10, color:G.goldDim, textAlign:'center', padding:'6px 0' }}>正在加载包装数据... / 로딩 중...</div></DkCard>
+        ) : packs && (
+          <DkCard>
+            <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>包装总览 / 포장 현황</div>
+            <DkRow label="总包装 / 전체" value={packs.length + ' 个'} />
+            <DkRow label="已装袋 / 마대 포함됨" value={baggedPacks.length + ' 个'} />
+            <DkRow label="待装袋 / 미할당" value={createdPacks.length + ' 个'} />
+            {minAvail != null && maxAvail != null && (
+              <div style={{ fontSize:10, color:G.gold, marginTop:8 }}>
+                当前可用范围 / 사용 가능 범위: #{minAvail} ~ #{maxAvail}
+              </div>
+            )}
+          </DkCard>
+        )}
+
+        {/* Range inputs */}
         <DkCard>
           <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:14, fontWeight:400 }}>包装序号范围 / 포장 범위</div>
-          <DkInput label="开始包装序号 / 시작 포장 번호" value={startSeq} onChange={e => setStartSeq(e.target.value)} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
-          <DkInput label="结束包装序号 / 종료 포장 번호" value={endSeq} onChange={e => setEndSeq(e.target.value)} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="开始包装序号 / 시작 포장 번호" value={startSeq} onChange={ev => setStartSeq(ev.target.value)} type="number" inputMode="numeric" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="结束包装序号 / 종료 포장 번호" value={endSeq} onChange={ev => setEndSeq(ev.target.value)} type="number" inputMode="numeric" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
           <div style={{ fontSize:12, color:G.gold, marginTop:4, fontWeight:400 }}>
-            {packCount} 包装 → {bagCount} 麻袋 / {bagCount} 마대
-            {packCount % MASTER_BAG_SIZE !== 0 && packCount > 0 && (
-              <span style={{ color:G.goldDim, fontSize:10 }}> (含1个自投리 {packCount % MASTER_BAG_SIZE}包)</span>
+            {packs ? (
+              inRangeAvailable.length > 0 ? (
+                <>
+                  {inRangeAvailable.length} 包装 → {totalBags} 麻袋
+                  {remainder !== 0 && <span style={{ color:G.goldDim, fontSize:10 }}> (含1个剩余 {remainder}包)</span>}
+                  {inRangeBagged.length > 0 && <span style={{ color:'#F59E0B', fontSize:10, display:'block', marginTop:2 }}>跳过 {inRangeBagged.length} 个已装袋 / {inRangeBagged.length}개 건너뜀</span>}
+                </>
+              ) : s > 0 && e >= s ? (
+                <span style={{ color:'#EF4444', fontSize:11 }}>⚠ 范围内无可装袋包装 / 범위 내 사용 가능한 포장 없음</span>
+              ) : null
+            ) : (
+              s > 0 && e >= s ? `${e - s + 1} 包装 → ${Math.ceil((e - s + 1) / MASTER_BAG_SIZE)} 麻袋` : null
             )}
           </div>
         </DkCard>
+
+        {/* Worker */}
         <DkCard>
-          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={ev => setWorker(ev.target.value)} placeholder="姓名 Name" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
         </DkCard>
-        <DkCard style={{ fontSize:10, color:G.goldDim, lineHeight:1.8 }}>
-          <div style={{ fontWeight:400, color:G.gold, marginBottom:6 }}>注意 / 주의사항</div>
-          <div>· 系统将自动加载指定范围内的包装</div>
-          <div>· 已装袋的包装将被跳过</div>
-          <div>· 每 {MASTER_BAG_SIZE} 个包装自动组成一个麻袋</div>
-          <div>· 目的地自动设为 MEX-Guadalajara</div>
+
+        {/* Tile grid */}
+        {packs && packs.length > 0 && (
+          <DkCard style={{ padding:'14px 12px' }}>
+            <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400, display:'flex', gap:12, flexWrap:'wrap' }}>
+              包装状态 / 포장 상태
+              <span style={{ display:'flex', alignItems:'center', gap:3 }}>
+                <span style={{ width:10, height:10, background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', display:'inline-block', borderRadius:1 }} />
+                <span style={{ color:G.goldDim }}>已装袋</span>
+              </span>
+              <span style={{ display:'flex', alignItems:'center', gap:3 }}>
+                <span style={{ width:10, height:10, background:'transparent', border:'1px solid rgba(212,175,55,0.4)', display:'inline-block', borderRadius:1 }} />
+                <span style={{ color:G.goldDim }}>待装袋</span>
+              </span>
+              <span style={{ display:'flex', alignItems:'center', gap:3 }}>
+                <span style={{ width:10, height:10, background:'rgba(75,139,255,0.2)', border:'1px solid #4B8BFF', display:'inline-block', borderRadius:1 }} />
+                <span style={{ color:G.goldDim }}>已选范围</span>
+              </span>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(50px, 1fr))', gap:4, maxHeight:272, overflowY:'auto' }}>
+              {packs.map(p => {
+                const seq = parseInt(p['Pack_Sequence']);
+                const isBagged = !!(p['Assigned_To_Bag'] && p['Assigned_To_Bag'] !== '');
+                const inRange = s > 0 && e >= s && seq >= s && seq <= e;
+                let bg, border, color;
+                if (isBagged) {
+                  bg = 'rgba(255,255,255,0.04)'; border = 'rgba(255,255,255,0.1)'; color = 'rgba(255,255,255,0.2)';
+                } else if (inRange) {
+                  bg = 'rgba(75,139,255,0.18)'; border = '#4B8BFF'; color = '#93C5FD';
+                } else {
+                  bg = 'transparent'; border = 'rgba(212,175,55,0.35)'; color = G.goldDim;
+                }
+                return (
+                  <div key={seq} style={{ border:'1px solid '+border, borderRadius:2, padding:'4px 2px', textAlign:'center', background:bg, transition:'background .12s,border-color .12s' }}>
+                    <div style={{ fontSize:10, color, lineHeight:1.2 }}>#{seq}</div>
+                    {isBagged && <div style={{ fontSize:7, color:'rgba(255,255,255,0.2)', lineHeight:1 }}>✓</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </DkCard>
+        )}
+
+        {/* Info / status card */}
+        <DkCard style={{ fontSize:10, color:G.goldDim, lineHeight:1.9 }}>
+          {packs && s > 0 && e >= s && inRangeAvailable.length > 0 ? (
+            inRangeBagged.length === 0 ? (
+              <div style={{ color:'#6EE7B7' }}>✓ 范围内 {inRangeAvailable.length} 个包装均可装袋 / 범위 내 {inRangeAvailable.length}개 모두 사용 가능</div>
+            ) : (
+              <div style={{ color:'#F59E0B' }}>⚠ 范围内 {inRangeAvailable.length} 个可装袋, {inRangeBagged.length} 个已装袋将被跳过 / 범위 내 {inRangeAvailable.length}개 사용, {inRangeBagged.length}개 건너뜀</div>
+            )
+          ) : (
+            <>
+              <div style={{ fontWeight:400, color:G.gold, marginBottom:4 }}>注意 / 주의사항</div>
+              <div>· 系统将自动加载指定范围内的包装</div>
+              <div>· 已装袋的包装将被跳过</div>
+              <div>· 每 {MASTER_BAG_SIZE} 个包装自动组成一个麻袋</div>
+              <div>· 目的地自动设为 MEX-Guadalajara</div>
+            </>
+          )}
         </DkCard>
-        <DkBtn onClick={handleSubmit} disabled={packCount <= 0 || !worker.trim()}>
-          ▶ 开始批量装袋 / 일괄 마대 생성 ({bagCount})
+
+        <DkBtn onClick={handleSubmit} disabled={!canSubmit}>
+          ▶ 开始批量装袋 / 일괄 마대 생성 ({totalBags || (s > 0 && e >= s ? Math.ceil((e - s + 1) / MASTER_BAG_SIZE) : 0)} 麻袋)
         </DkBtn>
       </div>
     </DkScreen>
