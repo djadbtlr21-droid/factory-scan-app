@@ -936,27 +936,54 @@ const PackCreateScreen = memo(function PackCreateScreen({
   isRemainder, setIsRemainder, lastComposition, onSubmit, onBack, submitting
 }) {
   const selectedCount = composition.filter(c => c.selected).length;
-  const applyStandard = () => setComposition(composition.map(c => ({ ...c, selected: true })));
+  const totalQty = isRemainder
+    ? composition.filter(c => c.selected).reduce((sum, c) => sum + (parseInt(c.qty) || 1), 0)
+    : selectedCount;
+
+  const applyStandard = () => setComposition(composition.map(c => ({ ...c, selected: true, qty: 1 })));
   const applyLastPack = () => {
     if (!lastComposition) return;
     setComposition(composition.map(c => {
       const found = lastComposition.find(l => l.color === c.color && l.size === c.size);
-      return { ...c, selected: !!found };
+      return { ...c, selected: !!found, qty: found ? (parseInt(found.qty) || 1) : (parseInt(c.qty) || 1) };
     }));
   };
   const toggleItem = (idx) => {
     const next = [...composition];
-    next[idx] = { ...next[idx], selected: !next[idx].selected };
+    const wasSelected = next[idx].selected;
+    next[idx] = { ...next[idx], selected: !wasSelected, qty: !wasSelected ? 1 : (parseInt(next[idx].qty) || 1) };
     setComposition(next);
   };
+  const changeQty = (idx, delta) => {
+    const next = [...composition];
+    const item = next[idx];
+    const newQty = Math.max(1, Math.min(99, (parseInt(item.qty) || 1) + delta));
+    next[idx] = { ...item, qty: newQty, selected: true };
+    setComposition(next);
+  };
+  const toggleRemainder = () => {
+    const next = !isRemainder;
+    setIsRemainder(next);
+    if (!next) {
+      setComposition(composition.map(c => ({ ...c, selected: true, qty: 1 })));
+    }
+  };
   const handleSubmit = () => {
-    if (selectedCount === 0) { alert('请选择包装组成'); return; }
+    if (selectedCount === 0 || totalQty === 0) { alert('请选择至少 1 件 / 최소 1개 이상 선택'); return; }
     if (!isRemainder && selectedCount !== INNER_PACK_SIZE) {
       if (!window.confirm(`당 상 ${INNER_PACK_SIZE}개가 아닙니다 (${selectedCount}개). 계속? / Not ${INNER_PACK_SIZE} items (${selectedCount}). Continue?`)) return;
     }
     if (!worker.trim()) { alert('请输入负责人 / 담당자를 입력하세요'); return; }
     onSubmit();
   };
+
+  const stepperBtn = (label, onClick, disabled) => (
+    <button onClick={onClick} disabled={disabled}
+      style={{ width:40, height:40, border:'1px solid '+(disabled?G.border:G.borderHover), borderRadius:2, background:'transparent', color:disabled?G.border:G.gold, fontSize:18, lineHeight:'1', cursor:disabled?'default':'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, touchAction:'manipulation' }}>
+      {label}
+    </button>
+  );
+
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
@@ -965,42 +992,81 @@ const PackCreateScreen = memo(function PackCreateScreen({
         <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{packMO.mo_number}</div>
         <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{packMO.sku} · {packMO.factory}</div>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:12 }}>
-          <div style={{ fontSize:11, color:G.gold }}>{selectedCount}</div>
-          <div style={{ flex:1, height:2, background:G.progressTrack, borderRadius:1 }}>
-            <div style={{ height:'100%', background:G.gold, width:Math.min(100, selectedCount / INNER_PACK_SIZE * 100) + '%', borderRadius:1, transition:'width .2s' }} />
-          </div>
-          <div style={{ fontSize:11, color:G.goldDim }}>{INNER_PACK_SIZE}</div>
+          {isRemainder ? (
+            <>
+              <div style={{ fontSize:11, color:G.gold }}>{totalQty} 件</div>
+              <div style={{ flex:1, height:2, background:G.progressTrack, borderRadius:1 }}>
+                <div style={{ height:'100%', background:G.gold, width:'100%', borderRadius:1 }} />
+              </div>
+              <div style={{ fontSize:11, color:G.goldDim }}>자투리</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize:11, color:G.gold }}>{selectedCount}</div>
+              <div style={{ flex:1, height:2, background:G.progressTrack, borderRadius:1 }}>
+                <div style={{ height:'100%', background:G.gold, width:Math.min(100, selectedCount / INNER_PACK_SIZE * 100) + '%', borderRadius:1, transition:'width .2s' }} />
+              </div>
+              <div style={{ fontSize:11, color:G.goldDim }}>{INNER_PACK_SIZE}</div>
+            </>
+          )}
         </div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
           <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>包装组成 / 포장 구성</div>
-          <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-            <button onClick={applyStandard} style={{ flex:1, padding:'9px 8px', border:'1px solid '+G.borderHover, borderRadius:2, background:G.btnBg, color:G.gold, fontSize:10, letterSpacing:1, cursor:'pointer', fontFamily:'inherit' }}>标准 / Standard</button>
-            {lastComposition && (
-              <button onClick={applyLastPack} style={{ flex:1, padding:'9px 8px', border:'1px solid '+G.border, borderRadius:2, background:'transparent', color:G.goldDim, fontSize:10, letterSpacing:1, cursor:'pointer', fontFamily:'inherit' }}>上次 / Copy Last</button>
-            )}
-          </div>
-          <div style={{ maxHeight:260, overflowY:'auto' }}>
+          {!isRemainder && (
+            <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+              <button onClick={applyStandard} style={{ flex:1, padding:'9px 8px', border:'1px solid '+G.borderHover, borderRadius:2, background:G.btnBg, color:G.gold, fontSize:10, letterSpacing:1, cursor:'pointer', fontFamily:'inherit' }}>标准 / Standard</button>
+              {lastComposition && (
+                <button onClick={applyLastPack} style={{ flex:1, padding:'9px 8px', border:'1px solid '+G.border, borderRadius:2, background:'transparent', color:G.goldDim, fontSize:10, letterSpacing:1, cursor:'pointer', fontFamily:'inherit' }}>上次 / Copy Last</button>
+              )}
+            </div>
+          )}
+          <div style={{ maxHeight:isRemainder ? 340 : 260, overflowY:'auto' }}>
             {composition.length === 0 ? (
               <div style={{ textAlign:'center', color:G.goldDim, padding:20, fontSize:11, letterSpacing:1 }}>此订单没有标准配货信息</div>
             ) : composition.map((item, idx) => (
-              <div key={idx} onClick={() => toggleItem(idx)} style={{ display:'flex', alignItems:'center', padding:'10px 0', borderBottom: idx < composition.length - 1 ? '1px solid var(--app-divider)' : 'none', cursor:'pointer' }}>
-                <div style={{ width:16, height:16, border:'1px solid '+(item.selected?G.gold:G.border), borderRadius:2, marginRight:12, background:item.selected?G.btnBg:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                  {item.selected && <div style={{ width:8, height:8, background:G.gold, borderRadius:1 }} />}
+              isRemainder ? (
+                <div key={idx} style={{ display:'flex', alignItems:'center', padding:'10px 0', borderBottom: idx < composition.length - 1 ? '1px solid var(--app-divider)' : 'none', gap:10 }}>
+                  <div onClick={() => toggleItem(idx)} style={{ width:20, height:20, border:'1px solid '+(item.selected?G.gold:G.border), borderRadius:2, background:item.selected?G.btnBg:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                    {item.selected && <div style={{ width:10, height:10, background:G.gold, borderRadius:1 }} />}
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, color:item.selected?G.cream:G.goldDim, fontWeight:400 }}>{item.color}</div>
+                    <div style={{ fontSize:10, color:G.goldDim, marginTop:1 }}>Size: {item.size}</div>
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+                    {stepperBtn('−', () => { if ((parseInt(item.qty)||1) <= 1) toggleItem(idx); else changeQty(idx, -1); }, !item.selected)}
+                    <div style={{ width:32, textAlign:'center', fontSize:15, color:item.selected?G.cream:G.border, fontWeight:400 }}>
+                      {item.selected ? (parseInt(item.qty) || 1) : 0}
+                    </div>
+                    {stepperBtn('+', () => changeQty(idx, 1), !item.selected)}
+                  </div>
                 </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, color:G.cream, fontWeight:400 }}>{item.color}</div>
-                  <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>Size: {item.size}</div>
+              ) : (
+                <div key={idx} onClick={() => toggleItem(idx)} style={{ display:'flex', alignItems:'center', padding:'10px 0', borderBottom: idx < composition.length - 1 ? '1px solid var(--app-divider)' : 'none', cursor:'pointer' }}>
+                  <div style={{ width:16, height:16, border:'1px solid '+(item.selected?G.gold:G.border), borderRadius:2, marginRight:12, background:item.selected?G.btnBg:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    {item.selected && <div style={{ width:8, height:8, background:G.gold, borderRadius:1 }} />}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, color:G.cream, fontWeight:400 }}>{item.color}</div>
+                    <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>Size: {item.size}</div>
+                  </div>
+                  <div style={{ fontSize:11, color:G.goldDim }}>×{item.qty || 1}</div>
                 </div>
-                <div style={{ fontSize:11, color:G.goldDim }}>×{item.qty || 1}</div>
-              </div>
+              )
             ))}
           </div>
+          {isRemainder && totalQty > 0 && (
+            <div style={{ marginTop:12, paddingTop:10, borderTop:'1px solid var(--app-divider)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:10, color:G.goldDim }}>合计 / 합계</span>
+              <span style={{ fontSize:15, color:G.gold, fontWeight:400 }}>{totalQty} 件</span>
+            </div>
+          )}
         </DkCard>
         <DkCard>
           <label style={{ display:'flex', alignItems:'center', cursor:'pointer', gap:12 }}>
-            <div onClick={() => setIsRemainder(!isRemainder)} style={{ width:16, height:16, border:'1px solid '+(isRemainder?G.gold:G.border), borderRadius:2, background:isRemainder?G.btnBg:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <div onClick={toggleRemainder} style={{ width:16, height:16, border:'1px solid '+(isRemainder?G.gold:G.border), borderRadius:2, background:isRemainder?G.btnBg:'transparent', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
               {isRemainder && <div style={{ width:8, height:8, background:G.gold, borderRadius:1 }} />}
             </div>
             <div>
@@ -1012,8 +1078,12 @@ const PackCreateScreen = memo(function PackCreateScreen({
         <DkCard>
           <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
-        <DkBtn onClick={handleSubmit} disabled={submitting} style={{ marginTop:8, padding:18, fontSize:11, letterSpacing:3 }}>
-          {submitting ? '保存中...' : `✅ ${selectedCount}件 打包完成 / 포장 완료`}
+        <DkBtn onClick={handleSubmit} disabled={submitting || totalQty === 0} style={{ marginTop:8, padding:18, fontSize:11, letterSpacing:3 }}>
+          {submitting ? '保存中...' : totalQty === 0
+            ? '请选择 / 선택하세요'
+            : isRemainder
+              ? `✅ ${totalQty}件 打包完成 / 포장 완료 (剩余 / 자투리)`
+              : `✅ ${totalQty}件 打包完成 / 포장 완료`}
         </DkBtn>
       </div>
     </DkScreen>
