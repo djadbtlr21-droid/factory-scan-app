@@ -2127,33 +2127,6 @@ const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit,
           </DkCard>
         )}
 
-        {/* Range inputs */}
-        <DkCard>
-          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:14, fontWeight:400 }}>包装序号范围 / 포장 범위</div>
-          <DkInput label="开始包装序号 / 시작 포장 번호" value={startSeq} onChange={ev => setStartSeq(ev.target.value)} type="number" inputMode="numeric" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
-          <DkInput label="结束包装序号 / 종료 포장 번호" value={endSeq} onChange={ev => setEndSeq(ev.target.value)} type="number" inputMode="numeric" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
-          <div style={{ fontSize:12, color:G.gold, marginTop:4, fontWeight:400 }}>
-            {packs ? (
-              inRangeAvailable.length > 0 ? (
-                <>
-                  {inRangeAvailable.length} 包装 → {totalBags} 麻袋
-                  {remainder !== 0 && <span style={{ color:G.goldDim, fontSize:10 }}> (含1个剩余 {remainder}包)</span>}
-                  {inRangeBagged.length > 0 && <span style={{ color:'#F59E0B', fontSize:10, display:'block', marginTop:2 }}>跳过 {inRangeBagged.length} 个已装袋 / {inRangeBagged.length}개 건너뜀</span>}
-                </>
-              ) : s > 0 && e >= s ? (
-                <span style={{ color:'#EF4444', fontSize:11 }}>⚠ 范围内无可装袋包装 / 범위 내 사용 가능한 포장 없음</span>
-              ) : null
-            ) : (
-              s > 0 && e >= s ? `${e - s + 1} 包装 → ${Math.ceil((e - s + 1) / MASTER_BAG_SIZE)} 麻袋` : null
-            )}
-          </div>
-        </DkCard>
-
-        {/* Worker */}
-        <DkCard>
-          <DkInput label="负责人 / 담당자 *" value={worker} onChange={ev => setWorker(ev.target.value)} placeholder="姓名 Name" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
-        </DkCard>
-
         {/* Tile grid */}
         {packs && packs.length > 0 && (
           <DkCard style={{ padding:'14px 12px' }}>
@@ -2195,6 +2168,33 @@ const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit,
             </div>
           </DkCard>
         )}
+
+        {/* Range inputs */}
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:14, fontWeight:400 }}>包装序号范围 / 포장 범위</div>
+          <DkInput label="开始包装序号 / 시작 포장 번호" value={startSeq} onChange={ev => setStartSeq(ev.target.value)} type="number" inputMode="numeric" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="结束包装序号 / 종료 포장 번호" value={endSeq} onChange={ev => setEndSeq(ev.target.value)} type="number" inputMode="numeric" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
+          <div style={{ fontSize:12, color:G.gold, marginTop:4, fontWeight:400 }}>
+            {packs ? (
+              inRangeAvailable.length > 0 ? (
+                <>
+                  {inRangeAvailable.length} 包装 → {totalBags} 麻袋
+                  {remainder !== 0 && <span style={{ color:G.goldDim, fontSize:10 }}> (含1个剩余 {remainder}包)</span>}
+                  {inRangeBagged.length > 0 && <span style={{ color:'#F59E0B', fontSize:10, display:'block', marginTop:2 }}>跳过 {inRangeBagged.length} 个已装袋 / {inRangeBagged.length}개 건너뜀</span>}
+                </>
+              ) : s > 0 && e >= s ? (
+                <span style={{ color:'#EF4444', fontSize:11 }}>⚠ 范围内无可装袋包装 / 범위 내 사용 가능한 포장 없음</span>
+              ) : null
+            ) : (
+              s > 0 && e >= s ? `${e - s + 1} 包装 → ${Math.ceil((e - s + 1) / MASTER_BAG_SIZE)} 麻袋` : null
+            )}
+          </div>
+        </DkCard>
+
+        {/* Worker */}
+        <DkCard>
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={ev => setWorker(ev.target.value)} placeholder="姓名 Name" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
+        </DkCard>
 
         {/* Info / status card */}
         <DkCard style={{ fontSize:10, color:G.goldDim, lineHeight:1.9 }}>
