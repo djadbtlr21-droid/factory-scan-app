@@ -1,7 +1,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import jsQR from 'jsqr';
-import { getRecords, submitRecord, updateRecord, deleteRecord } from './api.js';
+import { getRecords, getRecordsByCriteria, submitRecord, updateRecord, deleteRecord } from './api.js';
 import {
   BRAND, INNER_PACK_SIZE, MASTER_BAG_SIZE, REPORTS, FORMS,
   PACK_STATUS_LABELS, BAG_STATUS_LABELS, APP_PIN, PIN_STORAGE_KEY
@@ -1468,10 +1468,10 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await getRecords(REPORTS.INNER_PACK);
+        const res = await getRecordsByCriteria(REPORTS.INNER_PACK, `Pack_UUID == "${uuid}"`);
         if (cancelled) return;
         const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
-        const found = list.find(r => r['Pack_UUID'] === uuid);
+        const found = list[0] || null;
         if (!found) { setNotFound(true); return; }
         let items = [];
         try { items = JSON.parse(found['Items_JSON'] || '[]'); } catch (e) {}
@@ -1574,9 +1574,9 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
     let cancelled = false;
     (async () => {
       try {
-        const bagRes = await getRecords(REPORTS.MASTER_BAG);
+        const bagRes = await getRecordsByCriteria(REPORTS.MASTER_BAG, `Bag_UUID == "${uuid}"`);
         const bagList = (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) ? bagRes.data : [];
-        const foundBag = bagList.find(r => r['Bag_UUID'] === uuid);
+        const foundBag = bagList[0] || null;
         if (!foundBag) { if (!cancelled) setNotFound(true); return; }
 
         let packUUIDs = [];
@@ -1603,7 +1603,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
 
         let packs = [];
         if (packUUIDs.length > 0) {
-          const packRes = await getRecords(REPORTS.INNER_PACK);
+          const packRes = await getRecordsByCriteria(REPORTS.INNER_PACK, `MO_Number == "${moNum}"`);
           if (packRes && packRes.code === 3000 && Array.isArray(packRes.data)) {
             packs = packRes.data
               .filter(r => packUUIDs.includes(r['Pack_UUID']))

@@ -10,9 +10,11 @@ export default async function handler(req, res) {
     const from = (req.query && req.query.from) || '1';
     const limitRaw = parseInt((req.query && req.query.limit) || '200', 10);
     const limit = String(Math.max(1, Math.min(isNaN(limitRaw) ? 200 : limitRaw, 200)));
+    const criteria = (req.query && req.query.criteria) || '';
 
     const token = await getAccessToken();
-    const url = `${zohoBase()}/report/${encodeURIComponent(report)}?from=${encodeURIComponent(from)}&limit=${encodeURIComponent(limit)}`;
+    const url = `${zohoBase()}/report/${encodeURIComponent(report)}?from=${encodeURIComponent(from)}&limit=${encodeURIComponent(limit)}`
+      + (criteria ? `&criteria=${encodeURIComponent(criteria)}` : '');
     const zres = await fetch(url, {
       headers: { Authorization: `Zoho-oauthtoken ${token}`, Accept: 'application/json' }
     });
