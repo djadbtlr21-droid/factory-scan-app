@@ -73,17 +73,24 @@ body{font-family:'Manrope','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Ping
 .screen{display:none;animation:fadeIn .35s ease}.screen.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-#screen-scan{
+#screen-scan,.scan-screen{
   background:var(--bg);
   background-image:radial-gradient(ellipse at 50% 20%,rgba(212,185,118,.06) 0%,transparent 60%);
   min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:48px 28px;gap:32px;position:relative;overflow:hidden;
 }
-#screen-scan::before{
+#screen-scan::before,.scan-screen::before{
   content:'';position:absolute;top:-40%;left:-20%;width:140%;height:80%;
   background:radial-gradient(ellipse,rgba(212,185,118,.04) 0%,transparent 70%);
   pointer-events:none;
 }
+.scan-back-btn{
+  position:absolute;top:16px;left:16px;background:transparent;
+  border:1px solid var(--gold);color:var(--gold);
+  font-size:10px;font-weight:400;letter-spacing:2px;padding:7px 14px;
+  cursor:pointer;z-index:10;font-family:inherit;transition:var(--transition);
+}
+.scan-back-btn:active{background:rgba(212,185,118,.08)}
 .scan-wordmark{
   font-family:'Bebas Neue',cursive;font-size:11px;letter-spacing:8px;
   color:var(--gold-dim);text-transform:uppercase;opacity:.7;
