@@ -188,11 +188,7 @@ const ScanStyleScreen = memo(function ScanStyleScreen({
   showInstruction = true,
   showBottomHint = true,
 }) {
-  const buttonClasses = buttons.map((btn, i) =>
-    btn.variant === 'filled' ? 'btn-upload-qr'
-    : buttons.slice(0, i).filter(b => b.variant !== 'filled').length === 0 ? 'btn-scan-start'
-    : 'btn-manual-mo'
-  );
+  const buttonClasses = buttons.map(() => 'btn-upload-qr');
   return (
     <div className="scan-screen">
       <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'transparent', border:'1px solid #D4AF37', color:G.gold, fontSize:10, fontWeight:400, letterSpacing:2, padding:'7px 14px', cursor:'pointer', zIndex:10, fontFamily:'inherit' }}>← 返回</button>
@@ -233,9 +229,9 @@ const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onManual, onBack
       onBack={onBack}
       systemLabel="IKU PRODUCTION SYSTEM"
       buttons={[
-        { label: 'SCAN START / 开始扫码', variant: 'outlined', onClick: onScan },
-        { label: 'QR UPLOAD / 上传二维码', variant: 'filled', onClick: onUpload },
-        { label: '✏️ TEXT / 文字查询', variant: 'outlined', onClick: onManual },
+        { label: 'SCAN START / 开始扫码', onClick: onScan },
+        { label: 'QR UPLOAD / 上传二维码', onClick: onUpload },
+        { label: '✏️ TEXT / 文字查询', onClick: onManual },
       ]}
       showInstruction={true}
       showBottomHint={true}
@@ -857,9 +853,9 @@ const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQuery
       pageLabel="INNER PACK"
       pageTitle="中包袋 / 중간포장"
       buttons={[
-        { label: '新建包装 / 새 포장 생성', variant: 'filled', onClick: onCreate },
-        { label: '批量生成 / 일괄 생성', variant: 'outlined', onClick: onBatch },
-        { label: 'QR 查询 / QR 조회', variant: 'outlined', onClick: onQueryMenu },
+        { label: '新建包装 / 새 포장 생성', onClick: onCreate },
+        { label: '批量生成 / 일괄 생성', onClick: onBatch },
+        { label: 'QR 查询 / QR 조회', onClick: onQueryMenu },
       ]}
       showInstruction={true}
       showBottomHint={true}
@@ -876,10 +872,10 @@ const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMe
       pageLabel="MASTER BAG"
       pageTitle="麻袋包装 / 마대"
       buttons={[
-        { label: '新建麻袋 / 새 마대 생성', variant: 'filled', onClick: onCreate },
-        { label: '批量生成 / 일괄 생성', variant: 'outlined', onClick: onBatch },
-        { label: 'QR 查询 / QR 조회', variant: 'outlined', onClick: onQueryMenu },
-        { label: '一括出货 / 일괄 출고', variant: 'outlined', onClick: onBulkShip },
+        { label: '新建麻袋 / 새 마대 생성', onClick: onCreate },
+        { label: '批量生成 / 일괄 생성', onClick: onBatch },
+        { label: '一括出货 / 일괄 출고', onClick: onBulkShip },
+        { label: 'QR 查询 / QR 조회', onClick: onQueryMenu },
       ]}
       showInstruction={true}
       showBottomHint={true}
@@ -1257,7 +1253,7 @@ const BagCreateScreen = memo(function BagCreateScreen({
           {availablePacksLoading ? (
             <div style={{ display:'flex', justifyContent:'center', padding:'20px 0' }}><div className="spinner" style={{ width:24, height:24 }} /></div>
           ) : !availablePacks || availablePacks.length === 0 ? (
-            <div style={{ textAlign:'center', color:G.goldDim, fontSize:11, padding:'16px 0', letterSpacing:1 }}>所有包装已分配 / 모든 포장이 마대에 할당됨</div>
+            <div style={{ textAlign:'center', color:G.goldDim, fontSize:11, padding:'16px 0', letterSpacing:1 }}>无可分配的中包袋 / 할당할 수 있는 중간포장이 없습니다</div>
           ) : (
             <>
               <div style={{ display:'flex', gap:8, marginBottom:12 }}>
@@ -1886,7 +1882,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
                 style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 4px', borderBottom:'1px solid var(--app-divider)', cursor: onViewPack ? 'pointer' : 'default' }}>
                 <span style={{ fontSize:11, color:G.cream }}>
                   <span style={{ color:G.goldDim, fontSize:9, marginRight:6 }}>{i + 1}.</span>
-                  中包袋 #{p.pack_sequence || (i + 1)} / 중간포장 #{p.pack_sequence || (i + 1)}
+                  {bagRecord.mo_number} 中包袋 #{p.pack_sequence || (i + 1)} / 중간포장 #{p.pack_sequence || (i + 1)}
                 </span>
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                   <span style={{ fontSize:10, color:G.gold }}>{p.total_qty} 件</span>
@@ -2575,6 +2571,7 @@ const BulkShipDoneScreen = memo(function BulkShipDoneScreen({ result, onHome }) 
 // ─── Reserved (中国仓库保留) screens ──────────────────────────────────
 const ReservedInputScreen = memo(function ReservedInputScreen({ reservedMO, onSubmit, onBack }) {
   const [qty, setQty] = useState('');
+  const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [worker, setWorker] = useState('');
   if (!reservedMO) return null;
@@ -2620,6 +2617,14 @@ const ReservedInputScreen = memo(function ReservedInputScreen({ reservedMO, onSu
         </DkCard>
         <DkCard>
           <DkInput
+            label="保留位置 / 보관 위치"
+            value={location}
+            onChange={e => setLocation(e.target.value)}
+            placeholder="예: 公司仓库 A区 / 회사 창고 A구역"
+          />
+        </DkCard>
+        <DkCard>
+          <DkInput
             label="备注 / 비고"
             value={notes}
             onChange={e => setNotes(e.target.value)}
@@ -2632,10 +2637,10 @@ const ReservedInputScreen = memo(function ReservedInputScreen({ reservedMO, onSu
             value={worker}
             onChange={e => setWorker(e.target.value)}
             placeholder="姓名 Name"
-            onKeyDown={e => { if (e.key === 'Enter' && canSubmit) onSubmit(qtyNum, notes.trim(), worker.trim()); }}
+            onKeyDown={e => { if (e.key === 'Enter' && canSubmit) onSubmit(qtyNum, location.trim(), notes.trim(), worker.trim()); }}
           />
         </DkCard>
-        <DkBtn onClick={() => { if (canSubmit) onSubmit(qtyNum, notes.trim(), worker.trim()); }} disabled={!canSubmit}>
+        <DkBtn onClick={() => { if (canSubmit) onSubmit(qtyNum, location.trim(), notes.trim(), worker.trim()); }} disabled={!canSubmit}>
           ✓ 登记保留 / 보관 등록
         </DkBtn>
       </div>
@@ -3153,14 +3158,14 @@ export default function App() {
     }
   }, []);
 
-  const handleRegisterReserved = useCallback(async (addQty, notes, worker) => {
+  const handleRegisterReserved = useCallback(async (addQty, location, notes, worker) => {
     if (!reservedMO) return;
     setLoadingMsg('登记中...');
     setCurrentScreen('loading');
     try {
       const newReserved = reservedMO.current_reserved + addQty;
       const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
-      const entry = `[${timestamp}] ${worker}: +${addQty}件${notes ? ' - ' + notes : ''}`;
+      const entry = `[${timestamp}] ${worker}: +${addQty}件${location ? ' @ ' + location : ''}${notes ? ' - ' + notes : ''}`;
       const updatedNotes = reservedMO.reserved_notes ? `${reservedMO.reserved_notes}\n${entry}` : entry;
       const result = await updateRecord(REPORTS.MO, reservedMO.record_id, {
         Reserved_Qty: newReserved,
