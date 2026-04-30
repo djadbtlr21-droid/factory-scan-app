@@ -25,7 +25,6 @@ const PROCESSES = [
   { code: 'Sewing_End',    zh: '车缝完成', ko: '봉제 완료', moField: 'Sewing_Completion_Date',emoji: '🪡', zohoValue: 'Sewing End / 봉제 완료 / 车缝完成' },
   { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦', zohoValue: 'Packing Start / 포장 시작 / 包装开始' },
   { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '🎁', zohoValue: 'Packing End / 포장 완료 / 包装完成' },
-  { code: 'Shipped',       zh: '出货',     ko: '출고',      moField: 'Ship_Date',              emoji: '🚚', zohoValue: 'Shipped / 출고 / 出货' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -329,7 +328,6 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
           <ProcBtn p={PROCESSES[4]} />
           <ProcBtn p={PROCESSES[5]} />
           <ProcBtn p={PROCESSES[6]} />
-          <ProcBtn p={PROCESSES[7]} full />
         </div>
       </div>
 
@@ -381,7 +379,7 @@ const InputScreen = memo(function InputScreen({ moData, process, onSubmit, onBac
   const [err, setErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const showBag = process.key.indexOf('Packing') >= 0 || process.key.indexOf('Shipped') >= 0;
+  const showBag = process.key.indexOf('Packing') >= 0;
   const orderQty = moData && moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-';
 
   async function handleSubmit() {
@@ -858,7 +856,7 @@ const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQuery
 });
 
 // ─── Bag Menu Screen ──────────────────────────────────────────────────
-const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
+const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMenu, onBulkShip, onBack }) {
   return (
     <ScanStyleScreen
       onBack={onBack}
@@ -869,6 +867,7 @@ const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMe
         { label: '新建麻袋 / 새 마대 생성', variant: 'filled', onClick: onCreate },
         { label: '批量生成 / 일괄 생성', variant: 'outlined', onClick: onBatch },
         { label: 'QR 查询 / QR 조회', variant: 'outlined', onClick: onQueryMenu },
+        { label: '一括出货 / 일괄 출고', variant: 'outlined', onClick: onBulkShip },
       ]}
       showInstruction={true}
       showBottomHint={true}
@@ -1334,9 +1333,37 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome 
 });
 
 // ─── NEW: Bag Detail Screen ───────────────────────────────────────────
-const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditStatus, onDelete, requirePin: reqPin }) {
+const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditStatus, onDelete, requirePin: reqPin, onViewPack }) {
   const [showPicker, setShowPicker] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [bagPacksData, setBagPacksData] = useState([]);
+  const [bagPacksLoading, setBagPacksLoading] = useState(false);
+
+  useEffect(() => {
+    if (!detail || !detail.inner_pack_uuids || detail.inner_pack_uuids.length === 0) return;
+    let cancelled = false;
+    setBagPacksLoading(true);
+    (async () => {
+      try {
+        let moNum = detail.mo_number;
+        const res = await getRecordsByCriteria(REPORTS.INNER_PACK, `MO_Number == "${moNum}"`);
+        if (cancelled) return;
+        const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+        const uuidSet = new Set(detail.inner_pack_uuids);
+        const matched = list
+          .filter(r => uuidSet.has(r['Pack_UUID']))
+          .map(r => ({ uuid: r['Pack_UUID'], pack_sequence: parseInt(r['Pack_Sequence']) || 0, total_qty: r['Total_Qty'] }))
+          .sort((a, b) => a.pack_sequence - b.pack_sequence);
+        if (!cancelled) setBagPacksData(matched);
+      } catch (e) {
+        if (!cancelled) setBagPacksData([]);
+      } finally {
+        if (!cancelled) setBagPacksLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [detail]);
+
   if (!detail) return null;
   const statusLabel = BAG_STATUS_LABELS[detail.bag_status] || detail.bag_status;
   const handleStatusSelect = async (newStatus) => {
@@ -1376,7 +1403,21 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
         {detail.inner_pack_uuids && detail.inner_pack_uuids.length > 0 && (
           <DkCard>
             <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>包装列表 / 포장 목록</div>
-            {detail.inner_pack_uuids.map((uuid, i) => (
+            {bagPacksLoading ? (
+              <div style={{ fontSize:10, color:G.goldDim, textAlign:'center', padding:'8px 0' }}>加载中...</div>
+            ) : bagPacksData.length > 0 ? bagPacksData.map((p, i) => (
+              <div key={p.uuid} onClick={() => onViewPack && onViewPack(p.uuid)}
+                style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 4px', borderBottom:'1px solid var(--app-divider)', cursor: onViewPack ? 'pointer' : 'default' }}>
+                <span style={{ fontSize:11, color:G.cream }}>
+                  <span style={{ color:G.goldDim, fontSize:9, marginRight:6 }}>{i + 1}.</span>
+                  中包袋 #{p.pack_sequence} / 중간포장 #{p.pack_sequence}
+                </span>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:10, color:G.gold }}>{p.total_qty}件</span>
+                  {onViewPack && <span style={{ fontSize:14, color:G.goldDim }}>›</span>}
+                </div>
+              </div>
+            )) : detail.inner_pack_uuids.map((uuid, i) => (
               <div key={uuid} style={{ padding:'6px 0', borderBottom:'1px solid var(--app-divider)', fontSize:10, color:G.goldDim, fontFamily:'monospace' }}>
                 {i + 1}. {uuid}
               </div>
@@ -1707,7 +1748,7 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
 });
 
 // ─── ViewBagScreen (read-only, URL-accessible) ────────────────────────
-const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
+const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) {
   const [bagRecord, setBagRecord]           = useState(null);
   const [innerPacks, setInnerPacks]         = useState([]);
   const [colorSizeSummary, setColorSizeSummary] = useState([]);
@@ -1828,10 +1869,17 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome }) {
         {innerPacks.length > 0 && (
           <DkCard>
             <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>包装列表 / 포장 목록</div>
-            {innerPacks.map((p, i) => (
-              <div key={p.uuid} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', borderBottom:'1px solid var(--app-divider)', fontSize:11 }}>
-                <span style={{ color:G.goldDim }}>Pack {p.pack_sequence || (i + 1)} · {p.uuid.substring(0, 8)}...</span>
-                <span style={{ color:G.gold }}>{p.total_qty} 件</span>
+            {innerPacks.sort((a, b) => (parseInt(a.pack_sequence) || 0) - (parseInt(b.pack_sequence) || 0)).map((p, i) => (
+              <div key={p.uuid} onClick={() => onViewPack && onViewPack(p.uuid)}
+                style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 4px', borderBottom:'1px solid var(--app-divider)', cursor: onViewPack ? 'pointer' : 'default' }}>
+                <span style={{ fontSize:11, color:G.cream }}>
+                  <span style={{ color:G.goldDim, fontSize:9, marginRight:6 }}>{i + 1}.</span>
+                  中包袋 #{p.pack_sequence || (i + 1)} / 중간포장 #{p.pack_sequence || (i + 1)}
+                </span>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:10, color:G.gold }}>{p.total_qty} 件</span>
+                  {onViewPack && <span style={{ fontSize:14, color:G.goldDim }}>›</span>}
+                </div>
               </div>
             ))}
           </DkCard>
@@ -2395,6 +2443,123 @@ const BagQuerySubMenu = memo(function BagQuerySubMenu({ onTextQuery, onScanQuery
   );
 });
 
+async function updateRecordWithRetry(report, id, data, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await updateRecord(report, id, data);
+      if (result && result.code === 3000) return { success: true };
+      console.warn(`[Update] attempt ${attempt} non-3000:`, result?.code);
+    } catch (err) {
+      console.warn(`[Update] attempt ${attempt} threw:`, err.message);
+    }
+    if (attempt < maxRetries) await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt - 1)));
+  }
+  return { success: false };
+}
+
+// ─── Bulk Ship screens ────────────────────────────────────────────────
+const BulkShipBagSelectScreen = memo(function BulkShipBagSelectScreen({ bagMO, bags, selected, onToggle, onSelectAll, onClearAll, worker, onWorkerChange, onSubmit, onBack }) {
+  const total = bags.length;
+  const selectedCount = selected.size;
+  const canSubmit = selectedCount > 0 && worker.trim();
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>BULK SHIP · 一括出货</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagMO ? bagMO.mo_number : '—'}</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>麻袋概况 / 마대 현황</div>
+          <DkRow label="已生成麻袋 / 생성된 마대" value={total + ' 个'} />
+          <DkRow label="已选 / 선택됨" value={selectedCount + ' / ' + total} />
+        </DkCard>
+        <DkCard style={{ padding:'14px 12px' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, fontWeight:400 }}>选择麻袋 / 마대 선택</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={onSelectAll} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.4)', color:G.goldDim, fontSize:9, padding:'3px 8px', cursor:'pointer', fontFamily:'inherit' }}>全选 / 전체</button>
+              <button onClick={onClearAll} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.2)', color:G.goldDim, fontSize:9, padding:'3px 8px', cursor:'pointer', fontFamily:'inherit' }}>清除 / 해제</button>
+            </div>
+          </div>
+          {total === 0 ? (
+            <div style={{ fontSize:11, color:'#EF4444', textAlign:'center', padding:'12px 0' }}>⚠ 无待出货麻袋 / 출고 가능한 마대 없음</div>
+          ) : (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(54px, 1fr))', gap:4, maxHeight:272, overflowY:'auto' }}>
+              {bags.map(bag => {
+                const isSel = selected.has(bag.record_id);
+                return (
+                  <div key={bag.record_id} onClick={() => onToggle(bag.record_id)}
+                    style={{ border:'1px solid '+(isSel ? G.gold : 'rgba(212,175,55,0.3)'), borderRadius:2, padding:'5px 2px', textAlign:'center', background: isSel ? 'rgba(212,175,55,0.15)' : 'transparent', cursor:'pointer', transition:'background .12s,border-color .12s' }}>
+                    <div style={{ fontSize:10, color: isSel ? G.gold : G.goldDim, lineHeight:1.2 }}>#{bag.bag_sequence}</div>
+                    <div style={{ fontSize:7, color: isSel ? 'rgba(212,175,55,0.7)' : 'rgba(255,255,255,0.15)' }}>{isSel ? '✓' : '·'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </DkCard>
+        <DkCard>
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => onWorkerChange(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter' && canSubmit) onSubmit(); }} />
+        </DkCard>
+        <DkBtn onClick={onSubmit} disabled={!canSubmit}>
+          ▶ 开始批量出货 / 일괄 출고 시작 ({selectedCount} 麻袋)
+        </DkBtn>
+      </div>
+    </DkScreen>
+  );
+});
+
+const BulkShipProgressScreen = memo(function BulkShipProgressScreen({ progress }) {
+  const pct = progress.total > 0 ? Math.round(progress.current / progress.total * 100) : 0;
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px', textAlign:'center' }}>
+        <div style={{ fontSize:9, letterSpacing:6, color:G.gold, fontWeight:400 }}>BULK SHIPPING...</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:8, fontWeight:400 }}>{progress.current} / {progress.total} 麻袋</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ height:4, background:G.progressTrack, borderRadius:2, marginBottom:14 }}>
+            <div style={{ height:'100%', background:G.gold, width:pct+'%', borderRadius:2, transition:'width .3s' }} />
+          </div>
+          <div style={{ fontSize:11, color:G.goldDim, textAlign:'center' }}>{pct}% · 出货处理中 / 출고 처리 중...</div>
+        </DkCard>
+        {progress.current > 0 && (
+          <div style={{ fontSize:10, color:G.goldDim, textAlign:'center', marginTop:8 }}>已完成: {progress.current} 麻袋</div>
+        )}
+      </div>
+    </DkScreen>
+  );
+});
+
+const BulkShipDoneScreen = memo(function BulkShipDoneScreen({ result, onHome }) {
+  if (!result) return null;
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px 20px 18px' }}>
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>批量出货完成 / 일괄 출고 완료</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{result.moNumber}</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <DkRow label="✅ 成功 / 성공" value={result.succeeded + ' 麻袋'} />
+          {result.failed > 0 && <DkRow label="❌ 失败 / 실패" value={String(result.failed)} />}
+          <DkRow label="총 포장 수량 / 总包装数" value={result.totalPacks + ' Packs'} />
+          <DkRow label="总件数 / 총 수량" value={result.totalQty.toLocaleString() + ' 件'} />
+        </DkCard>
+        {result.failed > 0 && (
+          <div style={{ padding:'10px 14px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)', marginBottom:12, fontSize:10, color:'#FCA5A5' }}>
+            ⚠ {result.failed} 个麻袋出货失败，请手动检查状态 / {result.failed}개 마대 출고 실패, 수동 확인 필요
+          </div>
+        )}
+        <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
+      </div>
+    </DkScreen>
+  );
+});
+
 async function updatePackToBagged(packId, bagUUID, packUUID, maxRetries = 5) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -2481,6 +2646,14 @@ export default function App() {
   const [batchBagProgress, setBatchBagProgress] = useState({ current: 0, total: 0, items: [], errors: [] });
   const [batchBagResult, setBatchBagResult] = useState(null);
   const [batchBagPreview, setBatchBagPreview] = useState(null);
+
+  // ── Bulk Ship state ──
+  const [bulkShipMO, setBulkShipMO] = useState(null);
+  const [bulkShipBags, setBulkShipBags] = useState([]);
+  const [bulkShipSelected, setBulkShipSelected] = useState(new Set());
+  const [bulkShipWorker, setBulkShipWorker] = useState('');
+  const [bulkShipProgress, setBulkShipProgress] = useState({ current: 0, total: 0 });
+  const [bulkShipResult, setBulkShipResult] = useState(null);
 
   // ── Toast state ──
   const [toastMsg, setToastMsg] = useState('');
@@ -2747,6 +2920,101 @@ export default function App() {
     } catch (err) {
       setCurrentScreen('batch_bag_mo_select');
       alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
+  const fetchMODataForBulkShip = useCallback(async (moNumber) => {
+    try {
+      const moRes = await getRecords(REPORTS.MO);
+      const moList = (moRes && moRes.code === 3000 && Array.isArray(moRes.data)) ? moRes.data : [];
+      const found = moList.find((r) => r['MO_Number'] === moNumber);
+      if (!found) { setCurrentScreen('bulk_ship_mo_select'); alert('未找到订单: ' + moNumber); return; }
+      setBulkShipMO({ mo_number: found['MO_Number'] || moNumber, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-' });
+      const bagRes = await getRecordsByCriteria(REPORTS.MASTER_BAG, `MO_Number == "${moNumber}" && Bag_Status == "Created"`);
+      const bagList = (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) ? bagRes.data : [];
+      const bags = bagList
+        .map(r => {
+          let uuids = [];
+          try { uuids = JSON.parse(r['Inner_Pack_UUIDs'] || '[]'); } catch (e) {}
+          return { record_id: r['ID'], bag_sequence: parseInt(r['Bag_Sequence']) || 0, bag_uuid: r['Bag_UUID'], inner_pack_uuids: uuids, total_qty: parseInt(r['Total_Qty']) || 0 };
+        })
+        .sort((a, b) => a.bag_sequence - b.bag_sequence);
+      setBulkShipBags(bags);
+      setBulkShipSelected(new Set(bags.map(b => b.record_id)));
+      setBulkShipWorker('');
+      setCurrentScreen('bulk_ship_bag_select');
+    } catch (err) {
+      setCurrentScreen('bulk_ship_mo_select');
+      alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
+  const handleBulkShip = useCallback(async () => {
+    const bags = bulkShipBags.filter(b => bulkShipSelected.has(b.record_id));
+    if (bags.length === 0) return;
+    setBulkShipProgress({ current: 0, total: bags.length });
+    setCurrentScreen('bulk_ship_progress');
+    let succeeded = 0, failed = 0, totalPacks = 0, totalQty = 0;
+    for (let i = 0; i < bags.length; i++) {
+      const bag = bags[i];
+      setBulkShipProgress({ current: i, total: bags.length });
+      try {
+        const bagUpd = await updateRecordWithRetry(REPORTS.MASTER_BAG, bag.record_id, { Bag_Status: 'Shipped' });
+        if (!bagUpd.success) throw new Error('Bag update failed');
+        for (const packUUID of bag.inner_pack_uuids) {
+          const packRes = await getRecordsByCriteria(REPORTS.INNER_PACK, `Pack_UUID == "${packUUID}"`);
+          const packList = (packRes && packRes.code === 3000 && Array.isArray(packRes.data)) ? packRes.data : [];
+          if (packList.length > 0) {
+            await updateRecordWithRetry(REPORTS.INNER_PACK, packList[0]['ID'], { Pack_Status: 'Shipped' });
+          }
+        }
+        succeeded++;
+        totalPacks += bag.inner_pack_uuids.length;
+        totalQty += bag.total_qty;
+        console.log(`[Bulk Ship] ✅ Bag #${bag.bag_sequence} → Shipped`);
+      } catch (err) {
+        failed++;
+        console.error(`[Bulk Ship] ❌ Bag #${bag.bag_sequence} failed:`, err.message);
+      }
+    }
+    setBulkShipProgress({ current: bags.length, total: bags.length });
+    setBulkShipResult({ moNumber: bulkShipMO?.mo_number || '', succeeded, failed, totalPacks, totalQty });
+    setCurrentScreen('bulk_ship_done');
+  }, [bulkShipBags, bulkShipSelected, bulkShipMO]);
+
+  const handleViewPackFromBag = useCallback(async (packUUID) => {
+    setLoadingMsg('查询包装信息...');
+    setCurrentScreen('loading');
+    try {
+      const res = await getRecordsByCriteria(REPORTS.INNER_PACK, `Pack_UUID == "${packUUID}"`);
+      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+      const found = list[0] || null;
+      if (!found) { setCurrentScreen('bag_detail'); alert('未找到此包装'); return; }
+      let items = [];
+      try { items = JSON.parse(found['Items_JSON'] || '[]'); } catch (e) {}
+      let moNum = found['MO_Number'];
+      if (typeof moNum === 'object') moNum = moNum.display_value || '';
+      setScannedPackDetail({
+        uuid: found['Pack_UUID'],
+        record_id: found['ID'],
+        brand: found['Brand'] || '',
+        mo_number: moNum,
+        pack_sequence: found['Pack_Sequence'],
+        total_qty: found['Total_Qty'],
+        is_remainder: found['Is_Remainder'] === 'true' || found['Is_Remainder'] === true,
+        items,
+        worker: found['Worker'] || '',
+        factory: found['Factory'] || '',
+        assigned_to_bag: found['Assigned_To_Bag'] || '',
+        pack_status: found['Pack_Status'] || 'Created',
+        created_time: found['Added_Time'] || found['Created_Time'] || '',
+        modified_time: found['Modified_Time'] || ''
+      });
+      setPackDetailFrom('bag_detail');
+      setCurrentScreen('pack_detail');
+    } catch (err) {
+      setCurrentScreen('bag_detail');
+      alert('查询失败: ' + (err?.message || String(err)));
     }
   }, []);
 
@@ -3520,7 +3788,18 @@ export default function App() {
       handleStatusScanUpdate(uuid);
       return;
     }
-  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchMODataForBag, fetchMODataForBatchPack, fetchMODataForBatchBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate]);
+
+    if (scanMode === 'bulk_ship_mo') {
+      if (qrType !== 'production_log') { setCameraOpen(false); alert('请扫描生产进度QR (MO QR)'); return; }
+      let moNumber = '';
+      text.split(/[|\n\r]+/).forEach((part) => { const idx = part.indexOf(':'); if (idx < 0) return; const key = part.substring(0, idx).trim().toUpperCase(); if (key === 'MO') moNumber = part.substring(idx + 1).trim(); });
+      if (!moNumber && /^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
+      if (!moNumber) { setCameraOpen(false); alert('未能识别订单号'); return; }
+      flushSync(() => { setCameraOpen(false); setLoadingMsg('加载订单数据...'); setCurrentScreen('loading'); });
+      fetchMODataForBulkShip(moNumber);
+      return;
+    }
+  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchMODataForBag, fetchMODataForBatchPack, fetchMODataForBatchBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate, fetchMODataForBulkShip]);
 
   // ── Existing handlers (unchanged except handleBackToScan goes to 'home') ──
   const handleScanRequest = useCallback(() => setCameraOpen(true), []);
@@ -3828,6 +4107,7 @@ export default function App() {
             })}
             onBatch={() => requirePin(() => { setBagMO(null); setCurrentScreen('batch_bag_mo_select'); })}
             onQueryMenu={() => setCurrentScreen('bag_query_sub_menu')}
+            onBulkShip={() => requirePin(() => { setBulkShipMO(null); setBulkShipBags([]); setBulkShipSelected(new Set()); setBulkShipWorker(''); setBulkShipResult(null); setCurrentScreen('bulk_ship_mo_select'); })}
             onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
           />
         )}
@@ -3891,6 +4171,7 @@ export default function App() {
             onEditStatus={handleBagStatusChange}
             onDelete={handleDeleteBag}
             requirePin={requirePin}
+            onViewPack={handleViewPackFromBag}
           />
         )}
         {currentScreen === 'bag_list' && (
@@ -3947,6 +4228,38 @@ export default function App() {
           />
         )}
 
+        {/* Bulk Ship screens */}
+        {currentScreen === 'bulk_ship_mo_select' && (
+          <BagMOSelectScreen
+            onScan={() => { setScanMode('bulk_ship_mo'); setCameraOpen(true); }}
+            onManual={(mo) => { setLoadingMsg('加载订单数据...'); setCurrentScreen('loading'); fetchMODataForBulkShip(mo); }}
+            onBack={() => setCurrentScreen('bag_menu')}
+          />
+        )}
+        {currentScreen === 'bulk_ship_bag_select' && bulkShipMO && (
+          <BulkShipBagSelectScreen
+            bagMO={bulkShipMO}
+            bags={bulkShipBags}
+            selected={bulkShipSelected}
+            onToggle={(id) => setBulkShipSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; })}
+            onSelectAll={() => setBulkShipSelected(new Set(bulkShipBags.map(b => b.record_id)))}
+            onClearAll={() => setBulkShipSelected(new Set())}
+            worker={bulkShipWorker}
+            onWorkerChange={setBulkShipWorker}
+            onSubmit={handleBulkShip}
+            onBack={() => setCurrentScreen('bulk_ship_mo_select')}
+          />
+        )}
+        {currentScreen === 'bulk_ship_progress' && (
+          <BulkShipProgressScreen progress={bulkShipProgress} />
+        )}
+        {currentScreen === 'bulk_ship_done' && bulkShipResult && (
+          <BulkShipDoneScreen
+            result={bulkShipResult}
+            onHome={() => { setBulkShipMO(null); setBulkShipBags([]); setBulkShipSelected(new Set()); setBulkShipResult(null); setCurrentScreen('home'); }}
+          />
+        )}
+
         {/* Status Scan screens */}
         {currentScreen === 'status_scan_mode' && (
           <StatusScanModeScreen
@@ -3984,6 +4297,7 @@ export default function App() {
           <ViewBagScreen
             uuid={viewUuid}
             onHome={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); setViewUuid(null); }}
+            onViewPack={(packUUID) => { window.history.pushState({}, '', '/view/inner/' + packUUID); setViewUuid(packUUID); setCurrentScreen('view-inner'); }}
           />
         )}
 
