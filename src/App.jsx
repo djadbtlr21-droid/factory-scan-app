@@ -730,8 +730,19 @@ const IconStatusScan = () => (
   </svg>
 );
 
+const IconReserved = () => (
+  <svg viewBox="0 0 48 48" width="42" height="42" fill="none" stroke="var(--app-gold)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 20 L24 8 L42 20 L42 44 L6 44 Z"/>
+    <line x1="6" y1="20" x2="42" y2="20"/>
+    <rect x="19" y="30" width="10" height="14" rx="1"/>
+    <rect x="8" y="24" width="9" height="9" rx="1"/>
+    <rect x="31" y="24" width="9" height="9" rx="1"/>
+    <line x1="24" y1="8" x2="24" y2="20"/>
+  </svg>
+);
+
 // ─── NEW: Home Screen ─────────────────────────────────────────────────
-const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan }) {
+const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan, onSelectReserved }) {
   const card = (onClick, Icon, label, sub) => (
     <div onClick={onClick} style={{ position:'relative', border:'1px solid '+G.border, borderRadius:2, background:G.card, padding:'20px 20px 20px 24px', marginBottom:14, display:'flex', alignItems:'center', gap:20, cursor:'pointer', transition:'all .2s' }}
       onMouseEnter={e => { e.currentTarget.style.border='1px solid '+G.borderHover; e.currentTarget.style.background='rgba(212,175,55,0.06)'; }}
@@ -764,6 +775,7 @@ const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInn
       {card(onSelectProductionLog, IconFactory, '生产进度扫码', 'Production Log Scan')}
       {card(onSelectInnerPack, IconInnerPack, '中包袋', 'Inner Pack')}
       {card(onSelectMasterBag, IconMasterBag, '麻袋包装', 'Master Bag')}
+      {card(onSelectReserved, IconReserved, '中国仓库保留', '중국창고보유')}
     </div>
   );
 });
@@ -2560,6 +2572,102 @@ const BulkShipDoneScreen = memo(function BulkShipDoneScreen({ result, onHome }) 
   );
 });
 
+// ─── Reserved (中国仓库保留) screens ──────────────────────────────────
+const ReservedInputScreen = memo(function ReservedInputScreen({ reservedMO, onSubmit, onBack }) {
+  const [qty, setQty] = useState('');
+  const [notes, setNotes] = useState('');
+  const [worker, setWorker] = useState('');
+  if (!reservedMO) return null;
+
+  const planQty = reservedMO.plan_qty || 0;
+  const packedQty = reservedMO.packed_qty || 0;
+  const currentReserved = reservedMO.current_reserved || 0;
+  const remainingReservable = Math.max(0, planQty - packedQty - currentReserved);
+  const qtyNum = parseInt(qty) || 0;
+  const qtyOk = qtyNum > 0 && qtyNum <= remainingReservable;
+  const canSubmit = qtyOk && worker.trim();
+
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>中国仓库保留 / 중국창고보유</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{reservedMO.mo_number}</div>
+        <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{reservedMO.sku}</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>订单概况 / 오더 현황</div>
+          <DkRow label="计划数量 / 계획 수량" value={planQty.toLocaleString() + ' 件'} />
+          <DkRow label="已包装 / 포장 완료" value={packedQty.toLocaleString() + ' 件'} />
+          <DkRow label="当前保留 / 현재 보관" value={currentReserved.toLocaleString() + ' 件'} />
+          <DkRow label="剩余可保留 / 보관 가능" value={<span style={{ color: remainingReservable > 0 ? G.gold : '#EF4444' }}>{remainingReservable.toLocaleString() + ' 件'}</span>} />
+        </DkCard>
+        <DkCard>
+          <DkInput
+            label="本次保留数量 / 이번 보관 수량"
+            value={qty}
+            onChange={e => setQty(e.target.value)}
+            type="number"
+            inputMode="numeric"
+            placeholder={'最多 ' + remainingReservable + ' 件'}
+          />
+          {qty !== '' && !qtyOk && (
+            <div style={{ fontSize:10, color:'#EF4444', marginTop:4 }}>
+              {qtyNum <= 0 ? '⚠ 请输入有效数量' : '⚠ 超过可保留数量 / 보관 가능 수량 초과'}
+            </div>
+          )}
+        </DkCard>
+        <DkCard>
+          <DkInput
+            label="备注 / 비고"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="例: 下季样品保留"
+          />
+        </DkCard>
+        <DkCard>
+          <DkInput
+            label="负责人 / 담당자 *"
+            value={worker}
+            onChange={e => setWorker(e.target.value)}
+            placeholder="姓名 Name"
+            onKeyDown={e => { if (e.key === 'Enter' && canSubmit) onSubmit(qtyNum, notes.trim(), worker.trim()); }}
+          />
+        </DkCard>
+        <DkBtn onClick={() => { if (canSubmit) onSubmit(qtyNum, notes.trim(), worker.trim()); }} disabled={!canSubmit}>
+          ✓ 登记保留 / 보관 등록
+        </DkBtn>
+      </div>
+    </DkScreen>
+  );
+});
+
+const ReservedDoneScreen = memo(function ReservedDoneScreen({ result, onContinue, onHome }) {
+  if (!result) return null;
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px 20px 18px' }}>
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>登记成功 / 등록 완료</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{result.moNumber}</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard>
+          <div style={{ textAlign:'center', padding:'16px 0 10px' }}>
+            <div style={{ fontSize:32, marginBottom:10 }}>✅</div>
+            <div style={{ fontSize:13, color:G.cream, letterSpacing:1 }}>保留登记完成 / 보관 등록 완료</div>
+          </div>
+          <DkRow label="本次保留 / 이번 보관" value={'+' + result.addQty.toLocaleString() + ' 件'} />
+          <DkRow label="累计保留 / 누적 보관" value={result.newReserved.toLocaleString() + ' 件'} />
+          <DkRow label="计划总量 / 계획 총량" value={result.planQty.toLocaleString() + ' 件'} />
+        </DkCard>
+        <DkBtn onClick={onContinue}>继续登记 / 계속 등록</DkBtn>
+        <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
+      </div>
+    </DkScreen>
+  );
+});
+
 async function updatePackToBagged(packId, bagUUID, packUUID, maxRetries = 5) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -2654,6 +2762,10 @@ export default function App() {
   const [bulkShipWorker, setBulkShipWorker] = useState('');
   const [bulkShipProgress, setBulkShipProgress] = useState({ current: 0, total: 0 });
   const [bulkShipResult, setBulkShipResult] = useState(null);
+
+  // ── Reserved state ──
+  const [reservedMO, setReservedMO] = useState(null);
+  const [reservedResult, setReservedResult] = useState(null);
 
   // ── Toast state ──
   const [toastMsg, setToastMsg] = useState('');
@@ -3017,6 +3129,53 @@ export default function App() {
       alert('查询失败: ' + (err?.message || String(err)));
     }
   }, []);
+
+  const fetchMODataForReserved = useCallback(async (moNumber) => {
+    try {
+      const res = await getRecords(REPORTS.MO, `MO_Number == "${moNumber}"`);
+      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
+      if (list.length === 0) { setCurrentScreen('reserved_mo_select'); alert('未找到订单: ' + moNumber); return; }
+      const found = list[0];
+      setReservedMO({
+        mo_number: found['MO_Number'] || moNumber,
+        record_id: found['ID'],
+        sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-',
+        factory: getField(found, 'Factory') || '-',
+        plan_qty: parseInt(found['Plan_Total_Quantity']) || 0,
+        packed_qty: parseInt(found['Inner_Pack_Total_Qty']) || 0,
+        current_reserved: parseInt(found['Reserved_Qty']) || 0,
+        reserved_notes: found['Reserved_Notes'] || '',
+      });
+      setCurrentScreen('reserved_input');
+    } catch (err) {
+      setCurrentScreen('reserved_mo_select');
+      alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
+  const handleRegisterReserved = useCallback(async (addQty, notes, worker) => {
+    if (!reservedMO) return;
+    setLoadingMsg('登记中...');
+    setCurrentScreen('loading');
+    try {
+      const newReserved = reservedMO.current_reserved + addQty;
+      const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+      const entry = `[${timestamp}] ${worker}: +${addQty}件${notes ? ' - ' + notes : ''}`;
+      const updatedNotes = reservedMO.reserved_notes ? `${reservedMO.reserved_notes}\n${entry}` : entry;
+      const result = await updateRecord(REPORTS.MO, reservedMO.record_id, {
+        Reserved_Qty: newReserved,
+        Reserved_Notes: updatedNotes,
+      });
+      if (!result || result.code !== 3000) throw new Error('更新失败: code=' + (result?.code || 'unknown'));
+      console.log(`[Reserved] ${reservedMO.mo_number}: +${addQty} (total ${newReserved})`);
+      setReservedMO(prev => prev ? { ...prev, current_reserved: newReserved, reserved_notes: updatedNotes } : prev);
+      setReservedResult({ moNumber: reservedMO.mo_number, addQty, newReserved, planQty: reservedMO.plan_qty });
+      setCurrentScreen('reserved_done');
+    } catch (err) {
+      setCurrentScreen('reserved_input');
+      alert('登记失败: ' + (err?.message || String(err)));
+    }
+  }, [reservedMO]);
 
   const fetchInnerPackDetail = useCallback(async (uuid) => {
     try {
@@ -3799,7 +3958,18 @@ export default function App() {
       fetchMODataForBulkShip(moNumber);
       return;
     }
-  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchMODataForBag, fetchMODataForBatchPack, fetchMODataForBatchBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate, fetchMODataForBulkShip]);
+
+    if (scanMode === 'reserved_mo') {
+      if (qrType !== 'production_log') { setCameraOpen(false); alert('请扫描生产进度QR (MO QR)'); return; }
+      let moNumber = '';
+      text.split(/[|\n\r]+/).forEach((part) => { const idx = part.indexOf(':'); if (idx < 0) return; const key = part.substring(0, idx).trim().toUpperCase(); if (key === 'MO') moNumber = part.substring(idx + 1).trim(); });
+      if (!moNumber && /^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
+      if (!moNumber) { setCameraOpen(false); alert('未能识别订单号'); return; }
+      flushSync(() => { setCameraOpen(false); setLoadingMsg('加载订单数据...'); setCurrentScreen('loading'); });
+      fetchMODataForReserved(moNumber);
+      return;
+    }
+  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchMODataForBag, fetchMODataForBatchPack, fetchMODataForBatchBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate, fetchMODataForBulkShip, fetchMODataForReserved]);
 
   // ── Existing handlers (unchanged except handleBackToScan goes to 'home') ──
   const handleScanRequest = useCallback(() => setCameraOpen(true), []);
@@ -3937,6 +4107,7 @@ export default function App() {
             onSelectInnerPack={() => setCurrentScreen('pack_menu')}
             onSelectMasterBag={() => setCurrentScreen('bag_menu')}
             onSelectStatusScan={() => setCurrentScreen('status_scan_mode')}
+            onSelectReserved={() => requirePin(() => { setReservedMO(null); setReservedResult(null); setCurrentScreen('reserved_mo_select'); })}
           />
         )}
 
@@ -4257,6 +4428,29 @@ export default function App() {
           <BulkShipDoneScreen
             result={bulkShipResult}
             onHome={() => { setBulkShipMO(null); setBulkShipBags([]); setBulkShipSelected(new Set()); setBulkShipResult(null); setCurrentScreen('home'); }}
+          />
+        )}
+
+        {/* Reserved (中国仓库保留) screens */}
+        {currentScreen === 'reserved_mo_select' && (
+          <BagMOSelectScreen
+            onScan={() => { setScanMode('reserved_mo'); setCameraOpen(true); }}
+            onManual={(mo) => { setLoadingMsg('加载订单数据...'); setCurrentScreen('loading'); fetchMODataForReserved(mo); }}
+            onBack={() => setCurrentScreen('home')}
+          />
+        )}
+        {currentScreen === 'reserved_input' && reservedMO && (
+          <ReservedInputScreen
+            reservedMO={reservedMO}
+            onSubmit={handleRegisterReserved}
+            onBack={() => setCurrentScreen('reserved_mo_select')}
+          />
+        )}
+        {currentScreen === 'reserved_done' && reservedResult && (
+          <ReservedDoneScreen
+            result={reservedResult}
+            onContinue={() => { setReservedResult(null); setCurrentScreen('reserved_input'); }}
+            onHome={() => { setReservedMO(null); setReservedResult(null); setCurrentScreen('home'); }}
           />
         )}
 
