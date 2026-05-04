@@ -739,39 +739,45 @@ const IconReserved = () => (
 
 // ─── NEW: Home Screen ─────────────────────────────────────────────────
 const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan, onSelectReserved }) {
-  const card = (onClick, Icon, label, sub) => (
-    <div onClick={onClick} style={{ position:'relative', border:'1px solid '+G.border, borderRadius:2, background:G.card, padding:'20px 20px 20px 24px', marginBottom:14, display:'flex', alignItems:'center', gap:20, cursor:'pointer', transition:'all .2s' }}
-      onMouseEnter={e => { e.currentTarget.style.border='1px solid '+G.borderHover; e.currentTarget.style.background='rgba(212,175,55,0.06)'; }}
-      onMouseLeave={e => { e.currentTarget.style.border='1px solid '+G.border; e.currentTarget.style.background=G.card; }}
-    >
-      {[{t:'-1px',l:'-1px'},{t:'-1px',r:'-1px'},{b:'-1px',l:'-1px'},{b:'-1px',r:'-1px'}].map((pos, i) => {
-        const isRight = pos.r !== undefined; const isBottom = pos.b !== undefined;
-        return (
-          <div key={i} style={{ position:'absolute', width:14, height:14, top:pos.t, bottom:pos.b, left:pos.l, right:pos.r }}>
-            <div style={{ position:'absolute', background:G.gold, [isBottom?'bottom':'top']:0, [isRight?'right':'left']:0, width:14, height:1.5 }} />
-            <div style={{ position:'absolute', background:G.gold, [isBottom?'bottom':'top']:0, [isRight?'right':'left']:0, width:1.5, height:14 }} />
-          </div>
-        );
-      })}
-      <Icon />
-      <div>
-        <div style={{ fontSize:16, fontWeight:400, letterSpacing:2, color:G.cream }}>{label}</div>
-        <div style={{ fontSize:10, color:G.goldDim, letterSpacing:1.5, marginTop:4, fontWeight:400 }}>{sub}</div>
-      </div>
-    </div>
-  );
   return (
-    <div style={{ minHeight:'100vh', width:'100%', background:G.bg, backgroundImage:'radial-gradient(ellipse at 50% -10%, rgba(212,175,55,0.07) 0%, transparent 55%)', padding:'0 20px 40px', display:'flex', flexDirection:'column', position:'relative' }}>
-      <div style={{ textAlign:'center', padding:'60px 0 48px' }}>
-        <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:52, letterSpacing:12, color:G.gold, lineHeight:1 }}>IKU</div>
-        <div style={{ fontSize:9, color:G.goldDim, letterSpacing:6, marginTop:8, fontWeight:400 }}>PRODUCTION SYSTEM</div>
-        <div style={{ fontSize:10, color:G.goldDim, letterSpacing:2, marginTop:6, fontWeight:400 }}>生产管理系统</div>
-        <div style={{ width:60, height:1, background:G.border, margin:'20px auto 0' }} />
+    <div className="home-page">
+      <div className="app-container" style={{ width:'100%' }}>
+        <header className="home-header">
+          <h1 className="brand-mark">IKU</h1>
+          <p className="brand-tagline">PRODUCTION SYSTEM</p>
+          <p className="brand-tagline-cn">生产管理系统</p>
+        </header>
+        <nav className="menu-grid">
+          <div className="card menu-card" onClick={onSelectProductionLog}>
+            <div className="menu-card-icon"><IconFactory /></div>
+            <div className="menu-card-content">
+              <span className="menu-card-title">生产进度扫码</span>
+              <span className="menu-card-subtitle">Production Log Scan</span>
+            </div>
+          </div>
+          <div className="card menu-card" onClick={onSelectInnerPack}>
+            <div className="menu-card-icon"><IconInnerPack /></div>
+            <div className="menu-card-content">
+              <span className="menu-card-title">中包袋</span>
+              <span className="menu-card-subtitle">Inner Pack</span>
+            </div>
+          </div>
+          <div className="card menu-card" onClick={onSelectMasterBag}>
+            <div className="menu-card-icon"><IconMasterBag /></div>
+            <div className="menu-card-content">
+              <span className="menu-card-title">麻袋包装</span>
+              <span className="menu-card-subtitle">Master Bag</span>
+            </div>
+          </div>
+          <div className="card menu-card" onClick={onSelectReserved}>
+            <div className="menu-card-icon"><IconReserved /></div>
+            <div className="menu-card-content">
+              <span className="menu-card-title">中国仓库保留</span>
+              <span className="menu-card-subtitle">중국창고보유</span>
+            </div>
+          </div>
+        </nav>
       </div>
-      {card(onSelectProductionLog, IconFactory, '生产进度扫码', 'Production Log Scan')}
-      {card(onSelectInnerPack, IconInnerPack, '中包袋', 'Inner Pack')}
-      {card(onSelectMasterBag, IconMasterBag, '麻袋包装', 'Master Bag')}
-      {card(onSelectReserved, IconReserved, '中国仓库保留', '중국창고보유')}
     </div>
   );
 });
@@ -2542,8 +2548,21 @@ const BulkShipProgressScreen = memo(function BulkShipProgressScreen({ progress }
   );
 });
 
-const BulkShipDoneScreen = memo(function BulkShipDoneScreen({ result, onHome }) {
+const BulkShipDoneScreen = memo(function BulkShipDoneScreen({ result, onHome, onRetriggerActure }) {
+  const [actureLoading, setActureLoading] = useState(false);
+  const [actureStatus, setActureStatus] = useState(null);
   if (!result) return null;
+
+  const handleRetry = async () => {
+    setActureLoading(true);
+    setActureStatus(null);
+    try {
+      const r = await onRetriggerActure();
+      setActureStatus(r && r.success ? 'ok' : 'fail');
+    } catch { setActureStatus('fail'); }
+    setActureLoading(false);
+  };
+
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px 20px 18px' }}>
@@ -2560,6 +2579,15 @@ const BulkShipDoneScreen = memo(function BulkShipDoneScreen({ result, onHome }) 
         {result.failed > 0 && (
           <div style={{ padding:'10px 14px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)', marginBottom:12, fontSize:10, color:'#FCA5A5' }}>
             ⚠ {result.failed} 个麻袋出货失败，请手动检查状态 / {result.failed}개 마대 출고 실패, 수동 확인 필요
+          </div>
+        )}
+        {onRetriggerActure && (
+          <div style={{ marginBottom:12 }}>
+            <DkBtnOutline onClick={handleRetry} disabled={actureLoading}>
+              {actureLoading ? '计算中… / 계산 중…' : '🔄 重新计算实际值 / 실적 재계산'}
+            </DkBtnOutline>
+            {actureStatus === 'ok' && <div style={{ fontSize:10, color:'#6EE7B7', marginTop:6, textAlign:'center' }}>✅ 实际值已更新 / 실적 업데이트 완료</div>}
+            {actureStatus === 'fail' && <div style={{ fontSize:10, color:'#FCA5A5', marginTop:6, textAlign:'center' }}>❌ 更新失败，请查看控制台 / 업데이트 실패, 콘솔 확인</div>}
           </div>
         )}
         <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
@@ -2672,6 +2700,65 @@ const ReservedDoneScreen = memo(function ReservedDoneScreen({ result, onContinue
     </DkScreen>
   );
 });
+
+async function runActureAutoFill(moNumber, moId, planTotalQty, planGrandTotal) {
+  console.log('[Acture Auto-fill] 🚀 START — moNumber:', moNumber, 'moId:', moId);
+  console.log('[Acture Auto-fill] Plan values — planTotalQty:', planTotalQty, 'planGrandTotal:', planGrandTotal);
+
+  if (!moId) {
+    console.warn('[Acture Auto-fill] ❌ moId is empty, skipping');
+    return { success: false, reason: 'no-moId' };
+  }
+  if (!planTotalQty || planTotalQty === 0) {
+    console.warn('[Acture Auto-fill] ❌ planTotalQty is 0, skipping');
+    return { success: false, reason: 'planTotalQty=0' };
+  }
+
+  const avgUnitPrice = planGrandTotal / planTotalQty;
+  console.log('[Acture Auto-fill] avgUnitPrice:', avgUnitPrice);
+
+  let allPacks = [], cursor = null, safety = 0;
+  while (safety++ < 50) {
+    const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${moNumber}"`, cursor ? { record_cursor: cursor } : {});
+    console.log(`[Acture Auto-fill] Pack page ${safety}: code=${pr?.code}, count=${Array.isArray(pr?.data) ? pr.data.length : 'N/A'}, cursor=${pr?.record_cursor || 'none'}`);
+    if (!pr || pr.code !== 3000 || !Array.isArray(pr.data)) break;
+    allPacks = allPacks.concat(pr.data);
+    cursor = pr.record_cursor || null;
+    if (!cursor) break;
+  }
+  console.log('[Acture Auto-fill] Total packs fetched:', allPacks.length);
+
+  if (allPacks.length === 0) {
+    console.warn('[Acture Auto-fill] ❌ No packs found for MO:', moNumber);
+    return { success: false, reason: 'no-packs' };
+  }
+
+  const actTotalQty = allPacks.reduce((s, p) => s + (parseInt(p['Total_Qty']) || 0), 0);
+  const actGrandTotal = actTotalQty * avgUnitPrice;
+  console.log('[Acture Auto-fill] actTotalQty:', actTotalQty, 'actGrandTotal:', actGrandTotal.toFixed(2));
+
+  const dist = {};
+  allPacks.forEach(pack => {
+    let items; try { items = JSON.parse(pack['Items_JSON'] || '[]'); } catch (e) { return; }
+    items.forEach(item => { const k = `${item.color}|${item.size}`; dist[k] = (dist[k] || 0) + (item.qty || 0); });
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  const linesText = Object.entries(dist).map(([k, q]) => {
+    const [color, size] = k.split('|');
+    return `Color: ${color} | Size: ${size} | Qty: ${q} | Unit: ¥${avgUnitPrice.toFixed(2)} | Total: ¥${(q * avgUnitPrice).toFixed(2)}`;
+  }).join('\n');
+  const actNotes = `[Auto ${today}] ${allPacks.length} packs\n${linesText}\nTOTAL: ${actTotalQty}件 / ¥${actGrandTotal.toFixed(2)}`;
+
+  console.log('[Acture Auto-fill] Patching MO record_id:', moId);
+  const patchResult = await updateRecordWithRetry(REPORTS.MO, moId, {
+    Acture_Total_Quantity: actTotalQty,
+    Acture_Grand_Total: parseFloat(actGrandTotal.toFixed(2)),
+    Acture_Notes: actNotes
+  });
+  console.log('[Acture Auto-fill] PATCH result:', patchResult);
+  console.log('[Acture Auto-fill] ✅ DONE');
+  return { success: true, actTotalQty, actGrandTotal };
+}
 
 async function updatePackToBagged(packId, bagUUID, packUUID, maxRetries = 5) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -3097,59 +3184,37 @@ export default function App() {
     setBulkShipProgress({ current: bags.length, total: bags.length });
 
     // ── Auto-fill Acture fields if ALL bags of this MO are now Shipped ──
+    console.log('[Bulk Ship] All selected bags processed. Checking full-shipment status for MO:', bulkShipMO?.mo_number);
     try {
-      const allBagRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${bulkShipMO?.mo_number || ''}"`);
+      const moNum = bulkShipMO?.mo_number || '';
+      const allBagRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${moNum}"`);
       const allBags = (allBagRes?.code === 3000 && Array.isArray(allBagRes.data)) ? allBagRes.data : [];
-      const allShipped = allBags.length > 0 && allBags.every(b => b['Bag_Status'] === 'Shipped');
-      if (allShipped) {
-        console.log('[Acture Auto-fill] All bags shipped — calculating actuals...');
-        const planTotalQty = bulkShipMO?.plan_total_quantity || 0;
-        const planGrandTotal = bulkShipMO?.plan_grand_total || 0;
-        if (planTotalQty > 0) {
-          const avgUnitPrice = planGrandTotal / planTotalQty;
-          // Fetch all packs with record_cursor pagination
-          let allPacks = [], cursor = null, safety = 0;
-          while (safety++ < 50) {
-            const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${bulkShipMO.mo_number}"`, cursor ? { record_cursor: cursor } : {});
-            if (!pr || pr.code !== 3000 || !Array.isArray(pr.data)) break;
-            allPacks = allPacks.concat(pr.data);
-            cursor = pr.record_cursor || null;
-            if (!cursor) break;
-          }
-          if (allPacks.length > 0) {
-            const actTotalQty = allPacks.reduce((s, p) => s + (parseInt(p['Total_Qty']) || 0), 0);
-            const actGrandTotal = actTotalQty * avgUnitPrice;
-            const dist = {};
-            allPacks.forEach(pack => {
-              let items; try { items = JSON.parse(pack['Items_JSON'] || '[]'); } catch (e) { return; }
-              items.forEach(item => { const k = `${item.color}|${item.size}`; dist[k] = (dist[k] || 0) + (item.qty || 0); });
-            });
-            const today = new Date().toISOString().slice(0, 10);
-            const linesText = Object.entries(dist).map(([k, q]) => {
-              const [color, size] = k.split('|');
-              return `Color: ${color} | Size: ${size} | Qty: ${q} | Unit: ¥${avgUnitPrice.toFixed(2)} | Total: ¥${(q * avgUnitPrice).toFixed(2)}`;
-            }).join('\n');
-            const actNotes = `[Auto ${today}] ${allPacks.length} packs\n${linesText}\nTOTAL: ${actTotalQty}件 / ¥${actGrandTotal.toFixed(2)}`;
-            await updateRecordWithRetry(REPORTS.MO, bulkShipMO.mo_id, {
-              Acture_Total_Quantity: actTotalQty,
-              Acture_Grand_Total: parseFloat(actGrandTotal.toFixed(2)),
-              Acture_Notes: actNotes
-            });
-            console.log('[Acture Auto-fill] ✅ MO updated:', { actTotalQty, actGrandTotal: actGrandTotal.toFixed(2) });
-          } else {
-            console.warn('[Acture Auto-fill] No packs found for MO:', bulkShipMO.mo_number);
-          }
-        } else {
-          console.warn('[Acture Auto-fill] Plan_Total_Quantity is 0, skipping');
-        }
+      const shippedBags = allBags.filter(b => b['Bag_Status'] === 'Shipped');
+      const createdBags = allBags.filter(b => b['Bag_Status'] === 'Created');
+      console.log(`[Bulk Ship] MO ${moNum}: total=${allBags.length} bags, shipped=${shippedBags.length}, created=${createdBags.length}`);
+      if (allBags.length === 0) {
+        console.warn('[Bulk Ship] No bags returned from Zoho — cannot determine shipment status');
+      } else if (shippedBags.length < allBags.length) {
+        console.log(`[Bulk Ship] Not all bags shipped (${shippedBags.length}/${allBags.length}) — skipping Acture auto-fill`);
+      } else {
+        console.log('[Bulk Ship] ✅ ALL bags Shipped — triggering Acture auto-fill');
+        await runActureAutoFill(moNum, bulkShipMO?.mo_id || '', bulkShipMO?.plan_total_quantity || 0, bulkShipMO?.plan_grand_total || 0);
       }
     } catch (autoErr) {
-      console.warn('[Acture Auto-fill] Failed (non-blocking):', autoErr?.message || String(autoErr));
+      console.error('[Bulk Ship] Acture trigger check failed:', autoErr?.message || String(autoErr));
+      console.error('[Bulk Ship] Acture error stack:', autoErr?.stack);
     }
 
-    setBulkShipResult({ moNumber: bulkShipMO?.mo_number || '', succeeded, failed, totalPacks, totalQty });
+    setBulkShipResult({ moNumber: bulkShipMO?.mo_number || '', moId: bulkShipMO?.mo_id || '', planTotalQty: bulkShipMO?.plan_total_quantity || 0, planGrandTotal: bulkShipMO?.plan_grand_total || 0, succeeded, failed, totalPacks, totalQty });
     setCurrentScreen('bulk_ship_done');
   }, [bulkShipBags, bulkShipSelected, bulkShipMO]);
+
+  const handleRetriggerActure = useCallback(async () => {
+    if (!bulkShipResult) return { success: false, reason: 'no-result' };
+    const { moNumber, moId, planTotalQty, planGrandTotal } = bulkShipResult;
+    console.log('[Retrigger Acture] Manual trigger — moNumber:', moNumber, 'moId:', moId, 'planTotalQty:', planTotalQty, 'planGrandTotal:', planGrandTotal);
+    return await runActureAutoFill(moNumber, moId, planTotalQty, planGrandTotal);
+  }, [bulkShipResult]);
 
   const handleViewPackFromBag = useCallback(async (packUUID) => {
     setLoadingMsg('查询包装信息...');
@@ -4485,6 +4550,7 @@ export default function App() {
           <BulkShipDoneScreen
             result={bulkShipResult}
             onHome={() => { setBulkShipMO(null); setBulkShipBags([]); setBulkShipSelected(new Set()); setBulkShipResult(null); setCurrentScreen('home'); }}
+            onRetriggerActure={handleRetriggerActure}
           />
         )}
 
