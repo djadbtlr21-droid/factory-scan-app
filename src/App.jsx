@@ -3046,7 +3046,7 @@ export default function App() {
       const moList = (moRes && moRes.code === 3000 && Array.isArray(moRes.data)) ? moRes.data : [];
       const found = moList.find((r) => r['MO_Number'] === moNumber);
       if (!found) { setCurrentScreen('bulk_ship_mo_select'); alert('未找到订单: ' + moNumber); return; }
-      setBulkShipMO({ mo_number: found['MO_Number'] || moNumber, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-' });
+      setBulkShipMO({ mo_number: found['MO_Number'] || moNumber, mo_id: found['ID'] || '', plan_grand_total: parseFloat(found['Plan_Grand_Total']) || 0, plan_total_quantity: parseInt(found['Plan_Total_Quantity']) || 0, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-' });
       const bagRes = await getRecordsByCriteria(REPORTS.MASTER_BAG, `MO_Number == "${moNumber}" && Bag_Status == "Created"`);
       const bagList = (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) ? bagRes.data : [];
       const bags = bagList
@@ -3095,6 +3095,58 @@ export default function App() {
       }
     }
     setBulkShipProgress({ current: bags.length, total: bags.length });
+
+    // ── Auto-fill Acture fields if ALL bags of this MO are now Shipped ──
+    try {
+      const allBagRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${bulkShipMO?.mo_number || ''}"`);
+      const allBags = (allBagRes?.code === 3000 && Array.isArray(allBagRes.data)) ? allBagRes.data : [];
+      const allShipped = allBags.length > 0 && allBags.every(b => b['Bag_Status'] === 'Shipped');
+      if (allShipped) {
+        console.log('[Acture Auto-fill] All bags shipped — calculating actuals...');
+        const planTotalQty = bulkShipMO?.plan_total_quantity || 0;
+        const planGrandTotal = bulkShipMO?.plan_grand_total || 0;
+        if (planTotalQty > 0) {
+          const avgUnitPrice = planGrandTotal / planTotalQty;
+          // Fetch all packs with record_cursor pagination
+          let allPacks = [], cursor = null, safety = 0;
+          while (safety++ < 50) {
+            const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${bulkShipMO.mo_number}"`, cursor ? { record_cursor: cursor } : {});
+            if (!pr || pr.code !== 3000 || !Array.isArray(pr.data)) break;
+            allPacks = allPacks.concat(pr.data);
+            cursor = pr.record_cursor || null;
+            if (!cursor) break;
+          }
+          if (allPacks.length > 0) {
+            const actTotalQty = allPacks.reduce((s, p) => s + (parseInt(p['Total_Qty']) || 0), 0);
+            const actGrandTotal = actTotalQty * avgUnitPrice;
+            const dist = {};
+            allPacks.forEach(pack => {
+              let items; try { items = JSON.parse(pack['Items_JSON'] || '[]'); } catch (e) { return; }
+              items.forEach(item => { const k = `${item.color}|${item.size}`; dist[k] = (dist[k] || 0) + (item.qty || 0); });
+            });
+            const today = new Date().toISOString().slice(0, 10);
+            const linesText = Object.entries(dist).map(([k, q]) => {
+              const [color, size] = k.split('|');
+              return `Color: ${color} | Size: ${size} | Qty: ${q} | Unit: ¥${avgUnitPrice.toFixed(2)} | Total: ¥${(q * avgUnitPrice).toFixed(2)}`;
+            }).join('\n');
+            const actNotes = `[Auto ${today}] ${allPacks.length} packs\n${linesText}\nTOTAL: ${actTotalQty}件 / ¥${actGrandTotal.toFixed(2)}`;
+            await updateRecordWithRetry(REPORTS.MO, bulkShipMO.mo_id, {
+              Acture_Total_Quantity: actTotalQty,
+              Acture_Grand_Total: parseFloat(actGrandTotal.toFixed(2)),
+              Acture_Notes: actNotes
+            });
+            console.log('[Acture Auto-fill] ✅ MO updated:', { actTotalQty, actGrandTotal: actGrandTotal.toFixed(2) });
+          } else {
+            console.warn('[Acture Auto-fill] No packs found for MO:', bulkShipMO.mo_number);
+          }
+        } else {
+          console.warn('[Acture Auto-fill] Plan_Total_Quantity is 0, skipping');
+        }
+      }
+    } catch (autoErr) {
+      console.warn('[Acture Auto-fill] Failed (non-blocking):', autoErr?.message || String(autoErr));
+    }
+
     setBulkShipResult({ moNumber: bulkShipMO?.mo_number || '', succeeded, failed, totalPacks, totalQty });
     setCurrentScreen('bulk_ship_done');
   }, [bulkShipBags, bulkShipSelected, bulkShipMO]);
