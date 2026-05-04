@@ -740,41 +740,38 @@ const IconReserved = () => (
 // ─── NEW: Home Screen ─────────────────────────────────────────────────
 const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan, onSelectReserved }) {
   return (
-    <div className="home-page">
-      <div className="app-container" style={{ width:'100%' }}>
-        <header className="home-header">
-          <h1 className="brand-mark">IKU</h1>
-          <p className="brand-tagline">PRODUCTION SYSTEM</p>
-          <p className="brand-tagline-cn">生产管理系统</p>
+    <div style={{ minHeight:'100vh', background:'var(--bg-base)' }}>
+      <div className="atelier-home">
+        <header className="atelier-header">
+          <div className="atelier-mark">IKU</div>
+          <div className="atelier-divider"></div>
+          <p className="atelier-tagline">Production system</p>
+          <p className="atelier-tagline-cn">生产管理系统</p>
         </header>
-        <nav className="menu-grid">
-          <div className="card menu-card" onClick={onSelectProductionLog}>
-            <div className="menu-card-icon"><IconFactory /></div>
-            <div className="menu-card-content">
-              <span className="menu-card-title">生产进度扫码</span>
-              <span className="menu-card-subtitle">Production Log Scan</span>
-            </div>
+        <nav className="atelier-menu">
+          <div className="atelier-menu-item" onClick={onSelectProductionLog}>
+            <span className="atelier-index">01</span>
+            <span className="atelier-title">生产进度扫码</span>
+            <span className="atelier-subtitle">Production log scan</span>
+            <span className="atelier-arrow">→</span>
           </div>
-          <div className="card menu-card" onClick={onSelectInnerPack}>
-            <div className="menu-card-icon"><IconInnerPack /></div>
-            <div className="menu-card-content">
-              <span className="menu-card-title">中包袋</span>
-              <span className="menu-card-subtitle">Inner Pack</span>
-            </div>
+          <div className="atelier-menu-item" onClick={onSelectInnerPack}>
+            <span className="atelier-index">02</span>
+            <span className="atelier-title">中包袋</span>
+            <span className="atelier-subtitle">Inner pack</span>
+            <span className="atelier-arrow">→</span>
           </div>
-          <div className="card menu-card" onClick={onSelectMasterBag}>
-            <div className="menu-card-icon"><IconMasterBag /></div>
-            <div className="menu-card-content">
-              <span className="menu-card-title">麻袋包装</span>
-              <span className="menu-card-subtitle">Master Bag</span>
-            </div>
+          <div className="atelier-menu-item" onClick={onSelectMasterBag}>
+            <span className="atelier-index">03</span>
+            <span className="atelier-title">麻袋包装</span>
+            <span className="atelier-subtitle">Master bag</span>
+            <span className="atelier-arrow">→</span>
           </div>
-          <div className="card menu-card" onClick={onSelectReserved}>
-            <div className="menu-card-icon"><IconReserved /></div>
-            <div className="menu-card-content">
-              <span className="menu-card-title">中国仓库保留</span>
-              <span className="menu-card-subtitle">중국창고보유</span>
-            </div>
+          <div className="atelier-menu-item" onClick={onSelectReserved}>
+            <span className="atelier-index">04</span>
+            <span className="atelier-title">中国仓库保留</span>
+            <span className="atelier-subtitle">Reserved inventory</span>
+            <span className="atelier-arrow">→</span>
           </div>
         </nav>
       </div>
@@ -880,7 +877,7 @@ const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMe
       buttons={[
         { label: '新建麻袋 / 새 마대 생성', onClick: onCreate },
         { label: '批量生成 / 일괄 생성', onClick: onBatch },
-        { label: '一括出货 / 일괄 출고', onClick: onBulkShip },
+        { label: '批量出货 / 일괄 출고', onClick: onBulkShip },
         { label: 'QR 查询 / QR 조회', onClick: onQueryMenu },
       ]}
       showInstruction={true}
