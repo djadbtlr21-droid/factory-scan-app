@@ -1,3 +1,5 @@
+@import url('https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -291,7 +293,7 @@ html { font-size: 110%; }
   --app-cream-dim:#C4A882;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Pretendard','Noto Sans KR','Noto Sans SC',sans-serif;background:var(--bg-base);color:var(--text-primary);font-size:var(--text-base);line-height:var(--leading-normal);min-height:100vh;-webkit-font-smoothing:antialiased}
+body{font-family:'Wanted Sans Variable','Wanted Sans','Pretendard Variable','Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR','Noto Sans SC','Segoe UI',sans-serif;background:var(--bg-base);color:var(--text-primary);font-size:var(--text-base);line-height:var(--leading-normal);min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .container{max-width:480px;margin:0 auto}
 .screen{display:none;animation:fadeIn .35s ease}.screen.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -683,10 +685,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Pretendard','Noto 
 }
 .atelier-header{
   text-align:center;
-  margin-bottom:var(--space-12);
+  margin-bottom:3.5rem;
 }
 @media(min-width:768px){
-  .atelier-header{margin-bottom:var(--space-16)}
+  .atelier-header{margin-bottom:4.5rem}
 }
 .atelier-mark{
   font-size:2.75rem;
@@ -795,12 +797,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Pretendard','Noto 
   text-align:center;font-size:0.6875rem;
   letter-spacing:0.4em;color:var(--text-tertiary);
   text-transform:uppercase;
-  margin:var(--space-8) 0 var(--space-2);
+  margin:var(--space-8) 0 var(--space-1);
 }
 .atelier-page-subtitle{
   text-align:center;font-size:0.875rem;
   color:var(--text-secondary);letter-spacing:0.1em;
-  margin-bottom:var(--space-6);
+  margin-top:0;
+  margin-bottom:var(--space-8);
 }
 
 .atelier-btn-primary{
