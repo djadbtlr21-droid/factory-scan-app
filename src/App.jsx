@@ -223,15 +223,15 @@ const ScanStyleScreen = memo(function ScanStyleScreen({
 });
 
 // ─── Existing Production Log screens ──────────────────────────────────
-const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onManual, onBack }) {
+const ScanScreen = memo(function ScanScreen({ onScan, onUpload, onQrQuery, onBack }) {
   return (
     <ScanStyleScreen
       onBack={onBack}
       systemLabel="IKU PRODUCTION SYSTEM"
       buttons={[
-        { label: 'SCAN START / 开始扫码', onClick: onScan },
-        { label: 'QR UPLOAD / 上传二维码', onClick: onUpload },
-        { label: '✏️ TEXT / 文字查询', onClick: onManual },
+        { label: '开始扫码 / 스캔 시작', onClick: onScan },
+        { label: '上传二维码 / QR 업로드', onClick: onUpload },
+        { label: 'QR查询 / QR 조회', onClick: onQrQuery },
       ]}
       showInstruction={true}
       showBottomHint={true}
@@ -751,8 +751,8 @@ const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInn
         <nav className="atelier-menu">
           <div className="atelier-menu-item" onClick={onSelectProductionLog}>
             <span className="atelier-index">01</span>
-            <span className="atelier-title">生产进度扫码</span>
-            <span className="atelier-subtitle">Production log scan</span>
+            <span className="atelier-title">生产进度</span>
+            <span className="atelier-subtitle">Production log</span>
             <span className="atelier-arrow">→</span>
           </div>
           <div className="atelier-menu-item" onClick={onSelectInnerPack}>
@@ -2447,6 +2447,21 @@ const BagQuerySubMenu = memo(function BagQuerySubMenu({ onTextQuery, onScanQuery
         <IconMasterBag />
         <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 查询 / QR 조회</div>
         <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>麻袋查询</div>
+      </div>
+      <DkBtn onClick={onTextQuery}>📋 文字查询 / 텍스트 조회</DkBtn>
+      <DkBtn onClick={onScanQuery}>🔍 扫码查询 / 스캔 조회</DkBtn>
+    </DkScreen>
+  );
+});
+
+const ProductionLogQuerySubMenu = memo(function ProductionLogQuerySubMenu({ onTextQuery, onScanQuery, onBack }) {
+  return (
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:40 }}>
+        <IconFactory />
+        <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 查询 / QR 조회</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>生产进度查询</div>
       </div>
       <DkBtn onClick={onTextQuery}>📋 文字查询 / 텍스트 조회</DkBtn>
       <DkBtn onClick={onScanQuery}>🔍 扫码查询 / 스캔 조회</DkBtn>
@@ -4231,7 +4246,14 @@ export default function App() {
         )}
 
         {/* Production Log screens */}
-        {currentScreen === 'scan' && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} onManual={() => setCurrentScreen('log_manual_mo')} onBack={() => { setScanMode('production_log'); setCurrentScreen('home'); }} />}
+        {currentScreen === 'scan' && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} onQrQuery={() => setCurrentScreen('log_query_sub_menu')} onBack={() => { setScanMode('production_log'); setCurrentScreen('home'); }} />}
+        {currentScreen === 'log_query_sub_menu' && (
+          <ProductionLogQuerySubMenu
+            onTextQuery={() => setCurrentScreen('log_manual_mo')}
+            onScanQuery={() => { setScanMode('production_log'); setCameraOpen(true); }}
+            onBack={() => setCurrentScreen('scan')}
+          />
+        )}
         {currentScreen === 'log_manual_mo' && (
           <LogManualMOScreen
             onSubmit={(mo) => { setLoadingMsg('加载订单数据...'); setCurrentScreen('loading'); fetchMOData(mo); }}
