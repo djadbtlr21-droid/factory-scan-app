@@ -943,6 +943,32 @@ const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, 
   );
 });
 
+// ─── Production Log: Scan-or-Manual Choice ───────────────────────────
+const LogScanChoiceScreen = memo(function LogScanChoiceScreen({ onScan, onManual, onBack }) {
+  const [manualMO, setManualMO] = useState('');
+  const handleManualSubmit = () => {
+    const mo = manualMO.trim().toUpperCase();
+    if (!mo) { alert('请输入订单号'); return; }
+    onManual(mo);
+  };
+  return (
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:36 }}>
+        <div style={{ fontSize:20, color:G.cream, fontWeight:400, letterSpacing:1 }}>扫描或输入 / 스캔 또는 입력</div>
+        <div style={{ fontSize:10, color:G.goldDim, marginTop:6 }}>Scan QR code or enter manually</div>
+      </div>
+      <DkBtn onClick={onScan}>📷 扫描 MO QR / QR 스캔</DkBtn>
+      <div style={{ textAlign:'center', color:G.goldDim, fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
+      <DkCard>
+        <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>手动输入 / 수동 입력</div>
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
+        <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
+      </DkCard>
+    </DkScreen>
+  );
+});
+
 // ─── NEW: Pack Create Screen ──────────────────────────────────────────
 const PackCreateScreen = memo(function PackCreateScreen({
   packMO, composition, setComposition, packSequence, worker, setWorker,
@@ -4249,11 +4275,18 @@ export default function App() {
         )}
 
         {/* Production Log screens */}
-        {currentScreen === 'scan' && <ScanScreen onScan={handleScanRequest} onUpload={openUpload} onQrQuery={() => setCurrentScreen('log_query_sub_menu')} onBack={() => { setScanMode('production_log'); setCurrentScreen('home'); }} />}
+        {currentScreen === 'scan' && <ScanScreen onScan={() => setCurrentScreen('log_scan_choice')} onUpload={openUpload} onQrQuery={() => setCurrentScreen('log_query_sub_menu')} onBack={() => { setScanMode('production_log'); setCurrentScreen('home'); }} />}
         {currentScreen === 'log_query_sub_menu' && (
           <ProductionLogQuerySubMenu
             onTextQuery={() => setCurrentScreen('log_manual_mo')}
             onScanQuery={() => { setScanMode('production_log'); setCameraOpen(true); }}
+            onBack={() => setCurrentScreen('scan')}
+          />
+        )}
+        {currentScreen === 'log_scan_choice' && (
+          <LogScanChoiceScreen
+            onScan={() => { setScanMode('production_log'); setCameraOpen(true); }}
+            onManual={(mo) => { setLoadingMsg('加载订单数据...'); setCurrentScreen('loading'); fetchMOData(mo); }}
             onBack={() => setCurrentScreen('scan')}
           />
         )}
