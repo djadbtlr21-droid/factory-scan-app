@@ -188,10 +188,9 @@ const ScanStyleScreen = memo(function ScanStyleScreen({
   showInstruction = true,
   showBottomHint = true,
 }) {
-  const buttonClasses = buttons.map(() => 'btn-upload-qr');
   return (
     <div className="scan-screen">
-      <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'transparent', border:'1px solid #D4AF37', color:G.gold, fontSize:10, fontWeight:400, letterSpacing:2, padding:'7px 14px', cursor:'pointer', zIndex:10, fontFamily:'inherit' }}>← 返回</button>
+      <button onClick={onBack} className="atelier-back">← 返回</button>
       <div className="scan-wordmark">{systemLabel}</div>
       <div className="scan-frame-wrap">
         <div className="sc-corner sc-tl"></div>
@@ -201,17 +200,21 @@ const ScanStyleScreen = memo(function ScanStyleScreen({
         <div className="sc-inner"><div className="sc-dot"></div></div>
         <div className="sc-line"></div>
       </div>
-      {pageLabel && <div style={{ fontFamily:"'Bebas Neue',cursive", fontSize:11, letterSpacing:8, color:'var(--gold-dim)', textTransform:'uppercase', opacity:.7, textAlign:'center' }}>{pageLabel}</div>}
-      {pageTitle && <div style={{ fontSize:13, color:'rgba(200,196,188,.8)', lineHeight:2, fontWeight:300, letterSpacing:.3, textAlign:'center' }}>{pageTitle}</div>}
+      {pageLabel && <div className="atelier-page-caption">{pageLabel}</div>}
+      {pageTitle && <div className="atelier-page-subtitle">{pageTitle}</div>}
       {showInstruction && (
         <div className="scan-label-wrap">
           <p>QR코드를 프레임 안에 맞춰주세요</p>
           <p>请将二维码对准框内</p>
         </div>
       )}
-      {buttons.map((btn, i) => (
-        <button key={i} className={buttonClasses[i]} onClick={btn.onClick}>{btn.label}</button>
-      ))}
+      {buttons.length > 0 && (
+        <div className="atelier-btn-stack">
+          {buttons.map((btn, i) => (
+            <button key={i} className="atelier-btn-primary" onClick={btn.onClick}>{btn.label}</button>
+          ))}
+        </div>
+      )}
       {showBottomHint && (
         <div className="scan-hint-wrap">
           <p>카메라가 자동으로 QR을 인식합니다</p>
