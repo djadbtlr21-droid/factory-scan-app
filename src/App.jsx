@@ -23,8 +23,6 @@ const PROCESSES = [
   { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date',      emoji: '✅', zohoValue: 'Cutting End / 재단 완료 / 裁剪完成' },
   { code: 'Sewing_Start',  zh: '车缝开始', ko: '봉제 시작', moField: 'Sewing_Start_Date',     emoji: '🧵', zohoValue: 'Sewing Start / 봉제 시작 / 车缝开始' },
   { code: 'Sewing_End',    zh: '车缝完成', ko: '봉제 완료', moField: 'Sewing_Completion_Date',emoji: '🪡', zohoValue: 'Sewing End / 봉제 완료 / 车缝完成' },
-  { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦', zohoValue: 'Packing Start / 포장 시작 / 包装开始' },
-  { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '🎁', zohoValue: 'Packing End / 포장 완료 / 包装完成' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -325,8 +323,6 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
           <ProcBtn p={PROCESSES[2]} />
           <ProcBtn p={PROCESSES[3]} />
           <ProcBtn p={PROCESSES[4]} />
-          <ProcBtn p={PROCESSES[5]} />
-          <ProcBtn p={PROCESSES[6]} />
         </div>
       </div>
 
