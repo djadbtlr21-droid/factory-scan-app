@@ -1157,12 +1157,35 @@ const PackCreateScreen = memo(function PackCreateScreen({
 });
 
 // ─── NEW: Pack Success Screen ─────────────────────────────────────────
-const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, onHome }) {
+const PackSuccessScreen = memo(function PackSuccessScreen({ pack, moData, onNextPack, onHome }) {
   if (!pack) return null;
+  const [downloading, setDownloading] = useState(false);
   const handleDownload = async () => {
     const label = `${pack.moNumber} / Inner Pack #${pack.packSequence} / ${pack.totalQty} pcs`;
     const dataURL = await generateQRDataURLWithLabel(pack.qrText, label);
     downloadQRPNG(dataURL, sanitizeFilename(`${pack.moNumber}_InnerPack_${pack.packSequence}_${pack.totalQty}pcs.png`));
+  };
+  const handleExcel = async () => {
+    if (!moData || downloading) return;
+    setDownloading(true);
+    try {
+      await generateInnerPackExcel(moData, [{
+        packNumber: pack.packSequence, qrText: pack.qrText,
+        totalQty: pack.totalQty, isRemainder: pack.isRemainder || false, items: pack.items || [],
+      }], sanitizeFilename(`${pack.moNumber}_InnerPack_#${pack.packSequence}.xlsx`));
+    } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
+  };
+  const handlePDF = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await downloadQRsAsPDF(
+        [{ text: pack.qrText, filename: sanitizeFilename(`${pack.moNumber}_InnerPack_${pack.packSequence}.png`) }],
+        sanitizeFilename(`${pack.moNumber}_InnerPack_#${pack.packSequence}.pdf`)
+      );
+    } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
@@ -1189,7 +1212,13 @@ const PackSuccessScreen = memo(function PackSuccessScreen({ pack, onNextPack, on
             Total <span style={{ color:G.gold }}>{pack.totalQty} 件</span>{pack.isRemainder ? ' · 剩余' : ''}
           </div>
         </DkCard>
-        <DkBtn onClick={handleDownload}>📥 下载 QR 图片 / QR 다운로드</DkBtn>
+        <DkBtn onClick={handleDownload} disabled={downloading}>📷 QR 이미지 다운로드 / QR 图片下载</DkBtn>
+        <DkBtn onClick={handleExcel} disabled={downloading || !moData}>
+          {downloading ? '처리중...' : '📊 Excel 다운로드 / Excel 下载'}
+        </DkBtn>
+        <DkBtn onClick={handlePDF} disabled={downloading}>
+          {downloading ? '처리중...' : '📄 PDF 다운로드 / PDF 下载'}
+        </DkBtn>
         <DkBtn onClick={onNextPack}>➕ 继续下一包 / 다음 포장</DkBtn>
         <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
       </div>
@@ -1363,12 +1392,35 @@ const BagCreateScreen = memo(function BagCreateScreen({
 });
 
 // ─── NEW: Bag Success Screen ──────────────────────────────────────────
-const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome }) {
+const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag, onHome }) {
   if (!bag) return null;
+  const [downloading, setDownloading] = useState(false);
   const handleDownload = async () => {
     const label = `${bag.moNumber} / Master Bag #${bag.bagSequence} / ${bag.totalQty} pcs`;
     const dataURL = await generateQRDataURLWithLabel(bag.qrText, label);
     downloadQRPNG(dataURL, sanitizeFilename(`${bag.moNumber}_MasterBag_${bag.bagSequence}_${bag.totalQty}pcs.png`));
+  };
+  const handleExcel = async () => {
+    if (!moData || downloading) return;
+    setDownloading(true);
+    try {
+      await generateMasterBagExcel(moData,
+        [{ bagNumber: bag.bagSequence, qrText: bag.qrText }],
+        sanitizeFilename(`${bag.moNumber}_MasterBag_#${bag.bagSequence}.xlsx`)
+      );
+    } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
+  };
+  const handlePDF = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      await downloadQRsAsPDF(
+        [{ text: bag.qrText, filename: sanitizeFilename(`${bag.moNumber}_MasterBag_${bag.bagSequence}.png`) }],
+        sanitizeFilename(`${bag.moNumber}_MasterBag_#${bag.bagSequence}.pdf`)
+      );
+    } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
   };
   return (
     <DkScreen style={{ paddingTop:0 }}>
@@ -1391,7 +1443,13 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, onNewBag, onHome 
             </div>
           ))}
         </DkCard>
-        <DkBtn onClick={handleDownload}>📥 下载 QR 图片 / QR 다운로드</DkBtn>
+        <DkBtn onClick={handleDownload} disabled={downloading}>📷 QR 이미지 다운로드 / QR 图片下载</DkBtn>
+        <DkBtn onClick={handleExcel} disabled={downloading || !moData}>
+          {downloading ? '처리중...' : '📊 Excel 다운로드 / Excel 下载'}
+        </DkBtn>
+        <DkBtn onClick={handlePDF} disabled={downloading}>
+          {downloading ? '처리중...' : '📄 PDF 다운로드 / PDF 下载'}
+        </DkBtn>
         <DkBtn onClick={onNewBag}>➕ 生成新麻袋 / 새 마대</DkBtn>
         <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
       </div>
@@ -4889,6 +4947,7 @@ export default function App() {
         {currentScreen === 'pack_success' && (
           <PackSuccessScreen
             pack={createdPack}
+            moData={packMO ? buildMOData(packMO) : null}
             onNextPack={() => {
               setPackSequence(s => s + 1);
               setCreatedPack(null);
@@ -5018,6 +5077,7 @@ export default function App() {
         {currentScreen === 'bag_success' && (
           <BagSuccessScreen
             bag={createdBag}
+            moData={bagMO ? buildMOData(bagMO) : null}
             onNewBag={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
               setBagWorker(''); setBagMO(null);
