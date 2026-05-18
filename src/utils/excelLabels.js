@@ -45,28 +45,28 @@ function applyLabelBorders(ws, topRow, bottomRow, textCol, qrCol) {
 const PX_TO_EMU = 9525;
 
 // ── Inner Pack ────────────────────────────────────────────────────────────────
-// 3 labels per row × 4 label-row groups = 12 per A4 sheet
+// 3 labels per row × 5 label-row groups = 15 per A4 sheet
 // Column layout: text(22) | qr(14) | spacer(2) | ... repeated × 3
-// QR anchored to Pack row (R+5, height 75pt) via native EMU — no drift
+// QR (80×80) anchored to SIZE row (R+3) via native EMU — spans SIZE+COLOR+Pack
 
 const IP_COLS       = 3;
-const IP_PAGE       = 12;  // 3 cols × 4 rows
+const IP_PAGE       = 15;  // 3 cols × 5 rows
 const IP_DATA_ROWS  = 6;
 const IP_LABEL_ROWS = 7;   // 6 data + 1 caption
 const IP_VSTRIDE    = IP_LABEL_ROWS + 1; // 8 rows between group starts
 const IP_TEXT_W     = 22;
 const IP_QR_W       = 14;
 const IP_SPACER_W   = 2;
-const IP_QR_SIZE    = 90;  // px square
+const IP_QR_SIZE    = 80;  // px square
 const IP_VSPACER_H  = 10;  // pt — spacer row between groups
 
-// Row R+4 (COLOR) is tall enough to hold the 90px QR; QR anchors to its top
+// Normal row heights — QR spans SIZE+COLOR+Pack visually (16+32+16 = 64pt ≈ 85px)
 const IP_ROW_HEIGHTS = [
   24, // R+0  ITEM NO
   16, // R+1  Q'TY
   16, // R+2  SURTIDO
-  16, // R+3  SIZE
-  75, // R+4  COLOR  ← tall: 75pt ≥ 90px QR
+  16, // R+3  SIZE     ← QR anchor top
+  32, // R+4  COLOR
   16, // R+5  Pack
   18, // R+6  Caption
 ];
@@ -89,13 +89,13 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     if (c < IP_COLS - 1) ws.getColumn(c * 3 + 3).width = IP_SPACER_W;
   }
 
-  // 4 label groups, 3 vertical spacer rows between them
-  for (let r = 0; r < 4; r++) {
+  // 5 label groups, 4 vertical spacer rows between them
+  for (let r = 0; r < 5; r++) {
     const groupStart = r * IP_VSTRIDE + 1;
     for (let s = 0; s < IP_LABEL_ROWS; s++) {
       ws.getRow(groupStart + s).height = IP_ROW_HEIGHTS[s];
     }
-    if (r < 3) ws.getRow(groupStart + IP_LABEL_ROWS).height = IP_VSPACER_H;
+    if (r < 4) ws.getRow(groupStart + IP_LABEL_ROWS).height = IP_VSPACER_H;
   }
 
   const cleanItemNo = stripChinese(moData.ITEM_NO);
@@ -163,15 +163,14 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
     captionCell.border = { left: THIN, bottom: THIN, right: THIN };
 
-    // QR anchored to top of COLOR row (R+4) using native EMU — bypasses ExcelJS
-    // fractional-row drift (ExcelJS rowHeight getter uses height*10000 ≠ EMU).
+    // QR anchored to top of SIZE row (R+3) via native EMU — spans SIZE+COLOR+Pack
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
     ws.addImage(imgId, {
       tl: {
         nativeCol:    qrColNo - 1,
         nativeColOff: 5 * PX_TO_EMU,
-        nativeRow:    firstRow - 1 + 4,  // 0-based index of COLOR row (R+4)
+        nativeRow:    firstRow - 1 + 3,  // 0-based index of SIZE row (R+3)
         nativeRowOff: 5 * PX_TO_EMU,
       },
       ext: { width: IP_QR_SIZE, height: IP_QR_SIZE },
@@ -210,7 +209,7 @@ export async function generateSingleInnerPackExcel(moData, pack) {
 // ── Master Bag ────────────────────────────────────────────────────────────────
 // 2 labels per row × 2 label-row groups = 4 per A4 sheet
 // Column layout: text(35) | qr(28) | spacer(3) | text(35) | qr(28)
-// QR anchored to Bag No row (R+6, height 110pt) via native EMU
+// QR (150×150) anchored to Q'TY row (R+3) via native EMU — spans Q'TY+SIZE+COLOR+Bag No
 
 const MB_COLS       = 2;
 const MB_PAGE       = 4;
@@ -219,16 +218,16 @@ const MB_LABEL_ROWS = MB_DATA_ROWS + 1; // 8
 const MB_TEXT_W     = 35;
 const MB_QR_W       = 28;
 const MB_SPACER_W   = 3;
-const MB_QR_SIZE    = 180; // px square
+const MB_QR_SIZE    = 150; // px square
 
-// Row R+5 (COLOR) holds the 180px QR; QR anchors to its top
+// Normal row heights — QR spans Q'TY+SIZE+COLOR+Bag No (22+22+45+22 = 111pt ≈ 148px)
 const MB_ROW_HEIGHTS = [
   20,  // R+0  PI NO
   20,  // R+1  C/T NO
   28,  // R+2  ITEM NO
-  22,  // R+3  Q'TY
+  22,  // R+3  Q'TY     ← QR anchor top
   22,  // R+4  SIZE
- 130,  // R+5  COLOR  ← tall: 130pt ≥ 180px QR (180px ≈ 135pt, fits)
+  45,  // R+5  COLOR
   22,  // R+6  Bag No
   22,  // R+7  Caption
 ];
@@ -305,14 +304,14 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
     captionCell.border = { left: THIN, bottom: THIN, right: THIN };
 
-    // QR anchored to top of COLOR row (R+5) using native EMU
+    // QR anchored to top of Q'TY row (R+3) via native EMU — spans Q'TY+SIZE+COLOR+Bag No
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
     ws.addImage(imgId, {
       tl: {
         nativeCol:    qrColNo - 1,
         nativeColOff: 10 * PX_TO_EMU,
-        nativeRow:    firstRow - 1 + 5,  // 0-based index of COLOR row (R+5)
+        nativeRow:    firstRow - 1 + 3,  // 0-based index of Q'TY row (R+3)
         nativeRowOff: 10 * PX_TO_EMU,
       },
       ext: { width: MB_QR_SIZE, height: MB_QR_SIZE },
