@@ -132,18 +132,23 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       cell.alignment = li === 4
         ? { vertical: 'top',    horizontal: 'left', wrapText: true,  indent: 1 }
         : { vertical: 'middle', horizontal: 'left', wrapText: true,  indent: 1 };
-      // Text col: outer-black left/right, black top for first row, gray elsewhere
+      // Text col: left/right black, top black on first row, gray otherwise;
+      // remove right divider for QR-overlapping rows (SIZE/COLOR/Pack) so no
+      // vertical line runs through the QR image.
       cell.border = {
         left:   THIN,
-        right:  THIN,
+        right:  li < 3 ? THIN : undefined,
         top:    li === 0 ? THIN : GRAY,
         bottom: GRAY,
       };
-      // QR col: li<3 (ITEM NO/Q'TY/SURTIDO) not overlapped — add borders
-      //         li>=3 (SIZE/COLOR/Pack) overlapped by QR — outer right only
+      // QR col: SURTIDO (li=2) gets no bottom so adjacent-cell bleed doesn't
+      // draw a horizontal line across the top of the QR; SIZE/COLOR/Pack keep
+      // only the outer-right label boundary.
       const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
-      if (li < 3) {
+      if (li < 2) {
         qCell.border = { right: THIN, top: li === 0 ? THIN : GRAY, bottom: GRAY };
+      } else if (li === 2) {
+        qCell.border = { right: THIN, top: GRAY };   // no bottom — QR starts below
       } else {
         qCell.border = { right: THIN };
       }
@@ -202,14 +207,15 @@ export async function generateSingleInnerPackExcel(moData, pack) {
 }
 
 // ── Master Bag ────────────────────────────────────────────────────────────────
-// 2 labels per row × 2 label-row groups = 4 per A4 sheet
-// Column layout: text(35) | qr(28) | spacer(3) | text(35) | qr(28)
-// QR (150×150) anchored to Q'TY row (R+3) via native EMU — spans Q'TY+SIZE+COLOR+Bag No
+// 1 bag per page — 4 IDENTICAL stickers in a 2×2 grid (one sticker per bag side)
+// Column layout: text(35) | qr(22) | spacer(3) | text(35) | qr(22)
+// QR (142×142) anchored to ITEM NO row (R+2) via native EMU — spans ITEM NO+Q'TY+SIZE+COLOR
 
 const MB_COLS       = 2;
-const MB_PAGE       = 4;
 const MB_DATA_ROWS  = 7;
-const MB_LABEL_ROWS = MB_DATA_ROWS + 1; // 8
+const MB_LABEL_ROWS = MB_DATA_ROWS + 1; // 8  (7 data + 1 caption)
+const MB_VSTRIDE    = MB_LABEL_ROWS + 1; // 9  (8 label rows + 1 spacer between row-groups)
+const MB_VSPACER_H  = 12; // pt — spacer row between upper and lower label groups
 const MB_TEXT_W     = 35;
 const MB_QR_W       = 22;
 const MB_SPACER_W   = 3;
@@ -218,8 +224,8 @@ const MB_QR_SIZE    = 142; // px square
 // Normal row heights — QR spans ITEM NO+Q'TY+SIZE+COLOR (28+22+22+45 = 117pt ≈ 156px)
 const MB_ROW_HEIGHTS = [
   20,  // R+0  PI NO
-  20,  // R+1  C/T NO
-  28,  // R+2  ITEM NO  ← QR anchor top
+  20,  // R+1  C/T NO       ← last non-QR row (remove QR-col bottom to kill bleed line)
+  28,  // R+2  ITEM NO       ← QR anchor top
   22,  // R+3  Q'TY
   22,  // R+4  SIZE
   45,  // R+5  COLOR
@@ -228,6 +234,9 @@ const MB_ROW_HEIGHTS = [
 ];
 
 async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
+  // Each page contains 4 identical stickers for the same bag.
+  const bag = pageItems[0];
+
   const ws = workbook.addWorksheet(`Page ${pageIdx + 1}`, {
     pageSetup: {
       paperSize: 9,
@@ -245,39 +254,43 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
     if (c < MB_COLS - 1) ws.getColumn(c * 3 + 3).width = MB_SPACER_W;
   }
 
+  // 2 label groups with 12pt spacer between them
   for (let r = 0; r < 2; r++) {
+    const groupStart = r * MB_VSTRIDE + 1;
     for (let s = 0; s < MB_LABEL_ROWS; s++) {
-      ws.getRow(r * MB_LABEL_ROWS + s + 1).height = MB_ROW_HEIGHTS[s];
+      ws.getRow(groupStart + s).height = MB_ROW_HEIGHTS[s];
     }
+    if (r < 1) ws.getRow(groupStart + MB_LABEL_ROWS).height = MB_VSPACER_H;
   }
 
   const cleanItemNo = stripChinese(moData.ITEM_NO);
   const cleanColors = stripChinese(moData.COLOR_LIST);
 
-  const baseLines = [
+  const dataLines = [
     [`PI NO:   `, '_______________'],
     [`C/T NO:  `, '_______________'],
     [`ITEM NO: `, cleanItemNo],
     [`Q'TY:    `, '120PCS'],
     [`SIZE:    `, moData.SIZE_LIST || ''],
     [`COLOR:   `, cleanColors],
-    [`Bag No:  `, ''],
+    [`Bag No:  `, `#${bag.bagNumber}`],
   ];
 
-  for (let i = 0; i < pageItems.length; i++) {
-    const { bagNumber, qrText } = pageItems[i];
-    const labelCol     = i % MB_COLS;
-    const labelRow     = Math.floor(i / MB_COLS);
+  // Generate QR once and reuse across all 4 positions
+  const qrBase64 = await qrToBase64(bag.qrText);
+  const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
+
+  for (let pos = 0; pos < 4; pos++) {
+    const labelCol     = pos % MB_COLS;
+    const labelRow     = Math.floor(pos / MB_COLS);
     const textColNo    = labelCol * 3 + 1;
     const qrColNo      = textColNo + 1;
-    const firstRow     = labelRow * MB_LABEL_ROWS + 1;
+    const firstRow     = labelRow * MB_VSTRIDE + 1;
     const captionRowNo = firstRow + MB_DATA_ROWS; // R+7
-
-    baseLines[6][1] = `#${bagNumber}`;
 
     for (let li = 0; li < MB_DATA_ROWS; li++) {
       const cell = ws.getRow(firstRow + li).getCell(textColNo);
-      const [lbl, val] = baseLines[li];
+      const [lbl, val] = dataLines[li];
       cell.value = lbl + val;
       cell.font  = {
         size: li === 5 ? 8 : 10,
@@ -288,33 +301,37 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
       cell.alignment = li === 5
         ? { vertical: 'top',    horizontal: 'left', wrapText: true,  indent: 1 }
         : { vertical: 'middle', horizontal: 'left', wrapText: true,  indent: 1 };
-      // Text col: outer-black left/right, black top for first row, gray elsewhere
+      // Text col: remove right divider for QR-overlapping rows (ITEM NO–COLOR)
+      // so no vertical line runs through the QR image.
       cell.border = {
         left:   THIN,
-        right:  THIN,
+        right:  (li < 2 || li === 6) ? THIN : undefined,
         top:    li === 0 ? THIN : GRAY,
         bottom: GRAY,
       };
-      // QR col: li<2 (PI NO/C/T NO) and li===6 (Bag No) not overlapped — add borders
-      //         li=2..5 (ITEM NO/Q'TY/SIZE/COLOR) overlapped by QR — outer right only
+      // QR col: C/T NO (li=1) gets no bottom to remove bleed line at QR start;
+      // ITEM NO–COLOR (li=2..5) overlapped — outer right only; Bag No restores borders.
       const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
-      if (li < 2 || li === 6) {
-        qCell.border = { right: THIN, top: li === 0 ? THIN : GRAY, bottom: GRAY };
-      } else {
+      if (li === 0) {
+        qCell.border = { right: THIN, top: THIN, bottom: GRAY };
+      } else if (li === 1) {
+        qCell.border = { right: THIN, top: GRAY };   // no bottom — QR starts below
+      } else if (li <= 5) {
         qCell.border = { right: THIN };
+      } else {
+        // li===6 (Bag No): QR ended, full borders
+        qCell.border = { right: THIN, top: GRAY, bottom: GRAY };
       }
     }
 
     ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
-    captionCell.value = `${moData.MO_Number} / Master Bag #${bagNumber} / 120 pcs`;
+    captionCell.value = `${moData.MO_Number} / Master Bag #${bag.bagNumber} / 120 pcs`;
     captionCell.font  = { name: 'Arial', size: 10, bold: true };
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
     captionCell.border = { left: THIN, top: GRAY, bottom: THIN, right: THIN };
 
-    // QR anchored to top of ITEM NO row (R+2) via native EMU — spans ITEM NO+Q'TY+SIZE+COLOR
-    const qrBase64 = await qrToBase64(qrText);
-    const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
+    // QR anchored to top of ITEM NO row (R+2) — reuse same imgId for all 4 positions
     ws.addImage(imgId, {
       tl: {
         nativeCol:    qrColNo - 1,
@@ -332,8 +349,9 @@ export async function generateMasterBagExcel(moData, bagList, filename) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'FactoryScanApp';
 
-  for (let p = 0; p < Math.ceil(bagList.length / MB_PAGE); p++) {
-    await addMasterBagSheet(wb, bagList.slice(p * MB_PAGE, (p + 1) * MB_PAGE), p, moData);
+  // 1 bag per page — 4 identical stickers per page
+  for (let p = 0; p < bagList.length; p++) {
+    await addMasterBagSheet(wb, [bagList[p]], p, moData);
   }
 
   const buf  = await wb.xlsx.writeBuffer();
