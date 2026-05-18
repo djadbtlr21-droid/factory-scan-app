@@ -12,6 +12,7 @@ import {
   downloadQRsAsZIP, downloadQRsAsPDF
 } from './qrUtils.js';
 import { generateInnerPackExcel, generateMasterBagExcel, generateSingleInnerPackExcel, generateSingleMasterBagExcel } from './utils/excelLabels.js';
+import { logActivity, getRecentActivities, clearActivities } from './utils/recentActivity.js';
 
 // Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
@@ -761,7 +762,7 @@ const IconReserved = () => (
 );
 
 // ─── NEW: Home Screen ─────────────────────────────────────────────────
-const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan, onSelectReserved }) {
+const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInnerPack, onSelectMasterBag, onSelectStatusScan, onSelectReserved, onSelectRecentActivity }) {
   return (
     <div style={{ minHeight:'100vh', background:'var(--bg-base)' }}>
       <div className="atelier-home">
@@ -794,6 +795,12 @@ const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInn
             <span className="atelier-index">04</span>
             <span className="atelier-title">中国仓库保留</span>
             <span className="atelier-subtitle">Reserved inventory</span>
+            <span className="atelier-arrow">→</span>
+          </div>
+          <div className="atelier-menu-item" onClick={onSelectRecentActivity}>
+            <span className="atelier-index">05</span>
+            <span className="atelier-title">最近记录</span>
+            <span className="atelier-subtitle">Recent activity</span>
             <span className="atelier-arrow">→</span>
           </div>
         </nav>
@@ -1523,12 +1530,15 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
   const [packs, setPacks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [selected, setSelected] = useState(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const search = async () => {
     const moNum = mo.trim().toUpperCase();
     if (!moNum) { alert('请输入订单号'); return; }
     setLoading(true);
     setSearched(true);
+    setSelected(new Set());
     try {
       const res = await getRecords(REPORTS.INNER_PACK);
       const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
@@ -1565,6 +1575,61 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
     }
   };
 
+  const allSelected = packs.length > 0 && packs.every(p => selected.has(p.uuid));
+  const toggleAll = () => {
+    if (allSelected) { setSelected(new Set()); }
+    else { setSelected(new Set(packs.map(p => p.uuid))); }
+  };
+  const toggleOne = (uuid) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(uuid) ? next.delete(uuid) : next.add(uuid);
+      return next;
+    });
+  };
+
+  const handleBulkExcel = async () => {
+    const sel = packs.filter(p => selected.has(p.uuid));
+    if (!sel.length) return;
+    setBulkLoading(true);
+    try {
+      const moNum = sel[0].mo_number;
+      const res = await getRecords(MO_REPORT, `MO_Number == "${moNum}"`);
+      const moData = buildMOData(res?.data?.[0]);
+      const packList = sel
+        .slice().sort((a, b) => a.pack_sequence - b.pack_sequence)
+        .map(p => ({
+          packNumber: p.pack_sequence,
+          qrText: window.location.origin + '/view/inner/' + p.uuid,
+          totalQty: p.total_qty,
+          isRemainder: p.is_remainder,
+          items: p.items,
+        }));
+      await generateInnerPackExcel(moData, packList, sanitizeFilename(`${moNum}_InnerPack_Selected_${packList.length}items.xlsx`));
+      setSelected(new Set());
+    } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
+    finally { setBulkLoading(false); }
+  };
+
+  const handleBulkPDF = async () => {
+    const sel = packs.filter(p => selected.has(p.uuid));
+    if (!sel.length) return;
+    setBulkLoading(true);
+    try {
+      const moNum = sel[0].mo_number;
+      const qrItems = await Promise.all(
+        sel.slice().sort((a, b) => a.pack_sequence - b.pack_sequence)
+          .map(async p => ({
+            text: window.location.origin + '/view/inner/' + p.uuid,
+            filename: sanitizeFilename(`${p.mo_number}_InnerPack_${p.pack_sequence}.png`),
+          }))
+      );
+      await downloadQRsAsPDF(qrItems, sanitizeFilename(`${moNum}_InnerPack_Selected_${qrItems.length}items.pdf`));
+      setSelected(new Set());
+    } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
+    finally { setBulkLoading(false); }
+  };
+
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
@@ -1577,20 +1642,43 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
           <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter' && !loading) search(); }} />
           <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
         </DkCard>
+        {packs.length > 0 && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 4px', marginBottom:4 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:10, color:G.goldDim }}>
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ accentColor:G.gold }} />
+              {selected.size > 0 ? `${selected.size} 선택됨 / 已选` : '全选 / 전체 선택'}
+            </label>
+            {selected.size > 0 && (
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={handleBulkPDF} disabled={bulkLoading}
+                  style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.4)', color:G.goldDim, fontSize:9, padding:'4px 8px', cursor:'pointer', fontFamily:'inherit' }}>
+                  {bulkLoading ? '...' : `📄 PDF (${selected.size})`}
+                </button>
+                <button onClick={handleBulkExcel} disabled={bulkLoading}
+                  style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'4px 8px', cursor:'pointer', fontFamily:'inherit' }}>
+                  {bulkLoading ? '...' : `📊 Excel (${selected.size})`}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {searched && !loading && packs.length === 0 && (
           <div style={{ textAlign:'center', color:G.goldDim, padding:24, fontSize:11, letterSpacing:1 }}>此订单没有包装记录</div>
         )}
         {packs.map(p => (
           <DkCard key={p.uuid} style={{ marginBottom:8 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-              <div onClick={() => onSelectPack(p.uuid)} style={{ flex:1, cursor:'pointer' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                  <div style={{ fontSize:9, letterSpacing:2, color:G.gold, border:'1px solid rgba(212,175,55,0.4)', padding:'1px 6px' }}>Pack #{p.pack_sequence}</div>
-                  <div style={{ fontSize:9, color:G.goldDim, letterSpacing:1 }}>{PACK_STATUS_LABELS[p.pack_status] || p.pack_status}</div>
+              <label style={{ display:'flex', alignItems:'flex-start', gap:8, flex:1, cursor:'pointer' }}>
+                <input type="checkbox" checked={selected.has(p.uuid)} onChange={() => toggleOne(p.uuid)} style={{ marginTop:4, accentColor:G.gold, flexShrink:0 }} />
+                <div onClick={() => onSelectPack(p.uuid)} style={{ flex:1 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                    <div style={{ fontSize:9, letterSpacing:2, color:G.gold, border:'1px solid rgba(212,175,55,0.4)', padding:'1px 6px' }}>Pack #{p.pack_sequence}</div>
+                    <div style={{ fontSize:9, color:G.goldDim, letterSpacing:1 }}>{PACK_STATUS_LABELS[p.pack_status] || p.pack_status}</div>
+                  </div>
+                  <div style={{ fontSize:11, color:G.cream, marginBottom:2 }}>{p.mo_number} · {p.total_qty} 件</div>
+                  <div style={{ fontSize:9, color:G.goldDim }}>{p.worker || '-'} · {formatDate(p.created_time)}</div>
                 </div>
-                <div style={{ fontSize:11, color:G.cream, marginBottom:2 }}>{p.mo_number} · {p.total_qty} 件</div>
-                <div style={{ fontSize:9, color:G.goldDim }}>{p.worker || '-'} · {formatDate(p.created_time)}</div>
-              </div>
+              </label>
               <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0, marginLeft:8 }}>
                 <button onClick={async e => {
                   e.stopPropagation();
@@ -1630,12 +1718,15 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
   const [bags, setBags] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [selected, setSelected] = useState(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const search = async () => {
     const moNum = mo.trim().toUpperCase();
     if (!moNum) { alert('请输入订单号'); return; }
     setLoading(true);
     setSearched(true);
+    setSelected(new Set());
     try {
       const allBags = [];
       let cursor = null;
@@ -1674,6 +1765,57 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
     }
   };
 
+  const allSelected = bags.length > 0 && bags.every(b => selected.has(b.uuid));
+  const toggleAll = () => {
+    if (allSelected) { setSelected(new Set()); }
+    else { setSelected(new Set(bags.map(b => b.uuid))); }
+  };
+  const toggleOne = (uuid) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(uuid) ? next.delete(uuid) : next.add(uuid);
+      return next;
+    });
+  };
+
+  const handleBulkExcel = async () => {
+    const sel = bags.filter(b => selected.has(b.uuid));
+    if (!sel.length) return;
+    setBulkLoading(true);
+    try {
+      const moNum = sel[0].mo_number;
+      const res = await getRecords(MO_REPORT, `MO_Number == "${moNum}"`);
+      const moData = buildMOData(res?.data?.[0]);
+      const bagList = sel
+        .slice().sort((a, b) => a.bag_sequence - b.bag_sequence)
+        .map(b => ({
+          bagNumber: b.bag_sequence,
+          qrText: window.location.origin + '/view/bag/' + b.uuid,
+        }));
+      await generateMasterBagExcel(moData, bagList, sanitizeFilename(`${moNum}_MasterBag_Selected_${bagList.length}items.xlsx`));
+      setSelected(new Set());
+    } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
+    finally { setBulkLoading(false); }
+  };
+
+  const handleBulkPDF = async () => {
+    const sel = bags.filter(b => selected.has(b.uuid));
+    if (!sel.length) return;
+    setBulkLoading(true);
+    try {
+      const moNum = sel[0].mo_number;
+      const qrItems = sel
+        .slice().sort((a, b) => a.bag_sequence - b.bag_sequence)
+        .map(b => ({
+          text: window.location.origin + '/view/bag/' + b.uuid,
+          filename: sanitizeFilename(`${b.mo_number}_MasterBag_${b.bag_sequence}.png`),
+        }));
+      await downloadQRsAsPDF(qrItems, sanitizeFilename(`${moNum}_MasterBag_Selected_${qrItems.length}items.pdf`));
+      setSelected(new Set());
+    } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
+    finally { setBulkLoading(false); }
+  };
+
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
@@ -1686,20 +1828,43 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
           <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter' && !loading) search(); }} />
           <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
         </DkCard>
+        {bags.length > 0 && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 4px', marginBottom:4 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:10, color:G.goldDim }}>
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} style={{ accentColor:G.gold }} />
+              {selected.size > 0 ? `${selected.size} 선택됨 / 已选` : '全选 / 전체 선택'}
+            </label>
+            {selected.size > 0 && (
+              <div style={{ display:'flex', gap:6 }}>
+                <button onClick={handleBulkPDF} disabled={bulkLoading}
+                  style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.4)', color:G.goldDim, fontSize:9, padding:'4px 8px', cursor:'pointer', fontFamily:'inherit' }}>
+                  {bulkLoading ? '...' : `📄 PDF (${selected.size})`}
+                </button>
+                <button onClick={handleBulkExcel} disabled={bulkLoading}
+                  style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'4px 8px', cursor:'pointer', fontFamily:'inherit' }}>
+                  {bulkLoading ? '...' : `📊 Excel (${selected.size})`}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {searched && !loading && bags.length === 0 && (
           <div style={{ textAlign:'center', color:G.goldDim, padding:24, fontSize:11, letterSpacing:1 }}>此订单没有麻袋记录</div>
         )}
         {bags.map(b => (
           <DkCard key={b.uuid} style={{ marginBottom:8 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-              <div onClick={() => onSelectBag(b.uuid)} style={{ flex:1, cursor:'pointer' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-                  <div style={{ fontSize:9, letterSpacing:2, color:G.gold, border:'1px solid rgba(212,175,55,0.4)', padding:'1px 6px' }}>Bag #{b.bag_sequence}</div>
-                  <div style={{ fontSize:9, color:G.goldDim, letterSpacing:1 }}>{BAG_STATUS_LABELS[b.bag_status] || b.bag_status}</div>
+              <label style={{ display:'flex', alignItems:'flex-start', gap:8, flex:1, cursor:'pointer' }}>
+                <input type="checkbox" checked={selected.has(b.uuid)} onChange={() => toggleOne(b.uuid)} style={{ marginTop:4, accentColor:G.gold, flexShrink:0 }} />
+                <div onClick={() => onSelectBag(b.uuid)} style={{ flex:1 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+                    <div style={{ fontSize:9, letterSpacing:2, color:G.gold, border:'1px solid rgba(212,175,55,0.4)', padding:'1px 6px' }}>Bag #{b.bag_sequence}</div>
+                    <div style={{ fontSize:9, color:G.goldDim, letterSpacing:1 }}>{BAG_STATUS_LABELS[b.bag_status] || b.bag_status}</div>
+                  </div>
+                  <div style={{ fontSize:11, color:G.cream, marginBottom:2 }}>{b.mo_number} · {b.inner_pack_count} packs · {b.total_qty} 件</div>
+                  <div style={{ fontSize:9, color:G.goldDim }}>{b.worker || '-'}{b.destination ? ' → ' + b.destination : ''} · {formatDate(b.created_time)}</div>
                 </div>
-                <div style={{ fontSize:11, color:G.cream, marginBottom:2 }}>{b.mo_number} · {b.inner_pack_count} packs · {b.total_qty} 件</div>
-                <div style={{ fontSize:9, color:G.goldDim }}>{b.worker || '-'}{b.destination ? ' → ' + b.destination : ''} · {formatDate(b.created_time)}</div>
-              </div>
+              </label>
               <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0, marginLeft:8 }}>
                 <button onClick={async e => {
                   e.stopPropagation();
@@ -1722,6 +1887,162 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
             </div>
           </DkCard>
         ))}
+      </div>
+    </DkScreen>
+  );
+});
+
+// ─── Recent Activity Screen ───────────────────────────────────────────
+const ACTIVITY_FILTERS = ['all', 'inner_pack', 'master_bag'];
+const ACTIVITY_FILTER_LABELS = { all: '全部 / 전체', inner_pack: 'Inner Pack', master_bag: 'Master Bag' };
+
+const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
+  const [activities, setActivities] = useState(() => getRecentActivities());
+  const [filter, setFilter] = useState('all');
+  const [redownloadingId, setRedownloadingId] = useState(null);
+
+  const displayed = filter === 'all' ? activities : activities.filter(a => a.type === filter);
+
+  const handleClearAll = () => {
+    if (!window.confirm('최근 기록을 모두 삭제하시겠습니까?\n确定清除所有记录?')) return;
+    clearActivities();
+    setActivities([]);
+  };
+
+  const handleRedownload = async (activity) => {
+    setRedownloadingId(activity.id);
+    try {
+      const moRes = await getRecords(MO_REPORT, `MO_Number == "${activity.moNumber}"`);
+      const moRecord = moRes?.data?.[0];
+      if (!moRecord) throw new Error('MO not found: ' + activity.moNumber);
+      const moData = buildMOData(moRecord);
+
+      if (activity.type === 'inner_pack') {
+        const packNums = new Set((activity.packNumbers || []).map(Number));
+        let allPacks = [], cursor = null, safety = 0;
+        while (safety++ < 50) {
+          const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${activity.moNumber}"`, cursor ? { record_cursor: cursor } : {});
+          const data = (pr?.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
+          if (!data.length) break;
+          allPacks = allPacks.concat(data);
+          cursor = pr.record_cursor || null;
+          if (!cursor) break;
+        }
+        const matching = allPacks.filter(r => packNums.has(parseInt(r['Pack_Sequence']) || 0));
+        if (!matching.length) throw new Error('해당 포장 기록을 찾을 수 없습니다 / 未找到包装记录');
+        const packList = matching
+          .map(r => {
+            let items = [];
+            try { items = JSON.parse(r['Items_JSON'] || '[]'); } catch (e) {}
+            return {
+              packNumber: parseInt(r['Pack_Sequence']) || 0,
+              qrText: window.location.origin + '/view/inner/' + r['Pack_UUID'],
+              totalQty: parseInt(r['Total_Qty']) || 12,
+              isRemainder: r['Is_Remainder'] === 'true' || r['Is_Remainder'] === true,
+              items,
+            };
+          })
+          .sort((a, b) => a.packNumber - b.packNumber);
+        await generateInnerPackExcel(moData, packList,
+          sanitizeFilename(`${activity.moNumber}_InnerPack_Redownload_${packList.length}packs.xlsx`));
+      } else {
+        const bagNums = new Set((activity.bagNumbers || []).map(Number));
+        let allBags = [], cursor = null, safety = 0;
+        while (safety++ < 50) {
+          const pr = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${activity.moNumber}"`, cursor ? { record_cursor: cursor } : {});
+          const data = (pr?.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
+          if (!data.length) break;
+          allBags = allBags.concat(data);
+          cursor = pr.record_cursor || null;
+          if (!cursor) break;
+        }
+        const matching = allBags.filter(r => bagNums.has(parseInt(r['Bag_Sequence']) || 0));
+        if (!matching.length) throw new Error('해당 마대 기록을 찾을 수 없습니다 / 未找到麻袋记录');
+        const bagList = matching
+          .map(r => ({
+            bagNumber: parseInt(r['Bag_Sequence']) || 0,
+            qrText: window.location.origin + '/view/bag/' + r['Bag_UUID'],
+          }))
+          .sort((a, b) => a.bagNumber - b.bagNumber);
+        await generateMasterBagExcel(moData, bagList,
+          sanitizeFilename(`${activity.moNumber}_MasterBag_Redownload_${bagList.length}bags.xlsx`));
+      }
+    } catch (err) {
+      alert('재다운로드 실패 / 重新下载失败:\n' + (err?.message || String(err)));
+    } finally {
+      setRedownloadingId(null);
+    }
+  };
+
+  const fmtTs = (ts) => {
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>RECENT ACTIVITY</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>最近记录 / 최근 기록</div>
+      </div>
+      <div style={{ padding:'16px 20px 40px' }}>
+        {/* Filter tabs */}
+        <div style={{ display:'flex', gap:6, marginBottom:16, overflowX:'auto' }}>
+          {ACTIVITY_FILTERS.map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              style={{
+                background: filter === f ? 'rgba(212,175,55,0.2)' : 'transparent',
+                border: filter === f ? '1px solid rgba(212,175,55,0.6)' : '1px solid rgba(212,175,55,0.2)',
+                color: filter === f ? G.gold : G.goldDim,
+                fontSize:9, padding:'5px 12px', cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
+              }}>
+              {ACTIVITY_FILTER_LABELS[f]}
+            </button>
+          ))}
+          {activities.length > 0 && (
+            <button onClick={handleClearAll}
+              style={{ background:'transparent', border:'1px solid rgba(200,60,60,0.4)', color:'rgba(220,80,80,0.8)', fontSize:9, padding:'5px 10px', cursor:'pointer', fontFamily:'inherit', marginLeft:'auto', whiteSpace:'nowrap' }}>
+              🗑 전체 삭제
+            </button>
+          )}
+        </div>
+
+        {displayed.length === 0 && (
+          <div style={{ textAlign:'center', color:G.goldDim, padding:40, fontSize:11, letterSpacing:1 }}>
+            {activities.length === 0 ? '아직 기록 없음 / 暂无记录' : '해당 유형 없음 / 无该类型记录'}
+          </div>
+        )}
+
+        {displayed.map(a => {
+          const isIP = a.type === 'inner_pack';
+          const numList = isIP ? (a.packNumbers || []) : (a.bagNumbers || []);
+          const label = isIP ? 'Inner Pack' : 'Master Bag';
+          const numLabel = isIP
+            ? (numList.length === 1 ? `Pack #${numList[0]}` : `Pack #${numList[0]}–#${numList[numList.length-1]} (${numList.length}개)`)
+            : (numList.length === 1 ? `Bag #${numList[0]}` : `Bag #${numList[0]}–#${numList[numList.length-1]} (${numList.length}개)`);
+          const isLoading = redownloadingId === a.id;
+          return (
+            <DkCard key={a.id} style={{ marginBottom:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+                    <div style={{ fontSize:9, letterSpacing:2, color:G.gold, border:'1px solid rgba(212,175,55,0.4)', padding:'1px 6px', flexShrink:0 }}>{label}</div>
+                    <div style={{ fontSize:9, color:G.goldDim, letterSpacing:1 }}>{a.action === 'batch_created' ? 'BATCH' : 'SINGLE'}</div>
+                  </div>
+                  <div style={{ fontSize:11, color:G.cream, marginBottom:2, fontWeight:500 }}>{a.moNumber}</div>
+                  <div style={{ fontSize:10, color:G.goldDim, marginBottom:2 }}>{numLabel} · {a.pieceCount} pcs</div>
+                  <div style={{ fontSize:9, color:G.goldDim }}>{a.creator || '-'} · {fmtTs(a.timestamp)}</div>
+                </div>
+                <button onClick={() => handleRedownload(a)} disabled={isLoading}
+                  style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>
+                  {isLoading ? '...' : '📊 재다운'}
+                </button>
+              </div>
+            </DkCard>
+          );
+        })}
       </div>
     </DkScreen>
   );
@@ -3579,6 +3900,17 @@ export default function App() {
         isRemainder: packIsRemainder
       });
       setLastPackComposition(selectedItems);
+      logActivity({
+        timestamp: Date.now(),
+        type: 'inner_pack',
+        action: 'created',
+        moNumber: packMO.mo_number,
+        moStyleSku: packMO.sku || '',
+        packNumbers: [packSequence],
+        bagNumbers: null,
+        pieceCount: totalQty,
+        creator: packWorker.trim(),
+      });
       setCurrentScreen('pack_success');
     } catch (err) {
       setCurrentScreen('pack_create');
@@ -3741,6 +4073,17 @@ export default function App() {
         isRemainder: bagIsRemainder,
         packs: bagScannedPacks
       });
+      logActivity({
+        timestamp: Date.now(),
+        type: 'master_bag',
+        action: 'created',
+        moNumber: primaryMO,
+        moStyleSku: bagMO.sku || '',
+        packNumbers: null,
+        bagNumbers: [bagSequence],
+        pieceCount: totalQty,
+        creator: bagWorker.trim(),
+      });
       setCurrentScreen('bag_success');
     } catch (err) {
       setCurrentScreen('bag_create');
@@ -3787,6 +4130,19 @@ export default function App() {
       }
     };
     await Promise.all(Array.from({ length: 3 }, () => createWorker()));
+    if (items.length > 0) {
+      logActivity({
+        timestamp: Date.now(),
+        type: 'inner_pack',
+        action: 'batch_created',
+        moNumber: packMO.mo_number,
+        moStyleSku: packMO.sku || '',
+        packNumbers: items.map(it => it.seq),
+        bagNumbers: null,
+        pieceCount: items.reduce((s, it) => s + (parseInt(it.totalQty) || 0), 0),
+        creator: worker,
+      });
+    }
     setBatchResult({ items, errors, moNumber: packMO.mo_number, worker, lastSeq: endSeq, moData: buildMOData(packMO) });
     setCurrentScreen('batch_pack_done');
   }, [packMO]);
@@ -3934,6 +4290,19 @@ export default function App() {
           errors.push({ bagSeq: bagGroups[i].bagSeq, error: e.message || String(e) });
         }
         setBatchBagProgress(p => ({ ...p, current: p.current + 1, items: [...items], errors: [...errors] }));
+      }
+      if (items.length > 0) {
+        logActivity({
+          timestamp: Date.now(),
+          type: 'master_bag',
+          action: 'batch_created',
+          moNumber: bagMO.mo_number,
+          moStyleSku: bagMO.sku || '',
+          packNumbers: null,
+          bagNumbers: items.map(it => it.bagSeq),
+          pieceCount: items.reduce((s, it) => s + (parseInt(it.totalQty) || 0), 0),
+          creator: worker,
+        });
       }
       setBatchBagResult({ items, errors, moNumber: bagMO.mo_number, worker, startPackSeq, endPackSeq, moData: buildMOData(bagMO) });
       setCurrentScreen('batch_bag_done');
@@ -4419,6 +4788,7 @@ export default function App() {
             onSelectMasterBag={() => setCurrentScreen('bag_menu')}
             onSelectStatusScan={() => setCurrentScreen('status_scan_mode')}
             onSelectReserved={() => requirePin(() => { setReservedMO(null); setReservedResult(null); setCurrentScreen('reserved_mo_select'); })}
+            onSelectRecentActivity={() => setCurrentScreen('recent_activity')}
           />
         )}
 
@@ -4680,6 +5050,10 @@ export default function App() {
               fetchMasterBagDetail(uuid);
             }}
           />
+        )}
+
+        {currentScreen === 'recent_activity' && (
+          <RecentActivityScreen onBack={() => setCurrentScreen('home')} />
         )}
 
         {/* Batch Bag screens */}

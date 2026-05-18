@@ -20,8 +20,9 @@ function stripChinese(text) {
   return result;
 }
 
-const THIN = { style: 'thin', color: { argb: 'FF000000' } };
-const GRAY = { style: 'thin', color: { argb: 'FFCCCCCC' } };
+const THIN   = { style: 'thin',   color: { argb: 'FF000000' } };
+const MEDIUM = { style: 'medium', color: { argb: 'FF000000' } };
+const GRAY   = { style: 'thin',   color: { argb: 'FFCCCCCC' } };
 
 // EMU constants (OOXML: 1px at 96dpi = 9525 EMU, 1pt = 12700 EMU)
 const PX_TO_EMU = 9525;
@@ -136,9 +137,9 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       // remove right divider for QR-overlapping rows (SIZE/COLOR/Pack) so no
       // vertical line runs through the QR image.
       cell.border = {
-        left:   THIN,
+        left:   MEDIUM,
         right:  li < 3 ? THIN : undefined,
-        top:    li === 0 ? THIN : GRAY,
+        top:    li === 0 ? MEDIUM : GRAY,
         bottom: GRAY,
       };
       // QR col: SURTIDO (li=2) gets no bottom so adjacent-cell bleed doesn't
@@ -146,11 +147,11 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       // only the outer-right label boundary.
       const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
       if (li < 2) {
-        qCell.border = { right: THIN, top: li === 0 ? THIN : GRAY, bottom: GRAY };
+        qCell.border = { right: MEDIUM, top: li === 0 ? MEDIUM : GRAY, bottom: GRAY };
       } else if (li === 2) {
-        qCell.border = { right: THIN, top: GRAY };   // no bottom — QR starts below
+        qCell.border = { right: MEDIUM, top: GRAY };   // no bottom — QR starts below
       } else {
-        qCell.border = { right: THIN };
+        qCell.border = { right: MEDIUM };
       }
     }
 
@@ -161,7 +162,7 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       : `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs`;
     captionCell.font  = { name: 'Arial', size: 8, bold: true };
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
-    captionCell.border = { left: THIN, top: GRAY, bottom: THIN, right: THIN };
+    captionCell.border = { left: MEDIUM, top: GRAY, bottom: MEDIUM, right: MEDIUM };
 
     // QR anchored to top of SIZE row (R+3) via native EMU — spans SIZE+COLOR+Pack
     const qrBase64 = await qrToBase64(qrText);
@@ -169,7 +170,7 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     ws.addImage(imgId, {
       tl: {
         nativeCol:    qrColNo - 1,
-        nativeColOff: 5 * PX_TO_EMU,
+        nativeColOff: 2 * PX_TO_EMU,
         nativeRow:    firstRow - 1 + 3,  // 0-based index of SIZE row (R+3)
         nativeRowOff: 5 * PX_TO_EMU,
       },
@@ -304,23 +305,23 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
       // Text col: remove right divider for QR-overlapping rows (ITEM NO–COLOR)
       // so no vertical line runs through the QR image.
       cell.border = {
-        left:   THIN,
+        left:   MEDIUM,
         right:  (li < 2 || li === 6) ? THIN : undefined,
-        top:    li === 0 ? THIN : GRAY,
+        top:    li === 0 ? MEDIUM : GRAY,
         bottom: GRAY,
       };
       // QR col: C/T NO (li=1) gets no bottom to remove bleed line at QR start;
       // ITEM NO–COLOR (li=2..5) overlapped — outer right only; Bag No restores borders.
       const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
       if (li === 0) {
-        qCell.border = { right: THIN, top: THIN, bottom: GRAY };
+        qCell.border = { right: MEDIUM, top: MEDIUM, bottom: GRAY };
       } else if (li === 1) {
-        qCell.border = { right: THIN, top: GRAY };   // no bottom — QR starts below
+        qCell.border = { right: MEDIUM, top: GRAY };   // no bottom — QR starts below
       } else if (li <= 5) {
-        qCell.border = { right: THIN };
+        qCell.border = { right: MEDIUM };
       } else {
         // li===6 (Bag No): QR ended, full borders
-        qCell.border = { right: THIN, top: GRAY, bottom: GRAY };
+        qCell.border = { right: MEDIUM, top: GRAY, bottom: GRAY };
       }
     }
 
@@ -329,13 +330,13 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
     captionCell.value = `${moData.MO_Number} / Master Bag #${bag.bagNumber} / 120 pcs`;
     captionCell.font  = { name: 'Arial', size: 10, bold: true };
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
-    captionCell.border = { left: THIN, top: GRAY, bottom: THIN, right: THIN };
+    captionCell.border = { left: MEDIUM, top: GRAY, bottom: MEDIUM, right: MEDIUM };
 
     // QR anchored to top of ITEM NO row (R+2) — reuse same imgId for all 4 positions
     ws.addImage(imgId, {
       tl: {
         nativeCol:    qrColNo - 1,
-        nativeColOff: 5 * PX_TO_EMU,
+        nativeColOff: 6 * PX_TO_EMU,
         nativeRow:    firstRow - 1 + 2,  // 0-based index of ITEM NO row (R+2)
         nativeRowOff: 5 * PX_TO_EMU,
       },
