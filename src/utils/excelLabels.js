@@ -21,25 +21,7 @@ function stripChinese(text) {
 }
 
 const THIN = { style: 'thin', color: { argb: 'FF000000' } };
-
-function applyLabelBorders(ws, topRow, bottomRow, textCol, qrCol) {
-  for (let r = topRow; r <= bottomRow; r++) {
-    const tc = ws.getRow(r).getCell(textCol);
-    const qc = ws.getRow(r).getCell(qrCol);
-    tc.border = {
-      left:   THIN,
-      top:    r === topRow    ? THIN : undefined,
-      bottom: r === bottomRow ? THIN : undefined,
-      right:  THIN,
-    };
-    qc.border = {
-      left:   undefined,
-      top:    r === topRow    ? THIN : undefined,
-      bottom: r === bottomRow ? THIN : undefined,
-      right:  THIN,
-    };
-  }
-}
+const GRAY = { style: 'thin', color: { argb: 'FFCCCCCC' } };
 
 // EMU constants (OOXML: 1px at 96dpi = 9525 EMU, 1pt = 12700 EMU)
 const PX_TO_EMU = 9525;
@@ -55,7 +37,7 @@ const IP_DATA_ROWS  = 6;
 const IP_LABEL_ROWS = 7;   // 6 data + 1 caption
 const IP_VSTRIDE    = IP_LABEL_ROWS + 1; // 8 rows between group starts
 const IP_TEXT_W     = 22;
-const IP_QR_W       = 14;
+const IP_QR_W       = 12;
 const IP_SPACER_W   = 2;
 const IP_QR_SIZE    = 80;  // px square
 const IP_VSPACER_H  = 10;  // pt — spacer row between groups
@@ -150,9 +132,22 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       cell.alignment = li === 4
         ? { vertical: 'top',    horizontal: 'left', wrapText: true,  indent: 1 }
         : { vertical: 'middle', horizontal: 'left', wrapText: true,  indent: 1 };
+      // Text col: outer-black left/right, black top for first row, gray elsewhere
+      cell.border = {
+        left:   THIN,
+        right:  THIN,
+        top:    li === 0 ? THIN : GRAY,
+        bottom: GRAY,
+      };
+      // QR col: li<3 (ITEM NO/Q'TY/SURTIDO) not overlapped — add borders
+      //         li>=3 (SIZE/COLOR/Pack) overlapped by QR — outer right only
+      const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
+      if (li < 3) {
+        qCell.border = { right: THIN, top: li === 0 ? THIN : GRAY, bottom: GRAY };
+      } else {
+        qCell.border = { right: THIN };
+      }
     }
-
-    applyLabelBorders(ws, firstRow, captionRowNo, textColNo, qrColNo);
 
     ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
@@ -161,7 +156,7 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       : `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs`;
     captionCell.font  = { name: 'Arial', size: 8, bold: true };
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
-    captionCell.border = { left: THIN, bottom: THIN, right: THIN };
+    captionCell.border = { left: THIN, top: GRAY, bottom: THIN, right: THIN };
 
     // QR anchored to top of SIZE row (R+3) via native EMU — spans SIZE+COLOR+Pack
     const qrBase64 = await qrToBase64(qrText);
@@ -216,16 +211,16 @@ const MB_PAGE       = 4;
 const MB_DATA_ROWS  = 7;
 const MB_LABEL_ROWS = MB_DATA_ROWS + 1; // 8
 const MB_TEXT_W     = 35;
-const MB_QR_W       = 28;
+const MB_QR_W       = 22;
 const MB_SPACER_W   = 3;
-const MB_QR_SIZE    = 150; // px square
+const MB_QR_SIZE    = 142; // px square
 
-// Normal row heights — QR spans Q'TY+SIZE+COLOR+Bag No (22+22+45+22 = 111pt ≈ 148px)
+// Normal row heights — QR spans ITEM NO+Q'TY+SIZE+COLOR (28+22+22+45 = 117pt ≈ 156px)
 const MB_ROW_HEIGHTS = [
   20,  // R+0  PI NO
   20,  // R+1  C/T NO
-  28,  // R+2  ITEM NO
-  22,  // R+3  Q'TY     ← QR anchor top
+  28,  // R+2  ITEM NO  ← QR anchor top
+  22,  // R+3  Q'TY
   22,  // R+4  SIZE
   45,  // R+5  COLOR
   22,  // R+6  Bag No
@@ -293,26 +288,39 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
       cell.alignment = li === 5
         ? { vertical: 'top',    horizontal: 'left', wrapText: true,  indent: 1 }
         : { vertical: 'middle', horizontal: 'left', wrapText: true,  indent: 1 };
+      // Text col: outer-black left/right, black top for first row, gray elsewhere
+      cell.border = {
+        left:   THIN,
+        right:  THIN,
+        top:    li === 0 ? THIN : GRAY,
+        bottom: GRAY,
+      };
+      // QR col: li<2 (PI NO/C/T NO) and li===6 (Bag No) not overlapped — add borders
+      //         li=2..5 (ITEM NO/Q'TY/SIZE/COLOR) overlapped by QR — outer right only
+      const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
+      if (li < 2 || li === 6) {
+        qCell.border = { right: THIN, top: li === 0 ? THIN : GRAY, bottom: GRAY };
+      } else {
+        qCell.border = { right: THIN };
+      }
     }
-
-    applyLabelBorders(ws, firstRow, captionRowNo, textColNo, qrColNo);
 
     ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
     captionCell.value = `${moData.MO_Number} / Master Bag #${bagNumber} / 120 pcs`;
     captionCell.font  = { name: 'Arial', size: 10, bold: true };
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
-    captionCell.border = { left: THIN, bottom: THIN, right: THIN };
+    captionCell.border = { left: THIN, top: GRAY, bottom: THIN, right: THIN };
 
-    // QR anchored to top of Q'TY row (R+3) via native EMU — spans Q'TY+SIZE+COLOR+Bag No
+    // QR anchored to top of ITEM NO row (R+2) via native EMU — spans ITEM NO+Q'TY+SIZE+COLOR
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
     ws.addImage(imgId, {
       tl: {
         nativeCol:    qrColNo - 1,
-        nativeColOff: 10 * PX_TO_EMU,
-        nativeRow:    firstRow - 1 + 3,  // 0-based index of Q'TY row (R+3)
-        nativeRowOff: 10 * PX_TO_EMU,
+        nativeColOff: 5 * PX_TO_EMU,
+        nativeRow:    firstRow - 1 + 2,  // 0-based index of ITEM NO row (R+2)
+        nativeRowOff: 5 * PX_TO_EMU,
       },
       ext: { width: MB_QR_SIZE, height: MB_QR_SIZE },
       editAs: 'absolute',
