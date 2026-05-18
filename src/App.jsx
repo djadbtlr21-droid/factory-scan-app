@@ -11,7 +11,7 @@ import {
   detectQRType, generateQRDataURL, generateQRDataURLWithLabel, downloadQRPNG, sanitizeFilename,
   downloadQRsAsZIP, downloadQRsAsPDF
 } from './qrUtils.js';
-import { generateInnerPackExcel, generateMasterBagExcel } from './utils/excelLabels.js';
+import { generateInnerPackExcel, generateMasterBagExcel, generateSingleInnerPackExcel, generateSingleMasterBagExcel } from './utils/excelLabels.js';
 
 // Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
@@ -1587,13 +1587,25 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
                 <div style={{ fontSize:11, color:G.cream, marginBottom:2 }}>{p.mo_number} · {p.total_qty} 件</div>
                 <div style={{ fontSize:9, color:G.goldDim }}>{p.worker || '-'} · {formatDate(p.created_time)}</div>
               </div>
-              <button onClick={async e => {
-                e.stopPropagation();
-                const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
-                const label = `${p.mo_number} / Inner Pack #${p.pack_sequence} / ${p.total_qty} pcs`;
-                const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-                downloadQRPNG(dataURL, sanitizeFilename(`${p.mo_number}_InnerPack_${p.pack_sequence}_${p.total_qty}pcs.png`));
-              }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:G.goldDim, fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
+              <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0, marginLeft:8 }}>
+                <button onClick={async e => {
+                  e.stopPropagation();
+                  const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
+                  const label = `${p.mo_number} / Inner Pack #${p.pack_sequence} / ${p.total_qty} pcs`;
+                  const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
+                  downloadQRPNG(dataURL, sanitizeFilename(`${p.mo_number}_InnerPack_${p.pack_sequence}_${p.total_qty}pcs.png`));
+                }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:G.goldDim, fontSize:9, padding:'5px 8px', cursor:'pointer', fontFamily:'inherit' }}>📷 PNG</button>
+                <button onClick={async e => {
+                  e.stopPropagation();
+                  try {
+                    const res = await getRecords(MO_REPORT, `MO_Number == "${p.mo_number}"`);
+                    const mo = res?.data?.[0];
+                    const moData = buildMOData(mo);
+                    const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
+                    await generateSingleInnerPackExcel(moData, { number: p.pack_sequence, qrString: qrUrl });
+                  } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
+                }} style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'5px 8px', cursor:'pointer', fontFamily:'inherit' }}>📊 Excel</button>
+              </div>
             </div>
           </DkCard>
         ))}
@@ -1678,13 +1690,25 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
                 <div style={{ fontSize:11, color:G.cream, marginBottom:2 }}>{b.mo_number} · {b.inner_pack_count} packs · {b.total_qty} 件</div>
                 <div style={{ fontSize:9, color:G.goldDim }}>{b.worker || '-'}{b.destination ? ' → ' + b.destination : ''} · {formatDate(b.created_time)}</div>
               </div>
-              <button onClick={async e => {
-                e.stopPropagation();
-                const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
-                const label = `${b.mo_number} / Master Bag #${b.bag_sequence} / ${b.total_qty} pcs`;
-                const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
-                downloadQRPNG(dataURL, sanitizeFilename(`${b.mo_number}_MasterBag_${b.bag_sequence}_${b.total_qty}pcs.png`));
-              }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:G.goldDim, fontSize:10, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>📥</button>
+              <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0, marginLeft:8 }}>
+                <button onClick={async e => {
+                  e.stopPropagation();
+                  const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
+                  const label = `${b.mo_number} / Master Bag #${b.bag_sequence} / ${b.total_qty} pcs`;
+                  const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
+                  downloadQRPNG(dataURL, sanitizeFilename(`${b.mo_number}_MasterBag_${b.bag_sequence}_${b.total_qty}pcs.png`));
+                }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:G.goldDim, fontSize:9, padding:'5px 8px', cursor:'pointer', fontFamily:'inherit' }}>📷 PNG</button>
+                <button onClick={async e => {
+                  e.stopPropagation();
+                  try {
+                    const res = await getRecords(MO_REPORT, `MO_Number == "${b.mo_number}"`);
+                    const mo = res?.data?.[0];
+                    const moData = buildMOData(mo);
+                    const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
+                    await generateSingleMasterBagExcel(moData, { number: b.bag_sequence, qrString: qrUrl });
+                  } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
+                }} style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'5px 8px', cursor:'pointer', fontFamily:'inherit' }}>📊 Excel</button>
+              </div>
             </div>
           </DkCard>
         ))}
