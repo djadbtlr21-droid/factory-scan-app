@@ -147,11 +147,11 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       // only the outer-right label boundary.
       const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
       if (li < 2) {
-        qCell.border = { right: MEDIUM, top: li === 0 ? MEDIUM : GRAY, bottom: GRAY };
+        qCell.border = { left: MEDIUM, right: MEDIUM, top: li === 0 ? MEDIUM : GRAY, bottom: GRAY };
       } else if (li === 2) {
-        qCell.border = { right: MEDIUM, top: GRAY };   // no bottom — QR starts below
+        qCell.border = { left: MEDIUM, right: MEDIUM, top: GRAY };   // no bottom — QR starts below
       } else {
-        qCell.border = { right: MEDIUM };
+        qCell.border = { left: MEDIUM, right: MEDIUM };
       }
     }
 
@@ -314,14 +314,14 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
       // ITEM NO–COLOR (li=2..5) overlapped — outer right only; Bag No restores borders.
       const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
       if (li === 0) {
-        qCell.border = { right: MEDIUM, top: MEDIUM, bottom: GRAY };
+        qCell.border = { left: MEDIUM, right: MEDIUM, top: MEDIUM, bottom: GRAY };
       } else if (li === 1) {
-        qCell.border = { right: MEDIUM, top: GRAY };   // no bottom — QR starts below
+        qCell.border = { left: MEDIUM, right: MEDIUM, top: GRAY };   // no bottom — QR starts below
       } else if (li <= 5) {
-        qCell.border = { right: MEDIUM };
+        qCell.border = { left: MEDIUM, right: MEDIUM };
       } else {
         // li===6 (Bag No): QR ended, full borders
-        qCell.border = { right: MEDIUM, top: GRAY, bottom: GRAY };
+        qCell.border = { left: MEDIUM, right: MEDIUM, top: GRAY, bottom: GRAY };
       }
     }
 
