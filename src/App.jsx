@@ -2039,15 +2039,75 @@ const PinGate = memo(function PinGate({ onSuccess, onCancel }) {
 });
 
 // ─── Batch Pack Screens ───────────────────────────────────────────────
-const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, defaultStartSeq, onSubmit, onBack }) {
-  const [startSeq, setStartSeq] = useState(String(defaultStartSeq || 1));
-  const [endSeq, setEndSeq] = useState(String(defaultStartSeq || 1));
-  const [worker, setWorker] = useState('');
+const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, onSubmit, onBack }) {
+  const [startSeq, setStartSeq] = useState('');
+  const [endSeq, setEndSeq]     = useState('');
+  const [worker, setWorker]     = useState('');
+  const [loading, setLoading]   = useState(true);
+  const [existingNums, setExistingNums] = useState(new Set());
+  const [rangeError, setRangeError]     = useState(null);
+
+  // Fetch all existing Pack_Sequence numbers for this MO on mount,
+  // then pre-fill start/end with max+1 to prevent duplicate creation.
+  useEffect(() => {
+    if (!packMO?.mo_number) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        let all = [], cursor = null, safety = 0;
+        while (safety++ < 50) {
+          const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${packMO.mo_number}"`, cursor ? { record_cursor: cursor } : {});
+          const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
+          if (data.length === 0) break;
+          all = all.concat(data);
+          cursor = pr.record_cursor || null;
+          if (!cursor) break;
+        }
+        if (cancelled) return;
+        const nums = new Set(all.map(p => parseInt(p['Pack_Sequence']) || 0).filter(n => n > 0));
+        const maxNum = nums.size > 0 ? Math.max(...nums) : 0;
+        const next = String(maxNum + 1);
+        setExistingNums(nums);
+        setStartSeq(next);
+        setEndSeq(next);
+      } catch (err) {
+        console.error('[BatchPackInput] fetch existing packs failed', err);
+        if (!cancelled) { setStartSeq('1'); setEndSeq('1'); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [packMO?.mo_number]);
+
+  const checkOverlap = (s, e, nums) => {
+    const sn = parseInt(s), en = parseInt(e);
+    if (!sn || !en || sn > en || sn < 1) return null;
+    const overlap = [];
+    for (let i = sn; i <= en; i++) { if (nums.has(i)) overlap.push(i); }
+    return overlap.length > 0 ? `중복 번호 / 重复序号: #${overlap.join(', #')}` : null;
+  };
+
+  const handleStartChange = (e) => {
+    const v = e.target.value;
+    setStartSeq(v);
+    setRangeError(checkOverlap(v, endSeq, existingNums));
+  };
+  const handleEndChange = (e) => {
+    const v = e.target.value;
+    setEndSeq(v);
+    setRangeError(checkOverlap(startSeq, v, existingNums));
+  };
+
   const count = Math.max(0, (parseInt(endSeq) || 0) - (parseInt(startSeq) || 0) + 1);
+  const canSubmit = !loading && count > 0 && !rangeError && !!worker.trim();
+
   const handleSubmit = () => {
     const s = parseInt(startSeq), e = parseInt(endSeq);
     if (!s || !e || s > e || s < 1) { alert('请输入有效的序号范围'); return; }
     if (!worker.trim()) { alert('请输入负责人 / 담당자'); return; }
+    if (rangeError) { alert(rangeError); return; }
     onSubmit({ startSeq: s, endSeq: e, worker: worker.trim() });
   };
   return (
@@ -2061,9 +2121,18 @@ const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, defaul
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
           <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:14, fontWeight:400 }}>序号范围 / 시퀀스 범위</div>
-          <DkInput label="开始序号 / 시작 번호" value={startSeq} onChange={e => setStartSeq(e.target.value)} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
-          <DkInput label="结束序号 / 종료 번호" value={endSeq} onChange={e => setEndSeq(e.target.value)} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
-          <div style={{ fontSize:12, color:G.gold, marginTop:4, fontWeight:400 }}>共 {count} 包 / 총 {count} 포장</div>
+          {loading ? (
+            <div style={{ fontSize:11, color:G.goldDim, padding:'8px 0' }}>기존 포장 번호 조회 중... / 查询已有序号...</div>
+          ) : (
+            <>
+              <DkInput label="开始序号 / 시작 번호" value={startSeq} onChange={handleStartChange} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+              <DkInput label="结束序号 / 종료 번호" value={endSeq} onChange={handleEndChange} type="number" inputMode="numeric" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+              <div style={{ fontSize:12, color:G.gold, marginTop:4, fontWeight:400 }}>共 {count} 包 / 총 {count} 포장</div>
+              {rangeError && (
+                <div style={{ fontSize:11, color:'#FF6B6B', marginTop:8, fontWeight:500 }}>{rangeError}</div>
+              )}
+            </>
+          )}
         </DkCard>
         <DkCard>
           <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
@@ -2079,7 +2148,7 @@ const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, defaul
             ))}
           </DkCard>
         )}
-        <DkBtn onClick={handleSubmit} disabled={count <= 0 || !worker.trim()}>
+        <DkBtn onClick={handleSubmit} disabled={!canSubmit}>
           ▶ 开始批量生成 / 일괄 생성 시작 ({count})
         </DkBtn>
       </div>
