@@ -11,6 +11,22 @@ async function qrToBase64(text) {
   return dataURL.split(',')[1];
 }
 
+function stripChinese(text) {
+  if (!text) return '';
+  // Remove parenthetical groups containing Chinese characters (half-width and full-width parens)
+  let result = text.replace(
+    /\s*[（(][^()（）]*[一-鿿][^()（）]*[)）]/g,
+    ''
+  );
+  // Remove standalone CJK characters and CJK punctuation
+  result = result.replace(/[一-鿿　-〿]+/g, '');
+  // Collapse whitespace
+  result = result.replace(/\s+/g, ' ').trim();
+  // Clean up dangling commas from removed segments
+  result = result.replace(/,\s*,/g, ',').replace(/^,|,$/g, '').trim();
+  return result;
+}
+
 const THIN = { style: 'thin', color: { argb: 'FF000000' } };
 
 function applyLabelBorders(ws, topRow, bottomRow, textCol, qrCol) {
@@ -35,19 +51,27 @@ function applyLabelBorders(ws, topRow, bottomRow, textCol, qrCol) {
 // ── Inner Pack ────────────────────────────────────────────────────────────────
 // 3 labels per row × 5 label rows = 15 per A4 sheet
 // Column layout: text(22) | qr(11) | spacer(2) | text(22) | qr(11) | spacer(2) | text(22) | qr(11)
-// label group col: labelCol * 3 + 1 (text), labelCol * 3 + 2 (qr)
+// Label row structure (7 rows): 6 data rows + 1 caption row (replaces buffer)
 
-const IP_COLS      = 3;
-const IP_PAGE      = 15;
-const IP_DATA_ROWS = 6;
-const IP_SPACER    = 1;
-const IP_LABEL_ROWS = IP_DATA_ROWS + IP_SPACER; // 7
-const IP_TEXT_W    = 22;
-const IP_QR_W      = 11;
-const IP_SPACER_W  = 2;
-const IP_ROW_H     = 20;
-const IP_SPACER_H  = 6;
-const IP_QR_SIZE   = 68; // px, must equal height
+const IP_COLS       = 3;
+const IP_PAGE       = 15;
+const IP_DATA_ROWS  = 6;
+const IP_LABEL_ROWS = 7; // 6 data + 1 caption
+const IP_TEXT_W     = 22;
+const IP_QR_W       = 11;
+const IP_SPACER_W   = 2;
+const IP_QR_SIZE    = 68; // px square
+
+// Per-row heights within each label group (7 rows)
+const IP_ROW_HEIGHTS = [
+  32, // R+0  ITEM NO  — tall for wrap
+  16, // R+1  Q'TY
+  16, // R+2  SURTIDO
+  16, // R+3  SIZE
+  32, // R+4  COLOR    — tall for wrap
+  16, // R+5  Pack #
+  18, // R+6  caption
+];
 
 async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
   const ws = workbook.addWorksheet(`Page ${pageIdx + 1}`, {
@@ -68,29 +92,31 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
   }
 
   for (let r = 0; r < 5; r++) {
-    for (let s = 0; s < IP_DATA_ROWS; s++) {
-      ws.getRow(r * IP_LABEL_ROWS + s + 1).height = IP_ROW_H;
+    for (let s = 0; s < IP_LABEL_ROWS; s++) {
+      ws.getRow(r * IP_LABEL_ROWS + s + 1).height = IP_ROW_HEIGHTS[s];
     }
-    ws.getRow(r * IP_LABEL_ROWS + IP_DATA_ROWS + 1).height = IP_SPACER_H;
   }
 
+  const cleanItemNo = stripChinese(moData.ITEM_NO);
+  const cleanColors = stripChinese(moData.COLOR_LIST);
+
   const lines = [
-    `ITEM NO: ${moData.ITEM_NO || ''}`,
+    `ITEM NO: ${cleanItemNo}`,
     `Q'TY:    12PCS`,
     `SURTIDO: ${moData.SURTIDO || ''}`,
     `SIZE:    ${moData.SIZE_LIST || ''}`,
-    `COLOR:   ${moData.COLOR_LIST || ''}`,
+    `COLOR:   ${cleanColors}`,
     '',
   ];
 
   for (let i = 0; i < pageItems.length; i++) {
     const { packNumber, qrText } = pageItems[i];
-    const labelCol  = i % IP_COLS;
-    const labelRow  = Math.floor(i / IP_COLS);
-    const textColNo = labelCol * 3 + 1;
-    const qrColNo   = textColNo + 1;
-    const firstRow  = labelRow * IP_LABEL_ROWS + 1;
-    const lastRow   = firstRow + IP_DATA_ROWS - 1;
+    const labelCol     = i % IP_COLS;
+    const labelRow     = Math.floor(i / IP_COLS);
+    const textColNo    = labelCol * 3 + 1;
+    const qrColNo      = textColNo + 1;
+    const firstRow     = labelRow * IP_LABEL_ROWS + 1;
+    const captionRowNo = firstRow + IP_DATA_ROWS; // R+6
 
     lines[5] = `Pack:    #${packNumber}`;
 
@@ -110,11 +136,19 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       };
     }
 
-    applyLabelBorders(ws, firstRow, lastRow, textColNo, qrColNo);
+    // Outer border spans data rows + caption row
+    applyLabelBorders(ws, firstRow, captionRowNo, textColNo, qrColNo);
+
+    // Caption: merged cell across text + QR columns
+    ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
+    const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
+    captionCell.value = `${moData.MO_Number} / Inner Pack #${packNumber} / 12 pcs`;
+    captionCell.font  = { name: 'Arial', size: 8, bold: true };
+    captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
+    captionCell.border = { left: THIN, bottom: THIN, right: THIN };
 
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
-    if (IP_QR_SIZE !== IP_QR_SIZE) throw new Error('QR ext not square!'); // always equal; guard pattern
     ws.addImage(imgId, {
       tl: { col: qrColNo - 1 + 0.1, row: firstRow - 1 + 0.1 },
       ext: { width: IP_QR_SIZE, height: IP_QR_SIZE },
@@ -147,19 +181,31 @@ export async function generateSingleInnerPackExcel(moData, pack) {
 // ── Master Bag ────────────────────────────────────────────────────────────────
 // 2 labels per row × 2 label rows = 4 per A4 sheet
 // Column layout: text(35) | qr(22) | spacer(3) | text(35) | qr(22)
-// label group col: labelCol * 3 + 1 (text), labelCol * 3 + 2 (qr)
+// Label row structure: 7 data rows + 1 caption row + 2 spacer rows = 10 rows
 
 const MB_COLS       = 2;
 const MB_PAGE       = 4;
 const MB_DATA_ROWS  = 7;
 const MB_SPACER     = 2;
-const MB_LABEL_ROWS = MB_DATA_ROWS + MB_SPACER; // 9
+const MB_LABEL_ROWS = MB_DATA_ROWS + 1 + MB_SPACER; // 10
 const MB_TEXT_W     = 35;
 const MB_QR_W       = 22;
 const MB_SPACER_W   = 3;
-const MB_ROW_H      = 36;
-const MB_SPACER_H   = 4;
-const MB_QR_SIZE    = 151; // px, must equal height
+const MB_QR_SIZE    = 151; // px square
+
+// Per-row heights within each label group (10 rows)
+const MB_ROW_HEIGHTS = [
+  20, // R+0  PI NO
+  20, // R+1  C/T NO
+  44, // R+2  ITEM NO  — tall for wrap
+  22, // R+3  Q'TY
+  22, // R+4  SIZE
+  44, // R+5  COLOR    — tall for wrap
+  22, // R+6  Bag No
+  22, // R+7  caption
+   4, // R+8  spacer
+   4, // R+9  spacer
+];
 
 async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
   const ws = workbook.addWorksheet(`Page ${pageIdx + 1}`, {
@@ -180,32 +226,32 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
   }
 
   for (let r = 0; r < 2; r++) {
-    for (let s = 0; s < MB_DATA_ROWS; s++) {
-      ws.getRow(r * MB_LABEL_ROWS + s + 1).height = MB_ROW_H;
-    }
-    for (let s = 0; s < MB_SPACER; s++) {
-      ws.getRow(r * MB_LABEL_ROWS + MB_DATA_ROWS + s + 1).height = MB_SPACER_H;
+    for (let s = 0; s < MB_LABEL_ROWS; s++) {
+      ws.getRow(r * MB_LABEL_ROWS + s + 1).height = MB_ROW_HEIGHTS[s];
     }
   }
+
+  const cleanItemNo = stripChinese(moData.ITEM_NO);
+  const cleanColors = stripChinese(moData.COLOR_LIST);
 
   const baseLines = [
     [`PI NO:   `, '_______________'],
     [`C/T NO:  `, '_______________'],
-    [`ITEM NO: `, moData.ITEM_NO || ''],
+    [`ITEM NO: `, cleanItemNo],
     [`Q'TY:    `, '120PCS'],
     [`SIZE:    `, moData.SIZE_LIST || ''],
-    [`COLOR:   `, moData.COLOR_LIST || ''],
+    [`COLOR:   `, cleanColors],
     [`Bag No:  `, ''],
   ];
 
   for (let i = 0; i < pageItems.length; i++) {
     const { bagNumber, qrText } = pageItems[i];
-    const labelCol  = i % MB_COLS;
-    const labelRow  = Math.floor(i / MB_COLS);
-    const textColNo = labelCol * 3 + 1;
-    const qrColNo   = textColNo + 1;
-    const firstRow  = labelRow * MB_LABEL_ROWS + 1;
-    const lastRow   = firstRow + MB_DATA_ROWS - 1;
+    const labelCol     = i % MB_COLS;
+    const labelRow     = Math.floor(i / MB_COLS);
+    const textColNo    = labelCol * 3 + 1;
+    const qrColNo      = textColNo + 1;
+    const firstRow     = labelRow * MB_LABEL_ROWS + 1;
+    const captionRowNo = firstRow + MB_DATA_ROWS; // R+7
 
     baseLines[6][1] = `#${bagNumber}`;
 
@@ -226,7 +272,16 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
       };
     }
 
-    applyLabelBorders(ws, firstRow, lastRow, textColNo, qrColNo);
+    // Outer border spans data rows + caption row
+    applyLabelBorders(ws, firstRow, captionRowNo, textColNo, qrColNo);
+
+    // Caption: merged cell across text + QR columns
+    ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
+    const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
+    captionCell.value = `${moData.MO_Number} / Master Bag #${bagNumber} / 120 pcs`;
+    captionCell.font  = { name: 'Arial', size: 10, bold: true };
+    captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
+    captionCell.border = { left: THIN, bottom: THIN, right: THIN };
 
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
