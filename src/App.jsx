@@ -11,11 +11,35 @@ import {
   detectQRType, generateQRDataURL, generateQRDataURLWithLabel, downloadQRPNG, sanitizeFilename,
   downloadQRsAsZIP, downloadQRsAsPDF
 } from './qrUtils.js';
+import { generateInnerPackExcel, generateMasterBagExcel } from './utils/excelLabels.js';
 
 // Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
 const LOG_FORM = 'Add_Production_Log';
 const LOG_REPORT = 'Production_Log_Report';
+
+function buildMOData(mo) {
+  const assortment = mo?.standard_assortment || [];
+  const colors = [...new Set(assortment.map(it => it.color).filter(Boolean))];
+  const sizes  = [...new Set(assortment.map(it => it.size).filter(Boolean))];
+  return {
+    MO_Number:  mo?.mo_number  || '',
+    ITEM_NO:    mo?.chi_style_name || '',
+    COLOR_LIST: colors.join(', '),
+    SURTIDO:    colors.length ? colors.length + 'COLOR' : '',
+    SIZE_LIST:  sizes.join(' '),
+  };
+}
+
+function parseStandardAssortment(found) {
+  const jsonStr = found['Standard_Assortment_JSON'];
+  if (!jsonStr || typeof jsonStr !== 'string') return [];
+  try {
+    let c = jsonStr.trim();
+    if (!c.startsWith('[')) c = '[' + c + ']';
+    return JSON.parse(c);
+  } catch (_) { return []; }
+}
 
 const PROCESSES = [
   { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date',  emoji: '📥', zohoValue: 'Fabric In / 원단입고 / 面料入库' },
@@ -2081,6 +2105,14 @@ const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, 
       await downloadQRsAsPDF(qrItems, sanitizeFilename(`${result.moNumber}_InnerPacks_Batch.pdf`));
     } finally { setDownloading(false); }
   };
+  const handleExcel = async () => {
+    if (downloading || savedItems.length === 0 || !result.moData) return;
+    setDownloading(true);
+    try {
+      const packList = savedItems.map(it => ({ packNumber: it.seq, qrText: it.qrText }));
+      await generateInnerPackExcel(result.moData, packList);
+    } finally { setDownloading(false); }
+  };
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px', textAlign:'center' }}>
@@ -2101,6 +2133,9 @@ const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, 
             ))}
           </DkCard>
         )}
+        <DkBtn onClick={handleExcel} disabled={downloading || savedItems.length === 0 || !result.moData}>
+          {downloading ? '生成中...' : '📊 Excel 下载标签 / Excel 라벨 다운로드 (.xlsx)'}
+        </DkBtn>
         <DkBtn onClick={handleZIP} disabled={downloading || savedItems.length === 0}>
           {downloading ? '生成中...' : '📦 ZIP 下载 QR / ZIP 다운로드'}
         </DkBtn>
@@ -2363,6 +2398,14 @@ const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, on
       await downloadQRsAsPDF(qrItems, sanitizeFilename(`${result.moNumber}_MasterBags_Batch.pdf`));
     } finally { setDownloading(false); }
   };
+  const handleExcel = async () => {
+    if (downloading || savedItems.length === 0 || !result.moData) return;
+    setDownloading(true);
+    try {
+      const bagList = savedItems.map(it => ({ bagNumber: it.bagSeq, qrText: it.qrText }));
+      await generateMasterBagExcel(result.moData, bagList);
+    } finally { setDownloading(false); }
+  };
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px', textAlign:'center' }}>
@@ -2383,6 +2426,9 @@ const BatchBagDoneScreen = memo(function BatchBagDoneScreen({ result, onHome, on
             ))}
           </DkCard>
         )}
+        <DkBtn onClick={handleExcel} disabled={downloading || savedItems.length === 0 || !result.moData}>
+          {downloading ? '生成中...' : '📊 Excel 下载标签 / Excel 라벨 다운로드 (.xlsx)'}
+        </DkBtn>
         <DkBtn onClick={handleZIP} disabled={downloading || savedItems.length === 0}>
           {downloading ? '生成中...' : '📦 ZIP 下载 QR / ZIP 다운로드'}
         </DkBtn>
@@ -3051,7 +3097,8 @@ export default function App() {
         order_qty: parseInt(found['Plan_Total_Quantity']) || 0,
         plan_notes: found['Plan_Notes'] || '',
         standard_assortment: standardAssortment,
-        record_id: found['ID']
+        record_id: found['ID'],
+        chi_style_name: found['Chi_Style_Name'] || '',
       });
       setPackSequence(nextSequence);
 
@@ -3082,6 +3129,8 @@ export default function App() {
         mo_number: found['MO_Number'] || moNumber,
         sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-',
         factory: getField(found, 'Factory') || '-',
+        chi_style_name: found['Chi_Style_Name'] || '',
+        standard_assortment: parseStandardAssortment(found),
       });
       setCurrentScreen('bag_create');
       setAvailablePacksLoading(true);
@@ -3141,7 +3190,7 @@ export default function App() {
           nextSequence = existing.length + 1;
         }
       } catch (e) {}
-      setPackMO({ mo_number: found['MO_Number'] || moNumber, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-', order_qty: parseInt(found['Plan_Total_Quantity']) || 0, plan_notes: found['Plan_Notes'] || '', standard_assortment: standardAssortment, record_id: found['ID'] });
+      setPackMO({ mo_number: found['MO_Number'] || moNumber, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-', order_qty: parseInt(found['Plan_Total_Quantity']) || 0, plan_notes: found['Plan_Notes'] || '', standard_assortment: standardAssortment, record_id: found['ID'], chi_style_name: found['Chi_Style_Name'] || '' });
       setPackSequence(nextSequence);
       setCurrentScreen('batch_pack_input');
     } catch (err) {
@@ -3156,7 +3205,7 @@ export default function App() {
       const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
       const found = list.find((r) => r['MO_Number'] === moNumber);
       if (!found) { setCurrentScreen('batch_bag_mo_select'); alert('未找到订单: ' + moNumber); return; }
-      setBagMO({ mo_number: found['MO_Number'] || moNumber, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-' });
+      setBagMO({ mo_number: found['MO_Number'] || moNumber, sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-', factory: getField(found, 'Factory') || '-', chi_style_name: found['Chi_Style_Name'] || '', standard_assortment: parseStandardAssortment(found) });
       setCurrentScreen('batch_bag_input');
     } catch (err) {
       setCurrentScreen('batch_bag_mo_select');
@@ -3635,7 +3684,7 @@ export default function App() {
       }
     };
     await Promise.all(Array.from({ length: 3 }, () => createWorker()));
-    setBatchResult({ items, errors, moNumber: packMO.mo_number, worker, lastSeq: endSeq });
+    setBatchResult({ items, errors, moNumber: packMO.mo_number, worker, lastSeq: endSeq, moData: buildMOData(packMO) });
     setCurrentScreen('batch_pack_done');
   }, [packMO]);
 
@@ -3682,7 +3731,7 @@ export default function App() {
       }
     };
     await Promise.all(Array.from({ length: 3 }, () => createWorker()));
-    setBatchResult({ items: [...prevItems, ...newItems], errors: newErrors, moNumber: packMO.mo_number, worker, lastSeq: batchResult.lastSeq });
+    setBatchResult({ items: [...prevItems, ...newItems], errors: newErrors, moNumber: packMO.mo_number, worker, lastSeq: batchResult.lastSeq, moData: batchResult.moData || buildMOData(packMO) });
     setCurrentScreen('batch_pack_done');
   }, [packMO, batchResult]);
 
@@ -3783,7 +3832,7 @@ export default function App() {
         }
         setBatchBagProgress(p => ({ ...p, current: p.current + 1, items: [...items], errors: [...errors] }));
       }
-      setBatchBagResult({ items, errors, moNumber: bagMO.mo_number, worker, startPackSeq, endPackSeq });
+      setBatchBagResult({ items, errors, moNumber: bagMO.mo_number, worker, startPackSeq, endPackSeq, moData: buildMOData(bagMO) });
       setCurrentScreen('batch_bag_done');
     } catch (err) {
       setCurrentScreen('batch_bag_preview');
