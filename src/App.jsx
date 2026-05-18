@@ -1542,6 +1542,8 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
           let moN = r['MO_Number'];
           if (typeof moN === 'object') moN = moN.display_value || '';
           const w = r['Worker'];
+          let items = [];
+          try { items = JSON.parse(r['Items_JSON'] || '[]'); } catch (e) {}
           return {
             uuid: r['Pack_UUID'],
             mo_number: moN,
@@ -1550,6 +1552,8 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
             pack_status: r['Pack_Status'] || 'Created',
             worker: typeof w === 'object' ? (w.display_value || '') : (w || ''),
             created_time: r['Added_Time'] || r['Created_Time'] || '',
+            is_remainder: r['Is_Remainder'] === 'true' || r['Is_Remainder'] === true,
+            items,
           };
         })
         .sort((a, b) => parseDateRaw(b.created_time) - parseDateRaw(a.created_time));
@@ -1602,7 +1606,13 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
                     const mo = res?.data?.[0];
                     const moData = buildMOData(mo);
                     const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
-                    await generateSingleInnerPackExcel(moData, { number: p.pack_sequence, qrString: qrUrl });
+                    await generateSingleInnerPackExcel(moData, {
+                      number: p.pack_sequence,
+                      qrString: qrUrl,
+                      totalQty: p.total_qty,
+                      isRemainder: p.is_remainder,
+                      items: p.items,
+                    });
                   } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
                 }} style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'5px 8px', cursor:'pointer', fontFamily:'inherit' }}>📊 Excel</button>
               </div>
@@ -2133,7 +2143,7 @@ const BatchPackDoneScreen = memo(function BatchPackDoneScreen({ result, onHome, 
     if (downloading || savedItems.length === 0 || !result.moData) return;
     setDownloading(true);
     try {
-      const packList = savedItems.map(it => ({ packNumber: it.seq, qrText: it.qrText }));
+      const packList = savedItems.map(it => ({ packNumber: it.seq, qrText: it.qrText, totalQty: it.totalQty, isRemainder: false }));
       await generateInnerPackExcel(result.moData, packList);
     } finally { setDownloading(false); }
   };

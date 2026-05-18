@@ -50,17 +50,19 @@ function applyLabelBorders(ws, topRow, bottomRow, textCol, qrCol) {
 
 // ── Inner Pack ────────────────────────────────────────────────────────────────
 // 3 labels per row × 5 label rows = 15 per A4 sheet
-// Column layout: text(22) | qr(11) | spacer(2) | text(22) | qr(11) | spacer(2) | text(22) | qr(11)
-// Label row structure (7 rows): 6 data rows + 1 caption row (replaces buffer)
+// Column layout: text(22) | qr(14) | spacer(2) | text(22) | qr(14) | spacer(2) | text(22) | qr(14)
+// Label group: IP_LABEL_ROWS rows per label + 1 vertical spacer row between groups
 
 const IP_COLS       = 3;
 const IP_PAGE       = 15;
 const IP_DATA_ROWS  = 6;
-const IP_LABEL_ROWS = 7; // 6 data + 1 caption
+const IP_LABEL_ROWS = 7;   // 6 data + 1 caption
+const IP_VSTRIDE    = IP_LABEL_ROWS + 1; // 8 — rows between group starts (includes spacer)
 const IP_TEXT_W     = 22;
-const IP_QR_W       = 11;
+const IP_QR_W       = 14;  // widened from 11 to fit 90px QR with margin
 const IP_SPACER_W   = 2;
-const IP_QR_SIZE    = 68; // px square
+const IP_QR_SIZE    = 90;  // px square — enlarged from 68
+const IP_VSPACER_H  = 10;  // pt — vertical spacer row between label groups
 
 // Per-row heights within each label group (7 rows)
 const IP_ROW_HEIGHTS = [
@@ -91,34 +93,54 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     if (c < IP_COLS - 1) ws.getColumn(c * 3 + 3).width = IP_SPACER_W;
   }
 
+  // Set row heights for each label group, with vertical spacer rows between groups
   for (let r = 0; r < 5; r++) {
+    const groupStart = r * IP_VSTRIDE + 1;
     for (let s = 0; s < IP_LABEL_ROWS; s++) {
-      ws.getRow(r * IP_LABEL_ROWS + s + 1).height = IP_ROW_HEIGHTS[s];
+      ws.getRow(groupStart + s).height = IP_ROW_HEIGHTS[s];
     }
+    if (r < 4) ws.getRow(groupStart + IP_LABEL_ROWS).height = IP_VSPACER_H;
   }
 
   const cleanItemNo = stripChinese(moData.ITEM_NO);
   const cleanColors = stripChinese(moData.COLOR_LIST);
 
-  const lines = [
-    `ITEM NO: ${cleanItemNo}`,
-    `Q'TY:    12PCS`,
-    `SURTIDO: ${moData.SURTIDO || ''}`,
-    `SIZE:    ${moData.SIZE_LIST || ''}`,
-    `COLOR:   ${cleanColors}`,
-    '',
-  ];
-
   for (let i = 0; i < pageItems.length; i++) {
-    const { packNumber, qrText } = pageItems[i];
+    const { packNumber, qrText, totalQty, isRemainder, items } = pageItems[i];
+
     const labelCol     = i % IP_COLS;
     const labelRow     = Math.floor(i / IP_COLS);
     const textColNo    = labelCol * 3 + 1;
     const qrColNo      = textColNo + 1;
-    const firstRow     = labelRow * IP_LABEL_ROWS + 1;
-    const captionRowNo = firstRow + IP_DATA_ROWS; // R+6
+    const firstRow     = labelRow * IP_VSTRIDE + 1;  // accounts for vertical spacers
+    const captionRowNo = firstRow + IP_DATA_ROWS;
 
-    lines[5] = `Pack:    #${packNumber}`;
+    // Per-pack data: leftover packs use Items_JSON, normal packs use MO-level data
+    let lineQty, lineSurtido, lineSize, lineColor, captionQty;
+    if (isRemainder && Array.isArray(items) && items.length > 0) {
+      captionQty  = parseInt(totalQty) || items.reduce((s, it) => s + (parseInt(it.qty) || 1), 0);
+      lineQty     = captionQty + 'PCS';
+      const colors = [...new Set(items.map(it => stripChinese(it.color || '')).filter(Boolean))];
+      const sizes  = [...new Set(items.map(it => (it.size || '').trim()).filter(Boolean))];
+      lineSurtido = colors.length + 'COLOR';
+      lineSize    = sizes.join(' ');
+      lineColor   = colors.join(', ');
+    } else {
+      captionQty  = parseInt(totalQty) || 12;
+      lineQty     = captionQty + 'PCS';
+      lineSurtido = moData.SURTIDO || '';
+      lineSize    = moData.SIZE_LIST || '';
+      lineColor   = cleanColors;
+    }
+
+    const lines = [
+      `ITEM NO: ${cleanItemNo}`,
+      `Q'TY:    ${lineQty}`,
+      `SURTIDO: ${lineSurtido}`,
+      `SIZE:    ${lineSize}`,
+      `COLOR:   ${lineColor}`,
+      `Pack:    #${packNumber}`,
+    ];
 
     for (let li = 0; li < IP_DATA_ROWS; li++) {
       const cell = ws.getRow(firstRow + li).getCell(textColNo);
@@ -139,10 +161,12 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     // Outer border spans data rows + caption row
     applyLabelBorders(ws, firstRow, captionRowNo, textColNo, qrColNo);
 
-    // Caption: merged cell across text + QR columns
+    // Caption: merged cell, uses actual qty + leftover marker if applicable
     ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
-    captionCell.value = `${moData.MO_Number} / Inner Pack #${packNumber} / 12 pcs`;
+    captionCell.value = isRemainder
+      ? `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs (자투리)`
+      : `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs`;
     captionCell.font  = { name: 'Arial', size: 8, bold: true };
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
     captionCell.border = { left: THIN, bottom: THIN, right: THIN };
@@ -150,7 +174,7 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
     ws.addImage(imgId, {
-      tl: { col: qrColNo - 1 + 0.1, row: firstRow - 1 + 0.1 },
+      tl: { col: qrColNo - 1 + 0.05, row: firstRow - 1 + 0.5 },
       ext: { width: IP_QR_SIZE, height: IP_QR_SIZE },
       editAs: 'absolute',
     });
@@ -173,14 +197,20 @@ export async function generateInnerPackExcel(moData, packList, filename) {
 export async function generateSingleInnerPackExcel(moData, pack) {
   await generateInnerPackExcel(
     moData,
-    [{ packNumber: pack.number, qrText: pack.qrString }],
+    [{
+      packNumber:  pack.number,
+      qrText:      pack.qrString,
+      totalQty:    pack.totalQty,
+      isRemainder: pack.isRemainder || false,
+      items:       pack.items || null,
+    }],
     `${moData.MO_Number}_InnerPack_#${pack.number}.xlsx`,
   );
 }
 
 // ── Master Bag ────────────────────────────────────────────────────────────────
 // 2 labels per row × 2 label rows = 4 per A4 sheet
-// Column layout: text(35) | qr(22) | spacer(3) | text(35) | qr(22)
+// Column layout: text(35) | qr(28) | spacer(3) | text(35) | qr(28)
 // Label row structure: 7 data rows + 1 caption row + 2 spacer rows = 10 rows
 
 const MB_COLS       = 2;
@@ -189,9 +219,9 @@ const MB_DATA_ROWS  = 7;
 const MB_SPACER     = 2;
 const MB_LABEL_ROWS = MB_DATA_ROWS + 1 + MB_SPACER; // 10
 const MB_TEXT_W     = 35;
-const MB_QR_W       = 22;
+const MB_QR_W       = 28;  // widened from 22 to fit 180px QR with margin
 const MB_SPACER_W   = 3;
-const MB_QR_SIZE    = 151; // px square
+const MB_QR_SIZE    = 180; // px square — enlarged from 151
 
 // Per-row heights within each label group (10 rows)
 const MB_ROW_HEIGHTS = [
@@ -203,8 +233,8 @@ const MB_ROW_HEIGHTS = [
   44, // R+5  COLOR    — tall for wrap
   22, // R+6  Bag No
   22, // R+7  caption
-   4, // R+8  spacer
-   4, // R+9  spacer
+  12, // R+8  spacer   — increased from 4 to 12
+  12, // R+9  spacer   — increased from 4 to 12
 ];
 
 async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
@@ -275,7 +305,7 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
     // Outer border spans data rows + caption row
     applyLabelBorders(ws, firstRow, captionRowNo, textColNo, qrColNo);
 
-    // Caption: merged cell across text + QR columns
+    // Caption: merged cell
     ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
     captionCell.value = `${moData.MO_Number} / Master Bag #${bagNumber} / 120 pcs`;
@@ -286,7 +316,7 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
     ws.addImage(imgId, {
-      tl: { col: qrColNo - 1 + 0.1, row: firstRow - 1 + 0.1 },
+      tl: { col: qrColNo - 1 + 0.05, row: firstRow - 1 + 0.5 },
       ext: { width: MB_QR_SIZE, height: MB_QR_SIZE },
       editAs: 'absolute',
     });
