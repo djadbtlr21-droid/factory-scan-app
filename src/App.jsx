@@ -897,8 +897,8 @@ const PackMenuScreen = memo(function PackMenuScreen({ onStandard, onLeftover, on
       pageLabel="INNER PACK"
       pageTitle="中包袋 / 중간포장"
       buttons={[
-        { label: '标准包装QR / 표준 포장 QR', onClick: onStandard },
-        { label: '零散包装 / 자투리 포장 생성', onClick: onLeftover },
+        { label: '标准中包袋 / 표준중간포장', onClick: onStandard },
+        { label: '尾包 / 자투리포장', onClick: onLeftover },
         { label: 'QR 查询 / QR 조회', onClick: onQueryMenu },
       ]}
       showInstruction={true}
@@ -908,7 +908,7 @@ const PackMenuScreen = memo(function PackMenuScreen({ onStandard, onLeftover, on
 });
 
 // ─── Bag Menu Screen ──────────────────────────────────────────────────
-const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMenu, onBulkShip, onBack }) {
+const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onQueryMenu, onBulkShip, onBack }) {
   return (
     <ScanStyleScreen
       onBack={onBack}
@@ -917,7 +917,6 @@ const BagMenuScreen = memo(function BagMenuScreen({ onCreate, onBatch, onQueryMe
       pageTitle="麻袋包装 / 마대"
       buttons={[
         { label: '新建麻袋 / 새 마대 생성', onClick: onCreate },
-        { label: '批量生成 / 일괄 생성', onClick: onBatch },
         { label: '批量出货 / 일괄 출고', onClick: onBulkShip },
         { label: 'QR 查询 / QR 조회', onClick: onQueryMenu },
       ]}
@@ -1005,7 +1004,7 @@ const StandardPackWorkerInputScreen = memo(function StandardPackWorkerInputScree
           onKeyDown={e => { if (e.key === 'Enter' && ready) onConfirm(trimmed); }}
         />
         <div style={{ fontSize:10, color:G.goldDim, marginTop:4 }}>
-          담당자 이름이 표준 포장 레코드에 저장됩니다 / 担当者将保存到标准包装记录
+          담당자 이름이 표준중간포장 레코드에 저장됩니다 / 担当者将保存到标准中包袋记录
         </div>
       </DkCard>
       <DkBtn onClick={() => onConfirm(trimmed)} disabled={!ready}>
@@ -1019,7 +1018,7 @@ const StandardPackWorkerInputScreen = memo(function StandardPackWorkerInputScree
 // Shared QR for every standard (12-pcs) Inner Pack of an MO. User picks
 // how many physical copies of the same label to print/download.
 const StandardPackQRScreen = memo(function StandardPackQRScreen({
-  standardPack, packMO, copies, setCopies, worker, onLogActivity, onBack, onHome,
+  standardPack, packMO, copies, setCopies, worker, onLogActivity, onBumpTotalExpected, onBack, onHome,
 }) {
   const [copyMode, setCopyMode] = useState('mo'); // 'mo' | 'manual' | 'one'
   const [manualInput, setManualInput] = useState(String(copies || 1));
@@ -1066,10 +1065,11 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
     if (downloading) return;
     setDownloading(true);
     try {
-      const label = `${packMO.mo_number} / Standard Pack / ${INNER_PACK_SIZE} pcs`;
+      const label = `${packMO.mo_number} / 표준중간포장 / ${INNER_PACK_SIZE} pcs`;
       const dataURL = await generateQRDataURLWithLabel(standardPack.qrText, label);
       downloadQRPNG(dataURL, sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack.png`));
       logDownload('png', 1);
+      if (onBumpTotalExpected) await onBumpTotalExpected(1);
     } catch (err) { alert('PNG 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
@@ -1092,6 +1092,7 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
         sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack_${N}copies.xlsx`)
       );
       logDownload('excel', N);
+      if (onBumpTotalExpected) await onBumpTotalExpected(N);
     } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
@@ -1109,6 +1110,7 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
         sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack_${N}copies.pdf`)
       );
       logDownload('pdf', N);
+      if (onBumpTotalExpected) await onBumpTotalExpected(N);
     } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
@@ -1142,10 +1144,10 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
         <DkCard style={{ textAlign:'center', padding:20 }}>
           <img src={standardPack.qrDataURL} alt="QR" style={{ width:200, height:200, margin:'0 auto', display:'block', borderRadius:2 }} />
           <div style={{ fontSize:10, color:G.cream, marginTop:14, lineHeight:1.5 }}>
-            모든 표준 포장(12pcs)에 동일한 QR을 사용합니다
+            모든 표준중간포장(12pcs)에 동일한 QR을 사용합니다
           </div>
           <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>
-            所有标准包装使用同一QR码
+            所有标准中包袋使用同一QR码
           </div>
         </DkCard>
 
@@ -1530,7 +1532,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>INNER PACK DETAIL</div>
         <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>
-          {detail.mo_number} · {detail.is_remainder ? '零散包装 / 자투리포장' : '中包袋 / 중간포장'}
+          {detail.mo_number} · {detail.is_remainder ? '尾包 / 자투리포장' : '标准中包袋 / 표준중간포장'}
         </div>
         <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{(detail.factory && typeof detail.factory === 'object') ? (detail.factory.display_value || '') : (detail.factory || '')}</div>
       </div>
@@ -1621,11 +1623,16 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
         {!loading && (
           <>
             <DkCard>
-              <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>标准包装现况 / 표준 포장 현황</div>
+              <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>标准中包袋现况 / 표준중간포장 현황</div>
               {!info.standardExists ? (
                 <div style={{ padding:'8px 0', fontSize:11, color:G.goldDim }}>
-                  표준 포장 레코드가 아직 없습니다. 표준 포장 QR을 먼저 생성하세요.
-                  <br />标准包装记录尚未创建，请先生成标准包装QR。
+                  표준중간포장 레코드가 아직 없습니다. QR을 먼저 인쇄하세요.
+                  <br />标准中包袋记录尚未创建，请先打印QR。
+                </div>
+              ) : info.totalExpected === 0 ? (
+                <div style={{ padding:'8px 0', fontSize:11, color:'#FCA5A5' }}>
+                  ⚠ QR 未印刷 / QR 미인쇄
+                  <br /><span style={{ color:G.goldDim }}>먼저 표준중간포장 QR을 인쇄(다운로드)하세요</span>
                 </div>
               ) : (
                 <>
@@ -1638,7 +1645,7 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
 
             <DkCard>
               <DkInput
-                label="标准包装数 / 표준 포장 수 *"
+                label="标准中包袋数 / 표준중간포장 수 *"
                 value={standardCount}
                 onChange={(e) => setStandardCount(e.target.value.replace(/[^\d]/g, ''))}
                 placeholder="0"
@@ -1652,9 +1659,9 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
             </DkCard>
 
             <DkCard>
-              <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>零散包装 / 자투리 포장</div>
+              <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>尾包 / 자투리포장</div>
               {leftoverPacks.length === 0 ? (
-                <div style={{ padding:'8px 0', fontSize:11, color:G.goldDim }}>未分配零散包装 / 미할당 자투리 없음</div>
+                <div style={{ padding:'8px 0', fontSize:11, color:G.goldDim }}>未分配尾包 / 미할당 자투리 없음</div>
               ) : leftoverPacks.map(p => {
                 const checked = selectedLeftovers.has(p.uuid);
                 const itemSummary = (p.items || []).slice(0, 3).map(it => `${it.color || ''} ${it.size || ''}`.trim()).filter(Boolean).join(', ');
@@ -1991,6 +1998,16 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
   const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [queryMOData, setQueryMOData] = useState(null);       // moData cached from MO lookup
+  const [rowCopies, setRowCopies] = useState({});             // per-uuid copies input
+
+  const getMOData = async (moNum) => {
+    if (queryMOData && queryMOData.MO_Number === moNum) return queryMOData;
+    const res = await getRecords(MO_REPORT, `MO_Number == "${moNum}"`);
+    const md = buildMODataFromRaw(res?.data?.[0]);
+    setQueryMOData(md);
+    return md;
+  };
 
   const search = async () => {
     const moNum = mo.trim().toUpperCase();
@@ -1998,6 +2015,8 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
     setLoading(true);
     setSearched(true);
     setSelected(new Set());
+    setQueryMOData(null);
+    setRowCopies({});
     try {
       const res = await getRecords(REPORTS.INNER_PACK);
       const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
@@ -2012,7 +2031,10 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
           if (typeof moN === 'object') moN = moN.display_value || '';
           const w = r['Worker'];
           let items = [];
-          try { items = JSON.parse(r['Items_JSON'] || '[]'); } catch (e) {}
+          try {
+            const raw = (r['Items_JSON'] || '').toString().trim();
+            if (raw) items = JSON.parse(raw.startsWith('[') ? raw : `[${raw}]`);
+          } catch (e) { items = []; }
           return {
             uuid: r['Pack_UUID'],
             mo_number: moN,
@@ -2027,6 +2049,10 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
         })
         .sort((a, b) => parseDateRaw(b.created_time) - parseDateRaw(a.created_time));
       setPacks(filtered);
+      // Prefetch moData so per-row Excel doesn't refetch
+      if (filtered.length > 0) {
+        try { await getMOData(filtered[0].mo_number); } catch (e) {}
+      }
     } catch (e) {
       alert('查询失败: ' + (e?.message || String(e)));
     } finally {
@@ -2053,8 +2079,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
     setBulkLoading(true);
     try {
       const moNum = sel[0].mo_number;
-      const res = await getRecords(MO_REPORT, `MO_Number == "${moNum}"`);
-      const moData = buildMOData(res?.data?.[0]);
+      const moData = await getMOData(moNum);
       const packList = sel
         .slice().sort((a, b) => a.pack_sequence - b.pack_sequence)
         .map(p => ({
@@ -2062,6 +2087,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
           qrText: window.location.origin + '/view/inner/' + p.uuid,
           totalQty: p.total_qty,
           isRemainder: p.is_remainder,
+          isStandard: !p.is_remainder && (parseInt(p.pack_sequence) || 0) === 0,
           items: p.items,
         }));
       await generateInnerPackExcel(moData, packList, sanitizeFilename(`${moNum}_InnerPack_Selected_${packList.length}items.xlsx`));
@@ -2138,7 +2164,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
                   <div style={{ fontSize:9, color:G.goldDim }}>{p.worker || '-'} · {formatDate(p.created_time)}</div>
                 </div>
               </label>
-              <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0, marginLeft:8 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, marginLeft:8 }}>
                 <button onClick={async e => {
                   e.stopPropagation();
                   const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
@@ -2146,20 +2172,37 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
                   const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
                   downloadQRPNG(dataURL, sanitizeFilename(`${p.mo_number}_InnerPack_${p.pack_sequence}_${p.total_qty}pcs.png`));
                 }} style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:G.goldDim, fontSize:9, padding:'5px 8px', cursor:'pointer', fontFamily:'inherit' }}>📷 PNG</button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={rowCopies[p.uuid] ?? '1'}
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^\d]/g, '');
+                    setRowCopies(prev => ({ ...prev, [p.uuid]: v }));
+                  }}
+                  style={{ width:40, padding:'4px 4px', background:'transparent', border:'1px solid '+G.border, borderRadius:2, color:G.gold, fontSize:11, textAlign:'center', fontFamily:'inherit', outline:'none' }}
+                />
+                <span style={{ fontSize:9, color:G.goldDim }}>장</span>
                 <button onClick={async e => {
                   e.stopPropagation();
                   try {
-                    const res = await getRecords(MO_REPORT, `MO_Number == "${p.mo_number}"`);
-                    const mo = res?.data?.[0];
-                    const moData = buildMOData(mo);
+                    const moData = await getMOData(p.mo_number);
                     const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
-                    await generateSingleInnerPackExcel(moData, {
-                      number: p.pack_sequence,
-                      qrString: qrUrl,
+                    const n = Math.min(999, Math.max(1, parseInt(rowCopies[p.uuid]) || 1));
+                    const item = {
+                      packNumber: p.pack_sequence,
+                      qrText: qrUrl,
                       totalQty: p.total_qty,
                       isRemainder: p.is_remainder,
+                      isStandard: !p.is_remainder && (parseInt(p.pack_sequence) || 0) === 0,
                       items: p.items,
-                    });
+                    };
+                    const packList = Array(n).fill(item);
+                    await generateInnerPackExcel(
+                      moData, packList,
+                      sanitizeFilename(`${p.mo_number}_InnerPack_${p.pack_sequence}_${n}copies.xlsx`)
+                    );
                   } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
                 }} style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'5px 8px', cursor:'pointer', fontFamily:'inherit' }}>📊 Excel</button>
               </div>
@@ -2244,7 +2287,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
     try {
       const moNum = sel[0].mo_number;
       const res = await getRecords(MO_REPORT, `MO_Number == "${moNum}"`);
-      const moData = buildMOData(res?.data?.[0]);
+      const moData = buildMODataFromRaw(res?.data?.[0]);
       const bagList = sel
         .slice().sort((a, b) => a.bag_sequence - b.bag_sequence)
         .map(b => ({
@@ -2336,8 +2379,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
                   e.stopPropagation();
                   try {
                     const res = await getRecords(MO_REPORT, `MO_Number == "${b.mo_number}"`);
-                    const mo = res?.data?.[0];
-                    const moData = buildMOData(mo);
+                    const moData = buildMODataFromRaw(res?.data?.[0]);
                     const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
                     await generateSingleMasterBagExcel(moData, { number: b.bag_sequence, qrString: qrUrl });
                   } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
@@ -2359,6 +2401,7 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
   const [activities, setActivities] = useState(() => getRecentActivities());
   const [filter, setFilter] = useState('all');
   const [redownloadingId, setRedownloadingId] = useState(null);
+  const [copiesMap, setCopiesMap] = useState({}); // activity.id -> string input
 
   const displayed = filter === 'all' ? activities : activities.filter(a => a.type === filter);
 
@@ -2370,6 +2413,7 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
 
   const handleRedownload = async (activity) => {
     setRedownloadingId(activity.id);
+    const copies = Math.min(999, Math.max(1, parseInt(copiesMap[activity.id]) || 1));
     try {
       const moRes = await getRecords(MO_REPORT, `MO_Number == "${activity.moNumber}"`);
       const moRecord = moRes?.data?.[0];
@@ -2389,21 +2433,26 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
         }
         const matching = allPacks.filter(r => packNums.has(parseInt(r['Pack_Sequence']) || 0));
         if (!matching.length) throw new Error('해당 포장 기록을 찾을 수 없습니다 / 未找到包装记录');
-        const packList = matching
+        const baseList = matching
           .map(r => {
             let items = [];
             try { items = JSON.parse(r['Items_JSON'] || '[]'); } catch (e) {}
+            const seq = parseInt(r['Pack_Sequence']) || 0;
+            const isRem = r['Is_Remainder'] === 'true' || r['Is_Remainder'] === true;
             return {
-              packNumber: parseInt(r['Pack_Sequence']) || 0,
+              packNumber: seq,
               qrText: window.location.origin + '/view/inner/' + r['Pack_UUID'],
               totalQty: parseInt(r['Total_Qty']) || 12,
-              isRemainder: r['Is_Remainder'] === 'true' || r['Is_Remainder'] === true,
+              isRemainder: isRem,
+              isStandard: !isRem && seq === 0,
               items,
             };
           })
           .sort((a, b) => a.packNumber - b.packNumber);
+        // Expand by copies: each matching record is repeated `copies` times.
+        const packList = baseList.flatMap(item => Array(copies).fill(item));
         await generateInnerPackExcel(moData, packList,
-          sanitizeFilename(`${activity.moNumber}_InnerPack_Redownload_${packList.length}packs.xlsx`));
+          sanitizeFilename(`${activity.moNumber}_InnerPack_Redownload_${baseList.length}x${copies}.xlsx`));
       } else {
         const bagNums = new Set((activity.bagNumbers || []).map(Number));
         let allBags = [], cursor = null, safety = 0;
@@ -2494,10 +2543,23 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
                   <div style={{ fontSize:10, color:G.goldDim, marginBottom:2 }}>{numLabel} · {a.pieceCount} pcs</div>
                   <div style={{ fontSize:9, color:G.goldDim }}>{a.creator || '-'} · {fmtTs(a.timestamp)}</div>
                 </div>
-                <button onClick={() => handleRedownload(a)} disabled={isLoading}
-                  style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit', flexShrink:0, marginLeft:8 }}>
-                  {isLoading ? '...' : '📊 재다운'}
-                </button>
+                <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, marginLeft:8 }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={copiesMap[a.id] ?? '1'}
+                    onChange={e => {
+                      const v = e.target.value.replace(/[^\d]/g, '');
+                      setCopiesMap(prev => ({ ...prev, [a.id]: v }));
+                    }}
+                    style={{ width:42, padding:'4px 4px', background:'transparent', border:'1px solid '+G.border, borderRadius:2, color:G.gold, fontSize:11, textAlign:'center', fontFamily:'inherit', outline:'none' }}
+                  />
+                  <span style={{ fontSize:9, color:G.goldDim }}>장</span>
+                  <button onClick={() => handleRedownload(a)} disabled={isLoading}
+                    style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit' }}>
+                    {isLoading ? '...' : '📊 재다운'}
+                  </button>
+                </div>
               </div>
             </DkCard>
           );
@@ -2533,7 +2595,10 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
         const found = list[0] || null;
         if (!found) { setNotFound(true); return; }
         let items = [];
-        try { items = JSON.parse(found['Items_JSON'] || '[]'); } catch (e) {}
+        try {
+          const raw = (found['Items_JSON'] || found['items_json'] || '').toString().trim();
+          if (raw) items = JSON.parse(raw.startsWith('[') ? raw : `[${raw}]`);
+        } catch (e) { items = []; }
         let moNum = found['MO_Number'];
         if (typeof moNum === 'object') moNum = moNum.display_value || '';
         setRecord({
@@ -2580,7 +2645,7 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px 20px 18px' }}>
         <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>中间包装详情 / 중간포장 상세</div>
         <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>
-          {record.mo_number} · {record.is_remainder ? '零散包装 / 자투리포장' : '中包袋 / 중간포장'}
+          {record.mo_number} · {record.is_remainder ? '尾包 / 자투리포장' : '标准中包袋 / 표준중간포장'}
         </div>
         <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{record.factory}</div>
       </div>
@@ -4001,6 +4066,20 @@ export default function App() {
     }
   }, []);
 
+  // ── PATCH Total_Expected upward on download to reflect actual prints ──
+  const bumpStandardTotalExpected = useCallback(async (n) => {
+    if (!standardPack || !standardPack.recordId) return;
+    const N = parseInt(n) || 0;
+    const current = parseInt(standardPack.totalExpected) || 0;
+    if (N <= current) return;
+    try {
+      await updateRecord(REPORTS.INNER_PACK, standardPack.recordId, { 'Total_Expected': N });
+      setStandardPack(prev => prev ? { ...prev, totalExpected: N } : prev);
+    } catch (e) {
+      console.warn('[standard pack] Total_Expected PATCH failed', e);
+    }
+  }, [standardPack]);
+
   // ── New: Standard Pack — Step A (MO load, gate on Worker input) ──
   const enterStandardPackWorker = useCallback(async (moNumber) => {
     setLoadingMsg('订单加载中... / MO 로딩...');
@@ -4048,27 +4127,40 @@ export default function App() {
       );
       const stdRecords = (stdRes && stdRes.code === 3000 && Array.isArray(stdRes.data)) ? stdRes.data : [];
 
-      let qrText, uuid;
+      let qrText, uuid, recordId, totalExpected;
+      // Normalize Items_JSON: ensure it's a bracketed array string
+      const rawItems = (packMO.standard_assortment_json_raw || '').trim();
+      const itemsJson = rawItems
+        ? (rawItems.startsWith('[') ? rawItems : `[${rawItems}]`)
+        : '';
+
       if (stdRecords.length > 0) {
         const existing = stdRecords[0];
         uuid = existing['Pack_UUID'];
+        recordId = existing['ID'];
+        totalExpected = parseInt(existing['Total_Expected']) || 0;
         qrText = window.location.origin + '/view/inner/' + uuid;
         // Update Worker on existing standard record (PATCH)
         const existingWorker = (typeof existing['Worker'] === 'object'
           ? (existing['Worker'].display_value || '')
           : (existing['Worker'] || '')).trim();
-        if (existing['ID'] && existingWorker !== workerName) {
+        const patch = {};
+        if (existingWorker !== workerName) patch['Worker'] = workerName;
+        // Backfill Items_JSON if missing
+        if ((!existing['Items_JSON'] || String(existing['Items_JSON']).trim() === '') && itemsJson) {
+          patch['Items_JSON'] = itemsJson;
+        }
+        if (recordId && Object.keys(patch).length > 0) {
           try {
-            await updateRecord(REPORTS.INNER_PACK, existing['ID'], { 'Worker': workerName });
+            await updateRecord(REPORTS.INNER_PACK, recordId, patch);
           } catch (e) {
-            console.warn('[standard pack] worker PATCH failed', e);
+            console.warn('[standard pack] PATCH failed', e);
           }
         }
       } else {
         qrText = buildInnerPackQR();
         uuid = qrText.split('/view/inner/')[1];
-        const totalExpected = packMO.order_qty > 0
-          ? Math.ceil(packMO.order_qty / INNER_PACK_SIZE) : 0;
+        totalExpected = 0; // Bumped up by download handlers — reflects actual print count
         const postData = {
           'Pack_UUID':      uuid,
           'Brand':          BRAND,
@@ -4078,7 +4170,7 @@ export default function App() {
           'Total_Expected': totalExpected,
           'Total_Qty':      INNER_PACK_SIZE,
           'Is_Remainder':   false,
-          'Items_JSON':     packMO.standard_assortment_json_raw || '',
+          'Items_JSON':     itemsJson,
           'Worker':         workerName,
           'Factory':        packMO.factory,
           'Pack_Status':    'Created',
@@ -4087,13 +4179,14 @@ export default function App() {
         if (!r || r.code !== 3000) {
           throw new Error('표준 레코드 생성 실패: ' + JSON.stringify(r));
         }
+        recordId = r?.data?.ID || r?.data?.[0]?.ID || null;
       }
 
       const qrDataURL = await generateQRDataURL(qrText, 512);
       const recommended = packMO.order_qty > 0
         ? Math.ceil(packMO.order_qty / INNER_PACK_SIZE) : 1;
       setStandardCopies(recommended);
-      setStandardPack({ uuid, qrText, qrDataURL });
+      setStandardPack({ uuid, qrText, qrDataURL, recordId, totalExpected });
       setCurrentScreen('standard_pack_qr');
     } catch (err) {
       setCurrentScreen('standard_pack_worker_input');
@@ -4148,12 +4241,14 @@ export default function App() {
           const seenP = new Set();
           const uniquePacks = allPacks.filter(p => { const id = p['Pack_UUID']; if (seenP.has(id)) return false; seenP.add(id); return true; });
 
-          // 2) Standard record (Is_Remainder == false) — for Total_Expected
+          // 2) Standard record (Is_Remainder == false) — for Total_Expected.
+          // No fallback to ceil(orderQty/12): we want the actual printed count.
+          // 0 = "QR 미인쇄" notice shown to the operator.
           const stdRecord = uniquePacks.find(p =>
             (p['Is_Remainder'] === false || p['Is_Remainder'] === 'false' || !p['Is_Remainder'])
             && (parseInt(p['Pack_Sequence']) || 0) === 0
           ) || null;
-          const totalExpected = stdRecord ? (parseInt(stdRecord['Total_Expected']) || Math.ceil(orderQty / INNER_PACK_SIZE)) : Math.ceil(orderQty / INNER_PACK_SIZE);
+          const totalExpected = stdRecord ? (parseInt(stdRecord['Total_Expected']) || 0) : 0;
 
           // 3) Existing Master Bags for this MO — sum Inner_Pack_Count
           let existingStandardCount = 0;
@@ -4444,9 +4539,9 @@ export default function App() {
       }
       let items = [];
       try {
-        const itemsJson = found['Items_JSON'];
-        if (itemsJson) items = JSON.parse(itemsJson);
-      } catch (e) {}
+        const raw = (found['Items_JSON'] || found['items_json'] || '').toString().trim();
+        if (raw) items = JSON.parse(raw.startsWith('[') ? raw : `[${raw}]`);
+      } catch (e) { items = []; }
       let moNum = found['MO_Number'];
       if (typeof moNum === 'object') moNum = moNum.display_value || '';
       setScannedPackDetail({
@@ -5622,6 +5717,7 @@ export default function App() {
             setCopies={setStandardCopies}
             worker={standardWorker}
             onLogActivity={logActivity}
+            onBumpTotalExpected={bumpStandardTotalExpected}
             onBack={() => { setStandardPack(null); setCurrentScreen('standard_pack_worker_input'); }}
             onHome={() => {
               setPackMO(null); setStandardPack(null); setStandardWorker('');
@@ -5741,9 +5837,10 @@ export default function App() {
             onCreate={() => requirePin(() => {
               setBagScannedPacks([]); setBagIsRemainder(false);
               setBagWorker(''); setBagMO(null);
+              setBagStandardCount(''); setBagSelectedLeftoverUuids(new Set());
+              setBagLeftoverPacks([]);
               setCurrentScreen('bag_mo_select');
             })}
-            onBatch={() => requirePin(() => { setBagMO(null); setCurrentScreen('batch_bag_mo_select'); })}
             onQueryMenu={() => setCurrentScreen('bag_query_sub_menu')}
             onBulkShip={() => requirePin(() => { setBulkShipMO(null); setBulkShipBags([]); setBulkShipSelected(new Set()); setBulkShipWorker(''); setBulkShipResult(null); setCurrentScreen('bulk_ship_mo_select'); })}
             onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}

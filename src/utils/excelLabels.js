@@ -50,21 +50,21 @@ const IP_VSTRIDE    = IP_LABEL_ROWS + 1; // 11 rows between label-group starts
 const IP_TEXT_W     = 22;
 const IP_SPACER_W   = 2;
 const IP_VSPACER_H  = 6;   // pt — spacer row between label rows
-const IP_QR_PX      = 120; // px square — centered in QR area
+const IP_QR_PX      = 114; // px square — 5% smaller than previous 120
 
-// Row heights per label (pt). COLOR row ~10% taller than other text rows
-// to host wrapped color lists. QR rows sum ≈ height of 120-px QR.
+// Row heights per label (pt). COLOR row taller than other text rows to host
+// wrapped color lists (18.54 ≈ previous 18 × 1.03). QR rows sum ≈ QR height.
 const IP_ROW_HEIGHTS = [
-  14, // R+0  ITEM NO
-  11, // R+1  Q'TY
-  11, // R+2  SURTIDO
-  11, // R+3  SIZE
-  18, // R+4  COLOR  (~10% taller than R+3)
-  22, // R+5  QR row 1
-  22, // R+6  QR row 2
-  22, // R+7  QR row 3
-  22, // R+8  QR row 4
-  13, // R+9  Caption
+  14,    // R+0  ITEM NO
+  11,    // R+1  Q'TY
+  11,    // R+2  SURTIDO
+  11,    // R+3  SIZE
+  18.54, // R+4  COLOR  (+3% over prior 18)
+  22,    // R+5  QR row 1
+  22,    // R+6  QR row 2
+  22,    // R+7  QR row 3
+  22,    // R+8  QR row 4
+  13,    // R+9  Caption
 ];
 
 async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
@@ -132,12 +132,12 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       `COLOR:   ${lineColor}`,
     ];
 
-    // 5 text rows on top
+    // 5 text rows on top — unified Arial 9, bold only on ITEM NO row
     for (let li = 0; li < IP_TEXT_ROWS; li++) {
       const cell = ws.getRow(firstRow + li).getCell(textColNo);
       cell.value = textLines[li];
       cell.font  = {
-        size: li === 4 ? 8 : 9,
+        size: 9,
         name: 'Arial',
         bold: li === 0,
       };
@@ -166,9 +166,9 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     // Caption row at bottom
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
     if (isStandard) {
-      captionCell.value = `${moData.MO_Number} / Standard Pack / ${captionQty} pcs`;
+      captionCell.value = `${moData.MO_Number} / 표준중간포장 / ${captionQty} pcs`;
     } else if (isRemainder) {
-      captionCell.value = `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs (자투리)`;
+      captionCell.value = `${moData.MO_Number} / 尾包#${packNumber} / ${captionQty} pcs`;
     } else {
       captionCell.value = `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs`;
     }
