@@ -42,6 +42,17 @@ function parseStandardAssortment(found) {
   } catch (_) { return []; }
 }
 
+function buildMODataFromRaw(rawRecord) {
+  if (!rawRecord) return { MO_Number: '', ITEM_NO: '', COLOR_LIST: '', SURTIDO: '', SIZE_LIST: '' };
+  let moNum = rawRecord['MO_Number'];
+  if (typeof moNum === 'object') moNum = moNum.display_value || '';
+  return buildMOData({
+    mo_number: moNum || '',
+    chi_style_name: rawRecord['Chi_Style_Name'] || '',
+    standard_assortment: parseStandardAssortment(rawRecord),
+  });
+}
+
 const PROCESSES = [
   { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date',  emoji: '📥', zohoValue: 'Fabric In / 원단입고 / 面料入库' },
   { code: 'Cutting_Start', zh: '裁剪开始', ko: '재단 시작', moField: 'Cutting_Start_Date',    emoji: '✂️', zohoValue: 'Cutting Start / 재단 시작 / 裁剪开始' },
@@ -1973,7 +1984,7 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
       const moRes = await getRecords(MO_REPORT, `MO_Number == "${activity.moNumber}"`);
       const moRecord = moRes?.data?.[0];
       if (!moRecord) throw new Error('MO not found: ' + activity.moNumber);
-      const moData = buildMOData(moRecord);
+      const moData = buildMODataFromRaw(moRecord);
 
       if (activity.type === 'inner_pack') {
         const packNums = new Set((activity.packNumbers || []).map(Number));
