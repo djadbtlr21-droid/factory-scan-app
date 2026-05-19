@@ -20,9 +20,16 @@ function stripChinese(text) {
   return result;
 }
 
-const THIN   = { style: 'thin',   color: { argb: 'FF000000' } };
-const MEDIUM = { style: 'medium', color: { argb: 'FF000000' } };
-const GRAY   = { style: 'thin',   color: { argb: 'FFCCCCCC' } };
+const THIN      = { style: 'thin',   color: { argb: 'FF000000' } };
+const MEDIUM    = { style: 'medium', color: { argb: 'FF000000' } };
+const GRAY      = { style: 'thin',   color: { argb: 'FFCCCCCC' } };
+const NO_BORDER = { style: 'none' };
+
+function formatSizes(input) {
+  if (!input) return '';
+  if (Array.isArray(input)) return input.filter(Boolean).join(' / ');
+  return String(input).split(/\s+/).filter(Boolean).join(' / ');
+}
 
 // EMU constants (OOXML: 1px at 96dpi = 9525 EMU, 1pt = 12700 EMU)
 const PX_TO_EMU = 9525;
@@ -102,13 +109,13 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       const colors = [...new Set(items.map(it => stripChinese(it.color || '')).filter(Boolean))];
       const sizes  = [...new Set(items.map(it => (it.size || '').trim()).filter(Boolean))];
       lineSurtido = colors.length + 'COLOR';
-      lineSize    = sizes.join(' ');
+      lineSize    = formatSizes(sizes);
       lineColor   = colors.join(', ');
     } else {
       captionQty  = parseInt(totalQty) || 12;
       lineQty     = captionQty + 'PCS';
       lineSurtido = moData.SURTIDO || '';
-      lineSize    = moData.SIZE_LIST || '';
+      lineSize    = formatSizes(moData.SIZE_LIST);
       lineColor   = cleanColors;
     }
 
@@ -135,24 +142,24 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
         : { vertical: 'middle', horizontal: 'left', wrapText: true,  indent: 1 };
       // Text col: left/right black, top black on first row, gray otherwise;
       // remove right divider for QR-overlapping rows (SIZE/COLOR/Pack) so no
-      // vertical line runs through the QR image.
+      // vertical line runs through the QR image. All undefineds → NO_BORDER
+      // to defeat OOXML adjacent-cell border bleed.
       cell.border = {
         left:   MEDIUM,
-        right:  li < 3 ? THIN : undefined,
+        right:  li < 3 ? THIN : NO_BORDER,
         top:    li === 0 ? MEDIUM : GRAY,
         bottom: GRAY,
       };
-      // QR col: SURTIDO (li=2) gets no bottom so adjacent-cell bleed doesn't
-      // draw a horizontal line across the top of the QR; SIZE/COLOR/Pack keep
-      // only the outer-right label boundary.
+      // QR col: ONLY outer boundaries — MEDIUM at top of label (li=0) and
+      // bottom of last data row (li=5, right above caption); every other
+      // horizontal QR border is NO_BORDER so no line crosses the QR image.
       const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
-      if (li < 2) {
-        qCell.border = { left: MEDIUM, right: MEDIUM, top: li === 0 ? MEDIUM : GRAY, bottom: GRAY };
-      } else if (li === 2) {
-        qCell.border = { left: MEDIUM, right: MEDIUM, top: GRAY };   // no bottom — QR starts below
-      } else {
-        qCell.border = { left: MEDIUM, right: MEDIUM };
-      }
+      qCell.border = {
+        left:   MEDIUM,
+        right:  MEDIUM,
+        top:    li === 0 ? MEDIUM : NO_BORDER,
+        bottom: li === IP_DATA_ROWS - 1 ? MEDIUM : NO_BORDER,
+      };
     }
 
     ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
@@ -272,7 +279,7 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
     [`C/T NO:  `, '_______________'],
     [`ITEM NO: `, cleanItemNo],
     [`Q'TY:    `, '120PCS'],
-    [`SIZE:    `, moData.SIZE_LIST || ''],
+    [`SIZE:    `, formatSizes(moData.SIZE_LIST)],
     [`COLOR:   `, cleanColors],
     [`Bag No:  `, `#${bag.bagNumber}`],
   ];
@@ -294,7 +301,7 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
       const [lbl, val] = dataLines[li];
       cell.value = lbl + val;
       cell.font  = {
-        size: li === 5 ? 8 : 10,
+        size: 10,
         name: 'Arial',
         bold: li === 0 || li === 1,
       };
@@ -303,26 +310,24 @@ async function addMasterBagSheet(workbook, pageItems, pageIdx, moData) {
         ? { vertical: 'top',    horizontal: 'left', wrapText: true,  indent: 1 }
         : { vertical: 'middle', horizontal: 'left', wrapText: true,  indent: 1 };
       // Text col: remove right divider for QR-overlapping rows (ITEM NO–COLOR)
-      // so no vertical line runs through the QR image.
+      // so no vertical line runs through the QR image. All undefineds →
+      // NO_BORDER to defeat OOXML adjacent-cell border bleed.
       cell.border = {
         left:   MEDIUM,
-        right:  (li < 2 || li === 6) ? THIN : undefined,
+        right:  (li < 2 || li === 6) ? THIN : NO_BORDER,
         top:    li === 0 ? MEDIUM : GRAY,
         bottom: GRAY,
       };
-      // QR col: C/T NO (li=1) gets no bottom to remove bleed line at QR start;
-      // ITEM NO–COLOR (li=2..5) overlapped — outer right only; Bag No restores borders.
+      // QR col: ONLY outer boundaries — MEDIUM at top of label (li=0) and
+      // bottom of last data row (li=6, right above caption); every other
+      // horizontal QR border is NO_BORDER so no line crosses the QR image.
       const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
-      if (li === 0) {
-        qCell.border = { left: MEDIUM, right: MEDIUM, top: MEDIUM, bottom: GRAY };
-      } else if (li === 1) {
-        qCell.border = { left: MEDIUM, right: MEDIUM, top: GRAY };   // no bottom — QR starts below
-      } else if (li <= 5) {
-        qCell.border = { left: MEDIUM, right: MEDIUM };
-      } else {
-        // li===6 (Bag No): QR ended, full borders
-        qCell.border = { left: MEDIUM, right: MEDIUM, top: GRAY, bottom: GRAY };
-      }
+      qCell.border = {
+        left:   MEDIUM,
+        right:  MEDIUM,
+        top:    li === 0 ? MEDIUM : NO_BORDER,
+        bottom: li === MB_DATA_ROWS - 1 ? MEDIUM : NO_BORDER,
+      };
     }
 
     ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
