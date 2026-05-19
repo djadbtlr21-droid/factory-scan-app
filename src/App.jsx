@@ -889,7 +889,7 @@ const StatusScanSuccessScreen = memo(function StatusScanSuccessScreen({ result, 
 });
 
 // ─── NEW: Pack Menu Screen ────────────────────────────────────────────
-const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQueryMenu, onBack }) {
+const PackMenuScreen = memo(function PackMenuScreen({ onStandard, onLeftover, onQueryMenu, onBack }) {
   return (
     <ScanStyleScreen
       onBack={onBack}
@@ -897,8 +897,8 @@ const PackMenuScreen = memo(function PackMenuScreen({ onCreate, onBatch, onQuery
       pageLabel="INNER PACK"
       pageTitle="中包袋 / 중간포장"
       buttons={[
-        { label: '新建包装 / 새 포장 생성', onClick: onCreate },
-        { label: '批量生成 / 일괄 생성', onClick: onBatch },
+        { label: '标准包装QR / 표준 포장 QR', onClick: onStandard },
+        { label: '零散包装 / 자투리 포장 생성', onClick: onLeftover },
         { label: 'QR 查询 / QR 조회', onClick: onQueryMenu },
       ]}
       showInstruction={true}
@@ -977,6 +977,171 @@ const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, 
         <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
         <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
       </DkCard>
+    </DkScreen>
+  );
+});
+
+// ─── NEW: Standard Pack QR Screen ─────────────────────────────────────
+// Shared QR for every standard (12-pcs) Inner Pack of an MO. User picks
+// how many physical copies of the same label to print/download.
+const StandardPackQRScreen = memo(function StandardPackQRScreen({
+  standardPack, packMO, copies, setCopies, onBack, onHome,
+}) {
+  const [copyMode, setCopyMode] = useState('mo'); // 'mo' | 'manual' | 'one'
+  const [manualInput, setManualInput] = useState(String(copies || 1));
+  const [downloading, setDownloading] = useState(false);
+
+  const recommended = packMO?.order_qty > 0
+    ? Math.ceil(packMO.order_qty / INNER_PACK_SIZE) : 1;
+
+  const applyMode = (mode) => {
+    setCopyMode(mode);
+    if (mode === 'mo') { setCopies(recommended); setManualInput(String(recommended)); }
+    else if (mode === 'one') { setCopies(1); setManualInput('1'); }
+  };
+
+  const handleManualChange = (e) => {
+    const v = e.target.value.replace(/[^\d]/g, '');
+    setManualInput(v);
+    setCopyMode('manual');
+    const n = parseInt(v) || 0;
+    if (n > 0) setCopies(n);
+  };
+
+  const N = Math.max(1, parseInt(copies) || 1);
+  const moData = packMO ? buildMOData(packMO) : null;
+
+  const handlePNG = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const label = `${packMO.mo_number} / Standard Pack / ${INNER_PACK_SIZE} pcs`;
+      const dataURL = await generateQRDataURLWithLabel(standardPack.qrText, label);
+      downloadQRPNG(dataURL, sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack.png`));
+    } catch (err) { alert('PNG 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
+  };
+
+  const handleExcel = async () => {
+    if (downloading || !moData) return;
+    setDownloading(true);
+    try {
+      const standardPackItem = {
+        packNumber: 0,
+        qrText: standardPack.qrText,
+        totalQty: INNER_PACK_SIZE,
+        isRemainder: false,
+        isStandard: true,
+        items: null,
+      };
+      const packList = Array(N).fill(standardPackItem);
+      await generateInnerPackExcel(
+        moData, packList,
+        sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack_${N}copies.xlsx`)
+      );
+    } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
+  };
+
+  const handlePDF = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const qrItems = Array.from({ length: N }, (_, i) => ({
+        text: standardPack.qrText,
+        filename: sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack_${i + 1}.png`),
+      }));
+      await downloadQRsAsPDF(
+        qrItems,
+        sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack_${N}copies.pdf`)
+      );
+    } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
+  };
+
+  const radioRow = (mode, body) => (
+    <div onClick={() => applyMode(mode)} style={{
+      display:'flex', alignItems:'flex-start', gap:10, padding:'10px 0',
+      cursor:'pointer', borderBottom:'1px solid var(--app-divider)',
+    }}>
+      <div style={{
+        width:14, height:14, marginTop:3, borderRadius:'50%',
+        border:'1px solid '+(copyMode===mode?G.gold:G.border),
+        background: copyMode===mode ? G.btnBg : 'transparent',
+        flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+      }}>
+        {copyMode===mode && <div style={{ width:6, height:6, background:G.gold, borderRadius:'50%' }} />}
+      </div>
+      <div style={{ flex:1 }}>{body}</div>
+    </div>
+  );
+
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>STANDARD PACK QR</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{packMO?.mo_number}</div>
+        <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{INNER_PACK_SIZE} pcs · 共享QR / 공유 QR</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        <DkCard style={{ textAlign:'center', padding:20 }}>
+          <img src={standardPack.qrDataURL} alt="QR" style={{ width:200, height:200, margin:'0 auto', display:'block', borderRadius:2 }} />
+          <div style={{ fontSize:10, color:G.cream, marginTop:14, lineHeight:1.5 }}>
+            모든 표준 포장(12pcs)에 동일한 QR을 사용합니다
+          </div>
+          <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>
+            所有标准包装使用同一QR码
+          </div>
+        </DkCard>
+
+        <DkCard>
+          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:6, fontWeight:400 }}>
+            인쇄 매수 선택 / 选择打印数量
+          </div>
+
+          {radioRow('manual', (
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:12, color:G.cream }}>직접 입력 / 直接输入:</span>
+              <input
+                type="text" inputMode="numeric" value={manualInput}
+                onChange={handleManualChange}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width:60, padding:'4px 8px', background:'transparent',
+                  border:'1px solid '+G.border, borderRadius:2, color:G.gold,
+                  fontSize:13, textAlign:'center', fontFamily:'inherit', outline:'none',
+                }}
+              />
+              <span style={{ fontSize:11, color:G.goldDim }}>장 / 张</span>
+            </div>
+          ))}
+
+          {radioRow('mo', (
+            <div>
+              <div style={{ fontSize:12, color:G.cream }}>MO 기준 자동 계산 / 按MO自动</div>
+              <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>
+                Plan_Total_Quantity({packMO?.order_qty || 0}) ÷ {INNER_PACK_SIZE} = {recommended}장 권장
+              </div>
+            </div>
+          ))}
+
+          {radioRow('one', (
+            <div style={{ fontSize:12, color:G.cream }}>1장 (빠른 다운로드) / 1张快速下载</div>
+          ))}
+        </DkCard>
+
+        <DkBtn onClick={handlePNG} disabled={downloading}>
+          {downloading ? '处理中...' : '📷 PNG (1장 / 1张)'}
+        </DkBtn>
+        <DkBtn onClick={handleExcel} disabled={downloading || !moData}>
+          {downloading ? '处理中...' : `📊 Excel (${N}장 / ${N}张)`}
+        </DkBtn>
+        <DkBtn onClick={handlePDF} disabled={downloading}>
+          {downloading ? '处理中...' : `📄 PDF (${N}장 / ${N}张)`}
+        </DkBtn>
+        <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
+      </div>
     </DkScreen>
   );
 });
@@ -3380,6 +3545,8 @@ export default function App() {
   const [lastPackComposition, setLastPackComposition] = useState(null);
   const [createdPack, setCreatedPack] = useState(null);
   const [scannedPackDetail, setScannedPackDetail] = useState(null);
+  const [standardPack, setStandardPack] = useState(null);
+  const [standardCopies, setStandardCopies] = useState(1);
 
   // ── New: Master Bag state ──
   const [bagScannedPacks, setBagScannedPacks] = useState([]);
@@ -3605,6 +3772,78 @@ export default function App() {
     } catch (err) {
       setCurrentScreen('pack_mo_select');
       alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, []);
+
+  // ── New: Standard Pack QR — fetch-or-create shared record ──
+  const fetchOrCreateStandardPack = useCallback(async (moNumber) => {
+    setLoadingMsg('표준 QR 불러오는 중... / 加载标准QR...');
+    setCurrentScreen('loading');
+    try {
+      const moRes = await getRecords(REPORTS.MO);
+      const moList = (moRes && moRes.code === 3000 && Array.isArray(moRes.data)) ? moRes.data : [];
+      const found = moList.find(r => r['MO_Number'] === moNumber);
+      if (!found) {
+        setCurrentScreen('standard_pack_mo_select');
+        alert('未找到订单: ' + moNumber);
+        return;
+      }
+      const normalizedMO = {
+        mo_number: found['MO_Number'] || moNumber,
+        sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-',
+        factory: getField(found, 'Factory') || '-',
+        order_qty: parseInt(found['Plan_Total_Quantity']) || 0,
+        plan_notes: found['Plan_Notes'] || '',
+        standard_assortment: parseStandardAssortment(found),
+        record_id: found['ID'],
+        chi_style_name: found['Chi_Style_Name'] || '',
+      };
+      setPackMO(normalizedMO);
+
+      const stdRes = await getRecords(
+        REPORTS.INNER_PACK,
+        `(MO_Number == "${moNumber}" && Is_Remainder == false)`
+      );
+      const stdRecords = (stdRes && stdRes.code === 3000 && Array.isArray(stdRes.data)) ? stdRes.data : [];
+
+      let qrText, uuid;
+      if (stdRecords.length > 0) {
+        uuid = stdRecords[0]['Pack_UUID'];
+        qrText = window.location.origin + '/view/inner/' + uuid;
+      } else {
+        qrText = buildInnerPackQR();
+        uuid = qrText.split('/view/inner/')[1];
+        const totalExpected = normalizedMO.order_qty > 0
+          ? Math.ceil(normalizedMO.order_qty / INNER_PACK_SIZE) : 0;
+        const postData = {
+          'Pack_UUID':      uuid,
+          'Brand':          BRAND,
+          'MO_Number':      moNumber,
+          'SKU':            normalizedMO.sku,
+          'Pack_Sequence':  0,
+          'Total_Expected': totalExpected,
+          'Total_Qty':      INNER_PACK_SIZE,
+          'Is_Remainder':   false,
+          'Items_JSON':     found['Standard_Assortment_JSON'] || '',
+          'Worker':         'system',
+          'Factory':        normalizedMO.factory,
+          'Pack_Status':    'Created',
+        };
+        const r = await submitRecord(FORMS.INNER_PACK, postData);
+        if (!r || r.code !== 3000) {
+          throw new Error('표준 레코드 생성 실패: ' + JSON.stringify(r));
+        }
+      }
+
+      const qrDataURL = await generateQRDataURL(qrText, 512);
+      const recommended = normalizedMO.order_qty > 0
+        ? Math.ceil(normalizedMO.order_qty / INNER_PACK_SIZE) : 1;
+      setStandardCopies(recommended);
+      setStandardPack({ uuid, qrText, qrDataURL });
+      setCurrentScreen('standard_pack_qr');
+    } catch (err) {
+      setCurrentScreen('standard_pack_mo_select');
+      alert('표준 QR 처리 실패 / 加载失败: ' + (err?.message || String(err)));
     }
   }, []);
 
@@ -4582,6 +4821,17 @@ export default function App() {
       return;
     }
 
+    if (scanMode === 'standard_pack_mo') {
+      if (qrType !== 'production_log') { setCameraOpen(false); alert('请扫描生产进度QR (MO QR)'); return; }
+      let moNumber = '';
+      text.split(/[|\n\r]+/).forEach((part) => { const idx = part.indexOf(':'); if (idx < 0) return; const key = part.substring(0, idx).trim().toUpperCase(); if (key === 'MO') moNumber = part.substring(idx + 1).trim(); });
+      if (!moNumber && /^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
+      if (!moNumber) { setCameraOpen(false); alert('未能识别订单号'); return; }
+      flushSync(() => { setCameraOpen(false); });
+      fetchOrCreateStandardPack(moNumber);
+      return;
+    }
+
     if (scanMode === 'bag_mo') {
       if (qrType !== 'production_log') {
         setCameraOpen(false);
@@ -4718,7 +4968,7 @@ export default function App() {
       fetchMODataForReserved(moNumber);
       return;
     }
-  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchMODataForBag, fetchMODataForBatchPack, fetchMODataForBatchBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate, fetchMODataForBulkShip, fetchMODataForReserved]);
+  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchOrCreateStandardPack, fetchMODataForBag, fetchMODataForBatchPack, fetchMODataForBatchBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate, fetchMODataForBulkShip, fetchMODataForReserved]);
 
   // ── Existing handlers (unchanged except handleBackToScan goes to 'home') ──
   const handleScanRequest = useCallback(() => setCameraOpen(true), []);
@@ -4915,8 +5165,8 @@ export default function App() {
         {/* Inner Pack screens */}
         {currentScreen === 'pack_menu' && (
           <PackMenuScreen
-            onCreate={() => requirePin(() => setCurrentScreen('pack_mo_select'))}
-            onBatch={() => requirePin(() => setCurrentScreen('batch_pack_mo_select'))}
+            onStandard={() => requirePin(() => setCurrentScreen('standard_pack_mo_select'))}
+            onLeftover={() => requirePin(() => setCurrentScreen('pack_mo_select'))}
             onQueryMenu={() => setCurrentScreen('pack_query_sub_menu')}
             onBack={() => { window.history.pushState({}, '', '/'); setCurrentScreen('home'); }}
           />
@@ -4926,6 +5176,27 @@ export default function App() {
             onTextQuery={() => setCurrentScreen('pack_list')}
             onScanQuery={() => { setPackDetailFrom('pack_query_sub_menu'); setScanMode('inner_pack_detail'); setCameraOpen(true); }}
             onBack={() => setCurrentScreen('pack_menu')}
+          />
+        )}
+        {currentScreen === 'standard_pack_mo_select' && (
+          <PackMOSelectScreen
+            onScan={() => { setScanMode('standard_pack_mo'); setCameraOpen(true); }}
+            onManual={(mo) => fetchOrCreateStandardPack(mo)}
+            onBack={() => setCurrentScreen('pack_menu')}
+          />
+        )}
+        {currentScreen === 'standard_pack_qr' && standardPack && packMO && (
+          <StandardPackQRScreen
+            standardPack={standardPack}
+            packMO={packMO}
+            copies={standardCopies}
+            setCopies={setStandardCopies}
+            onBack={() => { setStandardPack(null); setCurrentScreen('standard_pack_mo_select'); }}
+            onHome={() => {
+              setPackMO(null); setStandardPack(null);
+              window.history.pushState({}, '', '/');
+              setCurrentScreen('home');
+            }}
           />
         )}
         {currentScreen === 'pack_mo_select' && (

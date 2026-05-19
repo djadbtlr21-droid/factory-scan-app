@@ -92,7 +92,7 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
   const cleanColors = stripChinese(moData.COLOR_LIST);
 
   for (let i = 0; i < pageItems.length; i++) {
-    const { packNumber, qrText, totalQty, isRemainder, items } = pageItems[i];
+    const { packNumber, qrText, totalQty, isRemainder, isStandard, items } = pageItems[i];
 
     const labelCol     = i % IP_COLS;
     const labelRow     = Math.floor(i / IP_COLS);
@@ -119,13 +119,14 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       lineColor   = cleanColors;
     }
 
+    const packLine = isStandard ? `Pack:    STD` : `Pack:    #${packNumber}`;
     const lines = [
       `ITEM NO: ${cleanItemNo}`,
       `Q'TY:    ${lineQty}`,
       `SURTIDO: ${lineSurtido}`,
       `SIZE:    ${lineSize}`,
       `COLOR:   ${lineColor}`,
-      `Pack:    #${packNumber}`,
+      packLine,
     ];
 
     for (let li = 0; li < IP_DATA_ROWS; li++) {
@@ -164,9 +165,13 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
 
     ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
-    captionCell.value = isRemainder
-      ? `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs (자투리)`
-      : `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs`;
+    if (isStandard) {
+      captionCell.value = `${moData.MO_Number} / Standard Pack / ${captionQty} pcs`;
+    } else if (isRemainder) {
+      captionCell.value = `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs (자투리)`;
+    } else {
+      captionCell.value = `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs`;
+    }
     captionCell.font  = { name: 'Arial', size: 8, bold: true };
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
     captionCell.border = { left: MEDIUM, top: GRAY, bottom: MEDIUM, right: MEDIUM };
