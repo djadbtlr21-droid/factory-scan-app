@@ -981,11 +981,45 @@ const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, 
   );
 });
 
+// ─── NEW: Standard Pack — Worker Input Gate ───────────────────────────
+// Standard record is created/updated with this worker name. Required.
+const StandardPackWorkerInputScreen = memo(function StandardPackWorkerInputScreen({
+  moNumber, worker, setWorker, onConfirm, onBack, submitting,
+}) {
+  const trimmed = (worker || '').trim();
+  const ready = trimmed.length > 0 && !submitting;
+  return (
+    <DkScreen style={{ padding:'80px 20px 40px' }}>
+      <DkBack onClick={onBack} />
+      <div style={{ textAlign:'center', marginBottom:36 }}>
+        <div style={{ fontSize:9, letterSpacing:4, color:G.goldDim, fontWeight:400 }}>STEP 2 / 3</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:10, fontWeight:400, letterSpacing:1 }}>担当者 / 담당자</div>
+        <div style={{ fontSize:10, color:G.goldDim, marginTop:4 }}>{moNumber}</div>
+      </div>
+      <DkCard>
+        <DkInput
+          label="담당자 이름 / 担当者"
+          value={worker}
+          onChange={e => setWorker(e.target.value)}
+          placeholder="담당자 / 担当者 이름"
+          onKeyDown={e => { if (e.key === 'Enter' && ready) onConfirm(trimmed); }}
+        />
+        <div style={{ fontSize:10, color:G.goldDim, marginTop:4 }}>
+          담당자 이름이 표준 포장 레코드에 저장됩니다 / 担当者将保存到标准包装记录
+        </div>
+      </DkCard>
+      <DkBtn onClick={() => onConfirm(trimmed)} disabled={!ready}>
+        {submitting ? '处理中...' : '확인 / 确认'}
+      </DkBtn>
+    </DkScreen>
+  );
+});
+
 // ─── NEW: Standard Pack QR Screen ─────────────────────────────────────
 // Shared QR for every standard (12-pcs) Inner Pack of an MO. User picks
 // how many physical copies of the same label to print/download.
 const StandardPackQRScreen = memo(function StandardPackQRScreen({
-  standardPack, packMO, copies, setCopies, onBack, onHome,
+  standardPack, packMO, copies, setCopies, worker, onLogActivity, onBack, onHome,
 }) {
   const [copyMode, setCopyMode] = useState('mo'); // 'mo' | 'manual' | 'one'
   const [manualInput, setManualInput] = useState(String(copies || 1));
@@ -1011,6 +1045,23 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
   const N = Math.max(1, parseInt(copies) || 1);
   const moData = packMO ? buildMOData(packMO) : null;
 
+  const logDownload = (channel, n) => {
+    if (!onLogActivity) return;
+    onLogActivity({
+      timestamp: Date.now(),
+      type: 'inner_pack',
+      action: 'standard_downloaded',
+      moNumber: packMO?.mo_number,
+      moStyleSku: packMO?.sku || '',
+      packNumbers: [0],
+      bagNumbers: null,
+      pieceCount: INNER_PACK_SIZE,
+      creator: worker || '',
+      channel,
+      copies: n,
+    });
+  };
+
   const handlePNG = async () => {
     if (downloading) return;
     setDownloading(true);
@@ -1018,6 +1069,7 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
       const label = `${packMO.mo_number} / Standard Pack / ${INNER_PACK_SIZE} pcs`;
       const dataURL = await generateQRDataURLWithLabel(standardPack.qrText, label);
       downloadQRPNG(dataURL, sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack.png`));
+      logDownload('png', 1);
     } catch (err) { alert('PNG 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
@@ -1039,6 +1091,7 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
         moData, packList,
         sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack_${N}copies.xlsx`)
       );
+      logDownload('excel', N);
     } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
@@ -1055,6 +1108,7 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
         qrItems,
         sanitizeFilename(`${packMO.mo_number}_Standard_InnerPack_${N}copies.pdf`)
       );
+      logDownload('pdf', N);
     } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
@@ -1402,6 +1456,62 @@ const PackSuccessScreen = memo(function PackSuccessScreen({ pack, moData, onNext
   );
 });
 
+// ─── NEW: Color × Size quantity matrix (used in pack detail) ─────────
+const ColorSizeMatrix = memo(function ColorSizeMatrix({ items }) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  // Group by color, then by size
+  const byColor = new Map();
+  const sizeSet = new Set();
+  for (const it of items) {
+    const color = (it?.color || '').trim();
+    const size  = (it?.size  || '').trim();
+    const qty   = parseInt(it?.qty) || 0;
+    if (!color || !size) continue;
+    sizeSet.add(size);
+    if (!byColor.has(color)) byColor.set(color, new Map());
+    const sizeMap = byColor.get(color);
+    sizeMap.set(size, (sizeMap.get(size) || 0) + qty);
+  }
+  if (byColor.size === 0) return null;
+  const sizes = Array.from(sizeSet);
+  const colors = Array.from(byColor.keys());
+  return (
+    <DkCard>
+      <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>색상/사이즈 수량 / 颜色/尺码数量</div>
+      <div style={{ overflowX:'auto' }}>
+        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11, color:G.cream }}>
+          <thead>
+            <tr style={{ borderBottom:'1px solid var(--app-divider)' }}>
+              <th style={{ textAlign:'left', padding:'6px 8px', fontWeight:400, fontSize:9, color:G.goldDim, letterSpacing:1 }}>색상 / 颜色</th>
+              {sizes.map(s => (
+                <th key={s} style={{ textAlign:'center', padding:'6px 6px', fontWeight:400, fontSize:9, color:G.goldDim, letterSpacing:1 }}>{s}</th>
+              ))}
+              <th style={{ textAlign:'right', padding:'6px 8px', fontWeight:400, fontSize:9, color:G.gold, letterSpacing:1 }}>합계 / 合计</th>
+            </tr>
+          </thead>
+          <tbody>
+            {colors.map(c => {
+              const sizeMap = byColor.get(c);
+              const rowTotal = sizes.reduce((s, sz) => s + (sizeMap.get(sz) || 0), 0);
+              return (
+                <tr key={c} style={{ borderBottom:'1px solid var(--app-divider)' }}>
+                  <td style={{ padding:'6px 8px', color:G.cream }}>{c}</td>
+                  {sizes.map(s => (
+                    <td key={s} style={{ padding:'6px 6px', textAlign:'center', color: sizeMap.get(s) ? G.cream : G.goldDim }}>
+                      {sizeMap.get(s) || '-'}
+                    </td>
+                  ))}
+                  <td style={{ padding:'6px 8px', textAlign:'right', color:G.gold }}>{rowTotal}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </DkCard>
+  );
+});
+
 // ─── NEW: Pack Detail Screen ──────────────────────────────────────────
 const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEditStatus, onDelete, requirePin: reqPin }) {
   const [showPicker, setShowPicker] = useState(false);
@@ -1419,7 +1529,9 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>INNER PACK DETAIL</div>
-        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{detail.mo_number} · Pack #{detail.pack_sequence}</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>
+          {detail.mo_number} · {detail.is_remainder ? '零散包装 / 자투리포장' : '中包袋 / 중간포장'}
+        </div>
         <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{(detail.factory && typeof detail.factory === 'object') ? (detail.factory.display_value || '') : (detail.factory || '')}</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
@@ -1441,19 +1553,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
           <DkRow label="创建时间 / 생성 시간" value={formatDate(detail.created_time) || '-'} />
           <DkRow label="最近修改 / 최근 수정" value={formatDate(detail.modified_time) || '-'} />
         </DkCard>
-        {detail.items && detail.items.length > 0 && (
-          <DkCard>
-            <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>包装内容 / 포장 내용</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
-              {detail.items.map((item, i) => (
-                <div key={i} style={{ border:'1px solid var(--app-border)', padding:'6px 8px', borderRadius:2 }}>
-                  <div style={{ fontSize:11, color:G.cream, fontWeight:400 }}>{item.color}</div>
-                  <div style={{ fontSize:10, color:G.goldDim }}>{item.size} · {item.qty}</div>
-                </div>
-              ))}
-            </div>
-          </DkCard>
-        )}
+        <ColorSizeMatrix items={detail.items} />
         <DkBtn onClick={async () => {
           const qrUrl = window.location.origin + '/view/inner/' + detail.uuid;
           const label = `${detail.mo_number} / Inner Pack #${detail.pack_sequence} / ${detail.total_qty} pcs`;
@@ -1483,6 +1583,131 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
           </div>
         </div>
       )}
+    </DkScreen>
+  );
+});
+
+// ─── NEW: Quantity-based Bag Create Screen ───────────────────────────
+// Standard packs share one Zoho record per MO, so we input a count rather
+// than scanning UUIDs. Leftover packs (Is_Remainder=true) are picked
+// individually because each is unique.
+const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
+  bagMO, info, leftoverPacks, standardCount, setStandardCount,
+  selectedLeftovers, toggleLeftover, worker, setWorker,
+  onSubmit, onBack, submitting, loading,
+}) {
+  const stdN = parseInt(standardCount) || 0;
+  const leftoverQty = leftoverPacks
+    .filter(p => selectedLeftovers.has(p.uuid))
+    .reduce((s, p) => s + (parseInt(p.total_qty) || 0), 0);
+  const totalQty = stdN * INNER_PACK_SIZE + leftoverQty;
+  const ready = !submitting && worker.trim().length > 0 && (stdN > 0 || selectedLeftovers.size > 0);
+  const overAvailable = info.standardExists && stdN > info.available;
+  return (
+    <DkScreen style={{ paddingTop:0 }}>
+      <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
+        <DkBack onClick={onBack} />
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>MASTER BAG</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagMO ? bagMO.mo_number : '—'}</div>
+        <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{bagMO?.factory || '-'}</div>
+      </div>
+      <div style={{ padding:'20px 20px 40px' }}>
+        {loading && (
+          <DkCard style={{ textAlign:'center', padding:24 }}>
+            <div className="spinner" style={{ width:24, height:24, margin:'0 auto 10px' }} />
+            <div style={{ fontSize:11, color:G.goldDim }}>현황 로딩 중... / 加载中...</div>
+          </DkCard>
+        )}
+        {!loading && (
+          <>
+            <DkCard>
+              <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>标准包装现况 / 표준 포장 현황</div>
+              {!info.standardExists ? (
+                <div style={{ padding:'8px 0', fontSize:11, color:G.goldDim }}>
+                  표준 포장 레코드가 아직 없습니다. 표준 포장 QR을 먼저 생성하세요.
+                  <br />标准包装记录尚未创建，请先生成标准包装QR。
+                </div>
+              ) : (
+                <>
+                  <DkRow label="총 인쇄 수량 / 总打印" value={String(info.totalExpected) + ' 个'} />
+                  <DkRow label="기존 마대 합산 / 已分配" value={String(info.existingStandardCount) + ' 个'} />
+                  <DkRow label="사용 가능 / 可用" value={String(info.available) + ' 个'} />
+                </>
+              )}
+            </DkCard>
+
+            <DkCard>
+              <DkInput
+                label="标准包装数 / 표준 포장 수 *"
+                value={standardCount}
+                onChange={(e) => setStandardCount(e.target.value.replace(/[^\d]/g, ''))}
+                placeholder="0"
+                inputMode="numeric"
+              />
+              {overAvailable && (
+                <div style={{ fontSize:10, color:'#FCA5A5', marginTop:6 }}>
+                  ⚠ 사용 가능({info.available})을 초과합니다 / 超出可用数量
+                </div>
+              )}
+            </DkCard>
+
+            <DkCard>
+              <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>零散包装 / 자투리 포장</div>
+              {leftoverPacks.length === 0 ? (
+                <div style={{ padding:'8px 0', fontSize:11, color:G.goldDim }}>未分配零散包装 / 미할당 자투리 없음</div>
+              ) : leftoverPacks.map(p => {
+                const checked = selectedLeftovers.has(p.uuid);
+                const itemSummary = (p.items || []).slice(0, 3).map(it => `${it.color || ''} ${it.size || ''}`.trim()).filter(Boolean).join(', ');
+                return (
+                  <label key={p.uuid} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'1px solid var(--app-divider)', cursor:'pointer' }}>
+                    <div onClick={() => toggleLeftover(p.uuid)} style={{
+                      width:16, height:16, border:'1px solid '+(checked?G.gold:G.border),
+                      borderRadius:2, background: checked?G.btnBg:'transparent',
+                      flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+                    }}>
+                      {checked && <div style={{ width:8, height:8, background:G.gold, borderRadius:1 }} />}
+                    </div>
+                    <div onClick={() => toggleLeftover(p.uuid)} style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:12, color:G.cream }}>
+                        {p.total_qty} 件{itemSummary ? ` · ${itemSummary}${(p.items?.length || 0) > 3 ? '…' : ''}` : ''}
+                      </div>
+                      <div style={{ fontSize:9, color:G.goldDim, marginTop:2, fontFamily:'monospace' }}>
+                        {String(p.uuid).slice(0, 8)}…
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </DkCard>
+
+            <DkCard>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:10, color:G.goldDim, letterSpacing:1 }}>총 수량 / 总数量</span>
+                <span style={{ fontSize:18, color:G.gold }}>
+                  {totalQty} 件
+                  <span style={{ fontSize:10, color:G.goldDim, marginLeft:8 }}>
+                    ({stdN}×{INNER_PACK_SIZE} + {leftoverQty})
+                  </span>
+                </span>
+              </div>
+            </DkCard>
+
+            <DkCard>
+              <DkInput
+                label="负责人 / 담당자 *"
+                value={worker}
+                onChange={(e) => setWorker(e.target.value)}
+                placeholder="姓名 Name"
+                onKeyDown={(e) => { if (e.key === 'Enter' && ready) onSubmit(); }}
+              />
+            </DkCard>
+
+            <DkBtn onClick={onSubmit} disabled={!ready} style={{ padding:18, fontSize:11, letterSpacing:3 }}>
+              {submitting ? '保存中...' : '✅ 마대 생성 / 创建麻袋'}
+            </DkBtn>
+          </>
+        )}
+      </div>
     </DkScreen>
   );
 });
@@ -1678,7 +1903,7 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
         <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>MASTER BAG DETAIL</div>
-        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{detail.mo_number} · Bag #{detail.bag_sequence}</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{detail.mo_number} · 麻袋包装 / 마대포장</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
@@ -2354,7 +2579,9 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px 20px 18px' }}>
         <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>中间包装详情 / 중간포장 상세</div>
-        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{record.mo_number} · Pack #{record.pack_sequence}</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>
+          {record.mo_number} · {record.is_remainder ? '零散包装 / 자투리포장' : '中包袋 / 중간포장'}
+        </div>
         <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{record.factory}</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
@@ -2369,27 +2596,12 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
           <DkRow label="订单号 / MO 번호" value={record.mo_number} />
           <DkRow label="SKU" value={record.sku || '-'} />
           <DkRow label="工厂 / 공장" value={record.factory || '-'} />
-          <DkRow label="中包袋编号 / 포장 순번" value={String(record.pack_sequence)} />
           <DkRow label="总件数 / 총 수량" value={String(record.total_qty) + ' 件'} />
           <DkRow label="负责人 / 담당자" value={record.worker || '-'} />
           <DkRow label="创建时间 / 생성 시간" value={formatDate(record.created_time) || '-'} />
           <DkRow label="最近修改 / 최근 수정" value={formatDate(record.modified_time) || '-'} />
         </DkCard>
-        {record.items && record.items.length > 0 && (
-          <DkCard>
-            <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>包装内容 / 포장 내용</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4, fontSize:9, color:G.goldDim, letterSpacing:1, marginBottom:8 }}>
-              <span>颜色 / Color</span><span style={{ textAlign:'center' }}>尺码 / Size</span><span style={{ textAlign:'right' }}>数量 / Qty</span>
-            </div>
-            {record.items.map((item, i) => (
-              <div key={i} style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', padding:'5px 0', borderBottom:'1px solid var(--app-divider)', fontSize:12 }}>
-                <span style={{ color:G.cream }}>{item.color}</span>
-                <span style={{ textAlign:'center', color:G.cream }}>{item.size}</span>
-                <span style={{ textAlign:'right', color:G.gold }}>{item.qty}</span>
-              </div>
-            ))}
-          </DkCard>
-        )}
+        <ColorSizeMatrix items={record.items} />
         <DkBtnOutline onClick={onHome}>🏠 返回首页 / 홈으로</DkBtnOutline>
       </div>
     </DkScreen>
@@ -2491,7 +2703,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px 20px 18px' }}>
         <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>麻袋详情 / 마대 상세</div>
-        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagRecord.mo_number} · Bag #{bagRecord.bag_sequence}</div>
+        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagRecord.mo_number} · 麻袋包装 / 마대포장</div>
         <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{bagRecord.factory}{bagRecord.destination ? ' → ' + (bagRecord.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : bagRecord.destination) : ''}</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
@@ -3547,6 +3759,8 @@ export default function App() {
   const [scannedPackDetail, setScannedPackDetail] = useState(null);
   const [standardPack, setStandardPack] = useState(null);
   const [standardCopies, setStandardCopies] = useState(1);
+  const [standardWorker, setStandardWorker] = useState('');
+  const [standardWorkerSubmitting, setStandardWorkerSubmitting] = useState(false);
 
   // ── New: Master Bag state ──
   const [bagScannedPacks, setBagScannedPacks] = useState([]);
@@ -3557,6 +3771,18 @@ export default function App() {
   const [scannedBagDetail, setScannedBagDetail] = useState(null);
   const [availablePacks, setAvailablePacks] = useState([]);
   const [availablePacksLoading, setAvailablePacksLoading] = useState(false);
+
+  // ── Qty-based bag create state ──
+  const [bagStandardInfo, setBagStandardInfo] = useState({
+    totalExpected: 0,
+    existingStandardCount: 0,
+    available: 0,
+    standardExists: false,
+  });
+  const [bagLeftoverPacks, setBagLeftoverPacks] = useState([]);
+  const [bagStandardCount, setBagStandardCount] = useState('');
+  const [bagSelectedLeftoverUuids, setBagSelectedLeftoverUuids] = useState(() => new Set());
+  const [bagSubmitting, setBagSubmitting] = useState(false);
 
   // ── Scan mode ──
   const [scanMode, setScanMode] = useState('production_log');
@@ -3775,9 +4001,9 @@ export default function App() {
     }
   }, []);
 
-  // ── New: Standard Pack QR — fetch-or-create shared record ──
-  const fetchOrCreateStandardPack = useCallback(async (moNumber) => {
-    setLoadingMsg('표준 QR 불러오는 중... / 加载标准QR...');
+  // ── New: Standard Pack — Step A (MO load, gate on Worker input) ──
+  const enterStandardPackWorker = useCallback(async (moNumber) => {
+    setLoadingMsg('订单加载中... / MO 로딩...');
     setCurrentScreen('loading');
     try {
       const moRes = await getRecords(REPORTS.MO);
@@ -3797,9 +4023,25 @@ export default function App() {
         standard_assortment: parseStandardAssortment(found),
         record_id: found['ID'],
         chi_style_name: found['Chi_Style_Name'] || '',
+        standard_assortment_json_raw: found['Standard_Assortment_JSON'] || '',
       };
       setPackMO(normalizedMO);
+      setStandardWorker('');
+      setCurrentScreen('standard_pack_worker_input');
+    } catch (err) {
+      setCurrentScreen('standard_pack_mo_select');
+      alert('加载失败: ' + (err?.message || String(err)));
+    }
+  }, []);
 
+  // ── New: Standard Pack — Step B (fetch-or-create with worker) ──
+  const confirmStandardPackWorker = useCallback(async (workerName) => {
+    if (!packMO || !workerName) return;
+    setStandardWorkerSubmitting(true);
+    setLoadingMsg('표준 QR 불러오는 중... / 加载标准QR...');
+    setCurrentScreen('loading');
+    try {
+      const moNumber = packMO.mo_number;
       const stdRes = await getRecords(
         REPORTS.INNER_PACK,
         `(MO_Number == "${moNumber}" && Is_Remainder == false)`
@@ -3808,25 +4050,37 @@ export default function App() {
 
       let qrText, uuid;
       if (stdRecords.length > 0) {
-        uuid = stdRecords[0]['Pack_UUID'];
+        const existing = stdRecords[0];
+        uuid = existing['Pack_UUID'];
         qrText = window.location.origin + '/view/inner/' + uuid;
+        // Update Worker on existing standard record (PATCH)
+        const existingWorker = (typeof existing['Worker'] === 'object'
+          ? (existing['Worker'].display_value || '')
+          : (existing['Worker'] || '')).trim();
+        if (existing['ID'] && existingWorker !== workerName) {
+          try {
+            await updateRecord(REPORTS.INNER_PACK, existing['ID'], { 'Worker': workerName });
+          } catch (e) {
+            console.warn('[standard pack] worker PATCH failed', e);
+          }
+        }
       } else {
         qrText = buildInnerPackQR();
         uuid = qrText.split('/view/inner/')[1];
-        const totalExpected = normalizedMO.order_qty > 0
-          ? Math.ceil(normalizedMO.order_qty / INNER_PACK_SIZE) : 0;
+        const totalExpected = packMO.order_qty > 0
+          ? Math.ceil(packMO.order_qty / INNER_PACK_SIZE) : 0;
         const postData = {
           'Pack_UUID':      uuid,
           'Brand':          BRAND,
           'MO_Number':      moNumber,
-          'SKU':            normalizedMO.sku,
+          'SKU':            packMO.sku,
           'Pack_Sequence':  0,
           'Total_Expected': totalExpected,
           'Total_Qty':      INNER_PACK_SIZE,
           'Is_Remainder':   false,
-          'Items_JSON':     found['Standard_Assortment_JSON'] || '',
-          'Worker':         'system',
-          'Factory':        normalizedMO.factory,
+          'Items_JSON':     packMO.standard_assortment_json_raw || '',
+          'Worker':         workerName,
+          'Factory':        packMO.factory,
           'Pack_Status':    'Created',
         };
         const r = await submitRecord(FORMS.INNER_PACK, postData);
@@ -3836,16 +4090,18 @@ export default function App() {
       }
 
       const qrDataURL = await generateQRDataURL(qrText, 512);
-      const recommended = normalizedMO.order_qty > 0
-        ? Math.ceil(normalizedMO.order_qty / INNER_PACK_SIZE) : 1;
+      const recommended = packMO.order_qty > 0
+        ? Math.ceil(packMO.order_qty / INNER_PACK_SIZE) : 1;
       setStandardCopies(recommended);
       setStandardPack({ uuid, qrText, qrDataURL });
       setCurrentScreen('standard_pack_qr');
     } catch (err) {
-      setCurrentScreen('standard_pack_mo_select');
+      setCurrentScreen('standard_pack_worker_input');
       alert('표준 QR 처리 실패 / 加载失败: ' + (err?.message || String(err)));
+    } finally {
+      setStandardWorkerSubmitting(false);
     }
-  }, []);
+  }, [packMO]);
 
   const fetchMODataForBag = useCallback(async (moNumber) => {
     try {
@@ -3857,43 +4113,100 @@ export default function App() {
         alert('未找到订单: ' + moNumber);
         return;
       }
+      const orderQty = parseInt(found['Plan_Total_Quantity']) || 0;
       setBagMO({
         mo_number: found['MO_Number'] || moNumber,
         sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || '-',
         factory: getField(found, 'Factory') || '-',
+        order_qty: orderQty,
         chi_style_name: found['Chi_Style_Name'] || '',
         standard_assortment: parseStandardAssortment(found),
       });
+      // Reset qty-based create state for this MO
+      setBagStandardCount('');
+      setBagSelectedLeftoverUuids(new Set());
+      setBagStandardInfo({ totalExpected: 0, existingStandardCount: 0, available: 0, standardExists: false });
+      setBagLeftoverPacks([]);
+
       setCurrentScreen('bag_create');
       setAvailablePacksLoading(true);
       setAvailablePacks([]);
       (async () => {
         try {
+          // 1) All inner packs for this MO (paginated)
           const allPacks = [];
           let cursor = null;
           let safety = 0;
           while (safety++ < 50) {
-            const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${moNumber}" && Pack_Status == "Created"`, cursor ? { record_cursor: cursor } : {});
+            const pr = await getRecords(REPORTS.INNER_PACK, `MO_Number == "${moNumber}"`, cursor ? { record_cursor: cursor } : {});
             const data = (pr && pr.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
-            console.log(`[Master Bag] Page ${safety}: got ${data.length} records, cursor=${pr?.record_cursor || 'none'}`);
             if (data.length === 0) break;
             allPacks.push(...data);
             cursor = pr?.record_cursor || null;
             if (!cursor) break;
           }
-          const seen = new Set();
-          const unique = allPacks.filter(p => { const id = p['Pack_UUID']; if (seen.has(id)) return false; seen.add(id); return true; });
-          const unassigned = unique
-            .filter(p => !p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '')
-            .sort((a, b) => (parseInt(a['Pack_Sequence']) || 0) - (parseInt(b['Pack_Sequence']) || 0));
-          const nonCreated = unique.filter(p => p['Pack_Status'] && p['Pack_Status'] !== 'Created');
-          if (nonCreated.length > 0) console.warn('[Master Bag] Non-Created packs in result:', nonCreated.map(p => `#${p['Pack_Sequence']} (${p['Pack_Status']})`));
-          console.log('[Master Bag] Total fetched:', allPacks.length, '| Unique unassigned:', unassigned.length);
-          console.log('[Master Bag] First Pack:', unassigned[0]?.['Pack_Sequence']);
-          console.log('[Master Bag] Last Pack:', unassigned[unassigned.length - 1]?.['Pack_Sequence']);
-          setAvailablePacks(unassigned);
+          const seenP = new Set();
+          const uniquePacks = allPacks.filter(p => { const id = p['Pack_UUID']; if (seenP.has(id)) return false; seenP.add(id); return true; });
+
+          // 2) Standard record (Is_Remainder == false) — for Total_Expected
+          const stdRecord = uniquePacks.find(p =>
+            (p['Is_Remainder'] === false || p['Is_Remainder'] === 'false' || !p['Is_Remainder'])
+            && (parseInt(p['Pack_Sequence']) || 0) === 0
+          ) || null;
+          const totalExpected = stdRecord ? (parseInt(stdRecord['Total_Expected']) || Math.ceil(orderQty / INNER_PACK_SIZE)) : Math.ceil(orderQty / INNER_PACK_SIZE);
+
+          // 3) Existing Master Bags for this MO — sum Inner_Pack_Count
+          let existingStandardCount = 0;
+          try {
+            const allBags = [];
+            let cur = null, safe = 0;
+            while (safe++ < 50) {
+              const br = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${moNumber}"`, cur ? { record_cursor: cur } : {});
+              const bd = (br && br.code === 3000 && Array.isArray(br.data)) ? br.data : [];
+              if (bd.length === 0) break;
+              allBags.push(...bd);
+              cur = br?.record_cursor || null;
+              if (!cur) break;
+            }
+            existingStandardCount = allBags.reduce((s, b) => s + (parseInt(b['Inner_Pack_Count']) || 0), 0);
+          } catch (e) {
+            console.warn('[Master Bag] existing bag fetch failed', e);
+          }
+
+          // 4) Unassigned leftover packs (Is_Remainder == true && !Assigned_To_Bag)
+          const leftovers = uniquePacks
+            .filter(p =>
+              (p['Is_Remainder'] === true || p['Is_Remainder'] === 'true')
+              && (!p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '')
+              && (!p['Pack_Status'] || p['Pack_Status'] === 'Created')
+            )
+            .map(p => {
+              let items = [];
+              try { items = JSON.parse(p['Items_JSON'] || '[]'); } catch (e) {}
+              return {
+                uuid: p['Pack_UUID'],
+                record_id: p['ID'],
+                pack_sequence: parseInt(p['Pack_Sequence']) || 0,
+                total_qty: parseInt(p['Total_Qty']) || 0,
+                items,
+              };
+            })
+            .sort((a, b) => a.pack_sequence - b.pack_sequence);
+
+          setBagStandardInfo({
+            totalExpected,
+            existingStandardCount,
+            available: Math.max(0, totalExpected - existingStandardCount),
+            standardExists: !!stdRecord,
+          });
+          setBagLeftoverPacks(leftovers);
+          // Legacy availablePacks still set for old BagCreateScreen if ever rendered
+          setAvailablePacks(uniquePacks
+            .filter(p => (!p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '') && (!p['Pack_Status'] || p['Pack_Status'] === 'Created'))
+            .sort((a, b) => (parseInt(a['Pack_Sequence']) || 0) - (parseInt(b['Pack_Sequence']) || 0)));
           setAvailablePacksLoading(false);
-        } catch {
+        } catch (e) {
+          console.error('[Master Bag] fetch context failed', e);
           setAvailablePacksLoading(false);
         }
       })();
@@ -4294,6 +4607,112 @@ export default function App() {
     });
     setBagScannedPacks(first10);
   }, []);
+
+  const toggleBagLeftover = useCallback((uuid) => {
+    setBagSelectedLeftoverUuids(prev => {
+      const next = new Set(prev);
+      next.has(uuid) ? next.delete(uuid) : next.add(uuid);
+      return next;
+    });
+  }, []);
+
+  // ── Qty-based bag creation: standardCount + selected leftover UUIDs ──
+  const handleCreateBagQty = useCallback(async () => {
+    if (!bagMO) { alert('请先选择订单号'); return; }
+    const stdN = parseInt(bagStandardCount) || 0;
+    const selectedLeftovers = bagLeftoverPacks.filter(p => bagSelectedLeftoverUuids.has(p.uuid));
+    if (stdN === 0 && selectedLeftovers.length === 0) {
+      alert('표준 또는 자투리 중 하나 이상 입력 / 请至少输入标准或选择零散');
+      return;
+    }
+    if (!bagWorker.trim()) {
+      alert('请输入负责人 / 담당자');
+      return;
+    }
+
+    const primaryMO = bagMO.mo_number;
+    const qrText = buildMasterBagQR();
+    const uuid = qrText.split('/view/bag/')[1];
+    const leftoverQty = selectedLeftovers.reduce((s, p) => s + (parseInt(p.total_qty) || 0), 0);
+    const totalQty = stdN * INNER_PACK_SIZE + leftoverQty;
+    const isRemainderBag = selectedLeftovers.length > 0;
+
+    let bagSequence = 1;
+    try {
+      const bagRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${primaryMO}"`);
+      if (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) {
+        bagSequence = bagRes.data.length + 1;
+      }
+    } catch (e) {}
+
+    const bagData = {
+      'Bag_UUID':         uuid,
+      'Brand':            BRAND,
+      'Bag_Sequence':     bagSequence,
+      'MO_Number':        primaryMO,
+      'SKU':              bagMO.sku,
+      'Factory':          bagMO.factory,
+      'Inner_Pack_Count': stdN,                                            // standard count only
+      'Inner_Pack_UUIDs': JSON.stringify(selectedLeftovers.map(p => p.uuid)), // leftover UUIDs only
+      'Total_Qty':        totalQty,
+      'Is_Remainder':     isRemainderBag,
+      'Worker':           bagWorker.trim(),
+      'Destination':      'MEX-Guadalajara',
+      'Bag_Status':       'Created',
+    };
+
+    setBagSubmitting(true);
+    try {
+      setLoadingMsg('保存麻袋信息...');
+      setCurrentScreen('loading');
+      const res = await submitRecord(FORMS.MASTER_BAG, bagData);
+      if (!res || res.code !== 3000) {
+        throw new Error('保存失败: ' + JSON.stringify(res));
+      }
+      // PATCH leftover packs → Bagged. Standard record is intentionally untouched.
+      if (selectedLeftovers.length > 0) {
+        setLoadingMsg('状态更新中...');
+        const failures = [];
+        for (const p of selectedLeftovers) {
+          const r = await updatePackToBagged(p.record_id, uuid, p.uuid);
+          if (!r.success) failures.push(r);
+        }
+        if (failures.length > 0) {
+          alert(`경고: ${failures.length}개 자투리 Pack의 상태 갱신 실패`);
+        }
+      }
+
+      const qrDataURL = await generateQRDataURL(qrText, 512);
+      setCreatedBag({
+        uuid, qrText, qrDataURL,
+        moNumber: primaryMO, bagSequence,
+        packCount: stdN + selectedLeftovers.length,
+        totalQty,
+        isRemainder: isRemainderBag,
+        packs: [
+          ...(stdN > 0 ? [{ mo_number: primaryMO, total_qty: stdN * INNER_PACK_SIZE, isStandardSummary: true, count: stdN }] : []),
+          ...selectedLeftovers.map(p => ({ uuid: p.uuid, mo_number: primaryMO, total_qty: p.total_qty })),
+        ],
+      });
+      logActivity({
+        timestamp: Date.now(),
+        type: 'master_bag',
+        action: 'created',
+        moNumber: primaryMO,
+        moStyleSku: bagMO.sku || '',
+        packNumbers: null,
+        bagNumbers: [bagSequence],
+        pieceCount: totalQty,
+        creator: bagWorker.trim(),
+      });
+      setCurrentScreen('bag_success');
+    } catch (err) {
+      setCurrentScreen('bag_create');
+      alert('保存失败 / 저장 실패: ' + (err?.message || String(err)));
+    } finally {
+      setBagSubmitting(false);
+    }
+  }, [bagMO, bagStandardCount, bagSelectedLeftoverUuids, bagLeftoverPacks, bagWorker]);
 
   const handleCreateBag = useCallback(async () => {
     if (!bagMO) {
@@ -4828,7 +5247,7 @@ export default function App() {
       if (!moNumber && /^[A-Z]{2}\d{2}-\d+/i.test(text)) moNumber = text;
       if (!moNumber) { setCameraOpen(false); alert('未能识别订单号'); return; }
       flushSync(() => { setCameraOpen(false); });
-      fetchOrCreateStandardPack(moNumber);
+      enterStandardPackWorker(moNumber);
       return;
     }
 
@@ -4968,7 +5387,7 @@ export default function App() {
       fetchMODataForReserved(moNumber);
       return;
     }
-  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, fetchOrCreateStandardPack, fetchMODataForBag, fetchMODataForBatchPack, fetchMODataForBatchBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate, fetchMODataForBulkShip, fetchMODataForReserved]);
+  }, [scanMode, bagScannedPacks, fetchMOData, fetchMODataForPack, enterStandardPackWorker, fetchMODataForBag, fetchMODataForBatchPack, fetchMODataForBatchBag, fetchInnerPackDetail, addPackToBag, fetchMasterBagDetail, handleStatusScanUpdate, fetchMODataForBulkShip, fetchMODataForReserved]);
 
   // ── Existing handlers (unchanged except handleBackToScan goes to 'home') ──
   const handleScanRequest = useCallback(() => setCameraOpen(true), []);
@@ -5181,8 +5600,18 @@ export default function App() {
         {currentScreen === 'standard_pack_mo_select' && (
           <PackMOSelectScreen
             onScan={() => { setScanMode('standard_pack_mo'); setCameraOpen(true); }}
-            onManual={(mo) => fetchOrCreateStandardPack(mo)}
+            onManual={(mo) => enterStandardPackWorker(mo)}
             onBack={() => setCurrentScreen('pack_menu')}
+          />
+        )}
+        {currentScreen === 'standard_pack_worker_input' && packMO && (
+          <StandardPackWorkerInputScreen
+            moNumber={packMO.mo_number}
+            worker={standardWorker}
+            setWorker={setStandardWorker}
+            submitting={standardWorkerSubmitting}
+            onConfirm={(name) => confirmStandardPackWorker(name)}
+            onBack={() => { setPackMO(null); setStandardWorker(''); setCurrentScreen('standard_pack_mo_select'); }}
           />
         )}
         {currentScreen === 'standard_pack_qr' && standardPack && packMO && (
@@ -5191,9 +5620,11 @@ export default function App() {
             packMO={packMO}
             copies={standardCopies}
             setCopies={setStandardCopies}
-            onBack={() => { setStandardPack(null); setCurrentScreen('standard_pack_mo_select'); }}
+            worker={standardWorker}
+            onLogActivity={logActivity}
+            onBack={() => { setStandardPack(null); setCurrentScreen('standard_pack_worker_input'); }}
             onHome={() => {
-              setPackMO(null); setStandardPack(null);
+              setPackMO(null); setStandardPack(null); setStandardWorker('');
               window.history.pushState({}, '', '/');
               setCurrentScreen('home');
             }}
@@ -5337,23 +5768,26 @@ export default function App() {
           />
         )}
         {currentScreen === 'bag_create' && (
-          <BagCreateScreen
+          <BagCreateQtyScreen
             bagMO={bagMO}
-            scannedPacks={bagScannedPacks}
-            isRemainder={bagIsRemainder}
-            setIsRemainder={setBagIsRemainder}
+            info={bagStandardInfo}
+            leftoverPacks={bagLeftoverPacks}
+            standardCount={bagStandardCount}
+            setStandardCount={setBagStandardCount}
+            selectedLeftovers={bagSelectedLeftoverUuids}
+            toggleLeftover={toggleBagLeftover}
             worker={bagWorker}
             setWorker={setBagWorker}
-            onScanNext={() => { setScanMode('master_bag_compose'); setCameraOpen(true); }}
-            onRemovePack={handleRemovePackFromBag}
-            onSubmit={handleCreateBag}
-            onBack={() => { setAvailablePacks([]); setCurrentScreen('bag_mo_select'); }}
-            submitting={false}
-            availablePacks={availablePacks}
-            availablePacksLoading={availablePacksLoading}
-            onSelectPack={handleSelectPackFromList}
-            onSelectFirst10={handleSelectFirst10Packs}
-            onClearAll={() => setBagScannedPacks([])}
+            onSubmit={handleCreateBagQty}
+            onBack={() => {
+              setAvailablePacks([]);
+              setBagLeftoverPacks([]);
+              setBagSelectedLeftoverUuids(new Set());
+              setBagStandardCount('');
+              setCurrentScreen('bag_mo_select');
+            }}
+            submitting={bagSubmitting}
+            loading={availablePacksLoading}
           />
         )}
         {currentScreen === 'bag_success' && (
@@ -5363,11 +5797,15 @@ export default function App() {
             onNewBag={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
               setBagWorker(''); setBagMO(null);
+              setBagStandardCount(''); setBagSelectedLeftoverUuids(new Set());
+              setBagLeftoverPacks([]);
               setCurrentScreen('bag_mo_select');
             }}
             onHome={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
               setBagWorker(''); setBagMO(null);
+              setBagStandardCount(''); setBagSelectedLeftoverUuids(new Set());
+              setBagLeftoverPacks([]);
               setCurrentScreen('home');
             }}
           />

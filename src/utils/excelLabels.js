@@ -35,30 +35,36 @@ function formatSizes(input) {
 const PX_TO_EMU = 9525;
 
 // ── Inner Pack ────────────────────────────────────────────────────────────────
-// 3 labels per row × 5 label-row groups = 15 per A4 sheet
-// Column layout: text(22) | qr(14) | spacer(2) | ... repeated × 3
-// QR (80×80) anchored to SIZE row (R+3) via native EMU — spans SIZE+COLOR+Pack
+// 4 labels per row × 5 label-row groups = 20 per A4 sheet
+// Vertical layout: 5 text rows on top → 4 rows of QR area → caption at bottom.
+// Column layout: text(22) | spacer(2) repeated × 4
 
-const IP_COLS       = 3;
-const IP_PAGE       = 15;  // 3 cols × 5 rows
-const IP_DATA_ROWS  = 6;
-const IP_LABEL_ROWS = 7;   // 6 data + 1 caption
-const IP_VSTRIDE    = IP_LABEL_ROWS + 1; // 8 rows between group starts
+const IP_COLS       = 4;
+const IP_ROWS       = 5;
+const IP_PAGE       = IP_COLS * IP_ROWS;  // 20
+const IP_TEXT_ROWS  = 5;   // ITEM NO / Q'TY / SURTIDO / SIZE / COLOR
+const IP_QR_ROWS    = 4;   // rows reserved for QR image
+const IP_LABEL_ROWS = IP_TEXT_ROWS + IP_QR_ROWS + 1; // 10 (text + qr + caption)
+const IP_CAPTION_IDX = IP_LABEL_ROWS - 1;            // 9
+const IP_VSTRIDE    = IP_LABEL_ROWS + 1; // 11 rows between label-group starts
 const IP_TEXT_W     = 22;
-const IP_QR_W       = 12;
 const IP_SPACER_W   = 2;
-const IP_QR_SIZE    = 80;  // px square
-const IP_VSPACER_H  = 10;  // pt — spacer row between groups
+const IP_VSPACER_H  = 6;   // pt — spacer row between label rows
+const IP_QR_PX      = 120; // px square — centered in QR area
 
-// Normal row heights — QR spans SIZE+COLOR+Pack visually (16+32+16 = 64pt ≈ 85px)
+// Row heights per label (pt). COLOR row ~10% taller than other text rows
+// to host wrapped color lists. QR rows sum ≈ height of 120-px QR.
 const IP_ROW_HEIGHTS = [
-  24, // R+0  ITEM NO
-  16, // R+1  Q'TY
-  16, // R+2  SURTIDO
-  16, // R+3  SIZE     ← QR anchor top
-  32, // R+4  COLOR
-  16, // R+5  Pack
-  18, // R+6  Caption
+  14, // R+0  ITEM NO
+  11, // R+1  Q'TY
+  11, // R+2  SURTIDO
+  11, // R+3  SIZE
+  18, // R+4  COLOR  (~10% taller than R+3)
+  22, // R+5  QR row 1
+  22, // R+6  QR row 2
+  22, // R+7  QR row 3
+  22, // R+8  QR row 4
+  13, // R+9  Caption
 ];
 
 async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
@@ -73,19 +79,19 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     },
   });
 
+  // Column widths: text + spacer per label column
   for (let c = 0; c < IP_COLS; c++) {
-    ws.getColumn(c * 3 + 1).width = IP_TEXT_W;
-    ws.getColumn(c * 3 + 2).width = IP_QR_W;
-    if (c < IP_COLS - 1) ws.getColumn(c * 3 + 3).width = IP_SPACER_W;
+    ws.getColumn(c * 2 + 1).width = IP_TEXT_W;
+    if (c < IP_COLS - 1) ws.getColumn(c * 2 + 2).width = IP_SPACER_W;
   }
 
-  // 5 label groups, 4 vertical spacer rows between them
-  for (let r = 0; r < 5; r++) {
+  // Row heights — 5 label-row groups separated by spacer rows
+  for (let r = 0; r < IP_ROWS; r++) {
     const groupStart = r * IP_VSTRIDE + 1;
     for (let s = 0; s < IP_LABEL_ROWS; s++) {
       ws.getRow(groupStart + s).height = IP_ROW_HEIGHTS[s];
     }
-    if (r < 4) ws.getRow(groupStart + IP_LABEL_ROWS).height = IP_VSPACER_H;
+    if (r < IP_ROWS - 1) ws.getRow(groupStart + IP_LABEL_ROWS).height = IP_VSPACER_H;
   }
 
   const cleanItemNo = stripChinese(moData.ITEM_NO);
@@ -94,14 +100,13 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
   for (let i = 0; i < pageItems.length; i++) {
     const { packNumber, qrText, totalQty, isRemainder, isStandard, items } = pageItems[i];
 
-    const labelCol     = i % IP_COLS;
-    const labelRow     = Math.floor(i / IP_COLS);
-    const textColNo    = labelCol * 3 + 1;
-    const qrColNo      = textColNo + 1;
-    const firstRow     = labelRow * IP_VSTRIDE + 1;
-    const captionRowNo = firstRow + IP_DATA_ROWS; // R+6
+    const labelCol  = i % IP_COLS;
+    const labelRow  = Math.floor(i / IP_COLS);
+    const textColNo = labelCol * 2 + 1;
+    const firstRow  = labelRow * IP_VSTRIDE + 1;
+    const captionRowNo = firstRow + IP_CAPTION_IDX;
 
-    // Per-pack data: use Items_JSON for leftover, MO-level for normal
+    // Per-pack data: use Items_JSON for leftover, MO-level for normal/standard
     let lineQty, lineSurtido, lineSize, lineColor, captionQty;
     if (isRemainder && Array.isArray(items) && items.length > 0) {
       captionQty  = parseInt(totalQty) || items.reduce((s, it) => s + (parseInt(it.qty) || 1), 0);
@@ -119,51 +124,46 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
       lineColor   = cleanColors;
     }
 
-    const packLine = isStandard ? `Pack:    STD` : `Pack:    #${packNumber}`;
-    const lines = [
+    const textLines = [
       `ITEM NO: ${cleanItemNo}`,
       `Q'TY:    ${lineQty}`,
       `SURTIDO: ${lineSurtido}`,
       `SIZE:    ${lineSize}`,
       `COLOR:   ${lineColor}`,
-      packLine,
     ];
 
-    for (let li = 0; li < IP_DATA_ROWS; li++) {
+    // 5 text rows on top
+    for (let li = 0; li < IP_TEXT_ROWS; li++) {
       const cell = ws.getRow(firstRow + li).getCell(textColNo);
-      cell.value = lines[li];
+      cell.value = textLines[li];
       cell.font  = {
         size: li === 4 ? 8 : 9,
         name: 'Arial',
-        bold: li === 0 || li === 5,
+        bold: li === 0,
       };
-      // COLOR row (li===4): top-align so wrapped text sits above the QR
       cell.alignment = li === 4
-        ? { vertical: 'top',    horizontal: 'left', wrapText: true,  indent: 1 }
-        : { vertical: 'middle', horizontal: 'left', wrapText: true,  indent: 1 };
-      // Text col: left/right black, top black on first row, gray otherwise;
-      // remove right divider for QR-overlapping rows (SIZE/COLOR/Pack) so no
-      // vertical line runs through the QR image. All undefineds → NO_BORDER
-      // to defeat OOXML adjacent-cell border bleed.
+        ? { vertical: 'top',    horizontal: 'left', wrapText: true, indent: 1 }
+        : { vertical: 'middle', horizontal: 'left', wrapText: true, indent: 1 };
       cell.border = {
         left:   MEDIUM,
-        right:  li < 3 ? THIN : NO_BORDER,
+        right:  MEDIUM,
         top:    li === 0 ? MEDIUM : GRAY,
         bottom: GRAY,
       };
-      // QR col: ONLY outer boundaries — MEDIUM at top of label (li=0) and
-      // bottom of last data row (li=5, right above caption); every other
-      // horizontal QR border is NO_BORDER so no line crosses the QR image.
-      const qCell = ws.getRow(firstRow + li).getCell(qrColNo);
+    }
+
+    // QR area — 4 placeholder rows with side borders, top boundary against COLOR
+    for (let qi = 0; qi < IP_QR_ROWS; qi++) {
+      const qCell = ws.getRow(firstRow + IP_TEXT_ROWS + qi).getCell(textColNo);
       qCell.border = {
         left:   MEDIUM,
         right:  MEDIUM,
-        top:    li === 0 ? MEDIUM : NO_BORDER,
-        bottom: li === IP_DATA_ROWS - 1 ? MEDIUM : NO_BORDER,
+        top:    NO_BORDER,
+        bottom: qi === IP_QR_ROWS - 1 ? MEDIUM : NO_BORDER,
       };
     }
 
-    ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
+    // Caption row at bottom
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
     if (isStandard) {
       captionCell.value = `${moData.MO_Number} / Standard Pack / ${captionQty} pcs`;
@@ -172,21 +172,21 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     } else {
       captionCell.value = `${moData.MO_Number} / Inner Pack #${packNumber} / ${captionQty} pcs`;
     }
-    captionCell.font  = { name: 'Arial', size: 8, bold: true };
+    captionCell.font  = { name: 'Arial', size: 7, bold: true };
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
     captionCell.border = { left: MEDIUM, top: GRAY, bottom: MEDIUM, right: MEDIUM };
 
-    // QR anchored to top of SIZE row (R+3) via native EMU — spans SIZE+COLOR+Pack
+    // QR — centered within the QR area (text col width ~22 ≈ 154 px effective)
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
     ws.addImage(imgId, {
       tl: {
-        nativeCol:    qrColNo - 1,
-        nativeColOff: 2 * PX_TO_EMU,
-        nativeRow:    firstRow - 1 + 3,  // 0-based index of SIZE row (R+3)
-        nativeRowOff: 5 * PX_TO_EMU,
+        nativeCol:    textColNo - 1,
+        nativeColOff: 17 * PX_TO_EMU,   // (154-120)/2 ≈ 17 px margin each side
+        nativeRow:    firstRow - 1 + IP_TEXT_ROWS,
+        nativeRowOff: 2 * PX_TO_EMU,
       },
-      ext: { width: IP_QR_SIZE, height: IP_QR_SIZE },
+      ext: { width: IP_QR_PX, height: IP_QR_PX },
       editAs: 'absolute',
     });
   }
