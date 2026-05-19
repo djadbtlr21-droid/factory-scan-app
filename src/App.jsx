@@ -480,11 +480,11 @@ const InputScreen = memo(function InputScreen({ moData, process, onSubmit, onBac
         )}
         <div className="field-card">
           <div className="field-card-label">负责人 / 담당자 *</div>
-          <input className="input-field text-field" type="text" placeholder="이름을 입력하세요" value={worker} onChange={(e) => setWorker(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
+          <input className="input-field text-field" type="text" placeholder="姓名 / 이름" value={worker} onChange={(e) => setWorker(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
         <div className="field-card">
           <div className="field-card-label">备注 / 메모</div>
-          <input className="input-field text-field" type="text" placeholder="선택사항" value={notes} onChange={(e) => setNotes(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
+          <input className="input-field text-field" type="text" placeholder="选填 / 선택사항" value={notes} onChange={(e) => setNotes(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
       </div>
 
@@ -522,17 +522,17 @@ const SuccessScreen = memo(function SuccessScreen({ result, onNextProcess, onNew
           </div>
           <div style={{ textAlign: 'center' }}>
             <div className="success-title">저장 완료 · 提交成功</div>
-            <div style={{ fontSize: 10, color: 'var(--text4)', letterSpacing: 1, marginTop: 6, fontWeight: 500 }}>공정 기록이 저장되었습니다 · 일정 자동 업데이트</div>
+            <div style={{ fontSize: 10, color: 'var(--text4)', letterSpacing: 1, marginTop: 6, fontWeight: 500 }}>工艺记录已保存 · 进度自动更新 · 공정 기록 저장됨</div>
           </div>
         </div>
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <ResultRow label="공정" value={(result.processCN || '') + (result.processKO ? ' / ' + result.processKO : '') + ' · ' + result.process} accent />
-          <ResultRow label="완성수량"  value={result.completed.toLocaleString() + ' 件'} />
-          {result.incomplete > 0 && <ResultRow label="미완성수량" value={result.incomplete.toLocaleString() + ' 件'} />}
-          {result.defect > 0     && <ResultRow label="불량수량"  value={result.defect.toLocaleString() + ' 件'} danger />}
-          <ResultRow label="담당자"    value={result.worker} />
-          <ResultRow label="기록시간"  value={result.time} mute />
-          {result.notes && <ResultRow label="메모" value={result.notes} mute />}
+          <ResultRow label="工艺 / 공정" value={(result.processCN || '') + (result.processKO ? ' / ' + result.processKO : '') + ' · ' + result.process} accent />
+          <ResultRow label="完成数量 / 완성수량"  value={result.completed.toLocaleString() + ' 件'} />
+          {result.incomplete > 0 && <ResultRow label="未完成数量 / 미완성수량" value={result.incomplete.toLocaleString() + ' 件'} />}
+          {result.defect > 0     && <ResultRow label="不良数量 / 불량수량"  value={result.defect.toLocaleString() + ' 件'} danger />}
+          <ResultRow label="负责人 / 담당자"    value={result.worker} />
+          <ResultRow label="记录时间 / 기록시간"  value={result.time} mute />
+          {result.notes && <ResultRow label="备注 / 메모" value={result.notes} mute />}
           {result.moField && (
             result.moUpdateOk ? (
               <div style={{ background: 'linear-gradient(135deg,rgba(212,185,118,.1),rgba(212,185,118,.04))', border: '1px solid rgba(212,185,118,.3)', borderRadius: 'var(--radius-sm)', padding: '12px 18px', marginTop: 2 }}>
@@ -1177,7 +1177,7 @@ const StandardPackQRScreen = memo(function StandardPackQRScreen({
             <div>
               <div style={{ fontSize:12, color:G.cream }}>MO 기준 자동 계산 / 按MO自动</div>
               <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>
-                Plan_Total_Quantity({packMO?.order_qty || 0}) ÷ {INNER_PACK_SIZE} = {recommended}장 권장
+                Plan_Total_Quantity({packMO?.order_qty || 0}) ÷ {INNER_PACK_SIZE} = {recommended}张 / 장 권장
               </div>
             </div>
           ))}
@@ -1632,7 +1632,7 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
               ) : info.totalExpected === 0 ? (
                 <div style={{ padding:'8px 0', fontSize:11, color:'#FCA5A5' }}>
                   ⚠ QR 未印刷 / QR 미인쇄
-                  <br /><span style={{ color:G.goldDim }}>먼저 표준중간포장 QR을 인쇄(다운로드)하세요</span>
+                  <br /><span style={{ color:G.goldDim }}>请先打印 / 먼저 표준중간포장 QR을 인쇄(다운로드)하세요</span>
                 </div>
               ) : (
                 <>
@@ -2183,7 +2183,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
                   }}
                   style={{ width:40, padding:'4px 4px', background:'transparent', border:'1px solid '+G.border, borderRadius:2, color:G.gold, fontSize:11, textAlign:'center', fontFamily:'inherit', outline:'none' }}
                 />
-                <span style={{ fontSize:9, color:G.goldDim }}>장</span>
+                <span style={{ fontSize:9, color:G.goldDim }}>张 / 장</span>
                 <button onClick={async e => {
                   e.stopPropagation();
                   try {
@@ -2395,7 +2395,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
 
 // ─── Recent Activity Screen ───────────────────────────────────────────
 const ACTIVITY_FILTERS = ['all', 'inner_pack', 'master_bag'];
-const ACTIVITY_FILTER_LABELS = { all: '全部 / 전체', inner_pack: 'Inner Pack', master_bag: 'Master Bag' };
+const ACTIVITY_FILTER_LABELS = { all: '全部 / 전체', inner_pack: '中包袋 / 중간포장', master_bag: '麻袋 / 마대' };
 
 const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
   const [activities, setActivities] = useState(() => getRecentActivities());
@@ -2512,7 +2512,7 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
           {activities.length > 0 && (
             <button onClick={handleClearAll}
               style={{ background:'transparent', border:'1px solid rgba(200,60,60,0.4)', color:'rgba(220,80,80,0.8)', fontSize:9, padding:'5px 10px', cursor:'pointer', fontFamily:'inherit', marginLeft:'auto', whiteSpace:'nowrap' }}>
-              🗑 전체 삭제
+              🗑 全部删除 / 전체 삭제
             </button>
           )}
         </div>
@@ -2528,8 +2528,8 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
           const numList = isIP ? (a.packNumbers || []) : (a.bagNumbers || []);
           const label = isIP ? 'Inner Pack' : 'Master Bag';
           const numLabel = isIP
-            ? (numList.length === 1 ? `Pack #${numList[0]}` : `Pack #${numList[0]}–#${numList[numList.length-1]} (${numList.length}개)`)
-            : (numList.length === 1 ? `Bag #${numList[0]}` : `Bag #${numList[0]}–#${numList[numList.length-1]} (${numList.length}개)`);
+            ? (numList.length === 1 ? `Pack #${numList[0]}` : `Pack #${numList[0]}–#${numList[numList.length-1]} (${numList.length}个 / 개)`)
+            : (numList.length === 1 ? `Bag #${numList[0]}` : `Bag #${numList[0]}–#${numList[numList.length-1]} (${numList.length}个 / 개)`);
           const isLoading = redownloadingId === a.id;
           return (
             <DkCard key={a.id} style={{ marginBottom:8 }}>
@@ -2554,10 +2554,10 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
                     }}
                     style={{ width:42, padding:'4px 4px', background:'transparent', border:'1px solid '+G.border, borderRadius:2, color:G.gold, fontSize:11, textAlign:'center', fontFamily:'inherit', outline:'none' }}
                   />
-                  <span style={{ fontSize:9, color:G.goldDim }}>장</span>
+                  <span style={{ fontSize:9, color:G.goldDim }}>张 / 장</span>
                   <button onClick={() => handleRedownload(a)} disabled={isLoading}
                     style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit' }}>
-                    {isLoading ? '...' : '📊 재다운'}
+                    {isLoading ? '...' : '📊 重新下载 / 재다운'}
                   </button>
                 </div>
               </div>
@@ -2815,7 +2815,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
           <DkCard>
             <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>颜色/尺码汇总 / 색상·사이즈 합계</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4, fontSize:9, color:G.goldDim, letterSpacing:1, marginBottom:8 }}>
-              <span>颜色 / Color</span><span style={{ textAlign:'center' }}>尺码 / Size</span><span style={{ textAlign:'right' }}>합계</span>
+              <span>颜色 / Color</span><span style={{ textAlign:'center' }}>尺码 / Size</span><span style={{ textAlign:'right' }}>合计 / 합계</span>
             </div>
             {colorSizeSummary.map((row, i) => (
               <div key={i} style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', padding:'5px 0', borderBottom:'1px solid var(--app-divider)', fontSize:12 }}>

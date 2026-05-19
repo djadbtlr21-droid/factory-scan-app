@@ -52,19 +52,19 @@ const IP_SPACER_W   = 2;
 const IP_VSPACER_H  = 6;   // pt — spacer row between label rows
 const IP_QR_PX      = 114; // px square — 5% smaller than previous 120
 
-// Row heights per label (pt). COLOR row taller than other text rows to host
-// wrapped color lists (18.54 ≈ previous 18 × 1.03). QR rows sum ≈ QR height.
+// Row heights per label (pt). COLOR row significantly taller to host
+// wrapped color lists (e.g. "BLACK, GRAY, D/MOCHA, NAVY") across 2 lines.
 const IP_ROW_HEIGHTS = [
-  14,    // R+0  ITEM NO
-  11,    // R+1  Q'TY
-  11,    // R+2  SURTIDO
-  11,    // R+3  SIZE
-  18.54, // R+4  COLOR  (+3% over prior 18)
-  22,    // R+5  QR row 1
-  22,    // R+6  QR row 2
-  22,    // R+7  QR row 3
-  22,    // R+8  QR row 4
-  13,    // R+9  Caption
+  14, // R+0  ITEM NO
+  11, // R+1  Q'TY
+  11, // R+2  SURTIDO
+  11, // R+3  SIZE
+  33, // R+4  COLOR  (~1.8x prior 18.54 to fit 2 wrapped lines of color list)
+  22, // R+5  QR row 1
+  22, // R+6  QR row 2
+  22, // R+7  QR row 3
+  22, // R+8  QR row 4
+  13, // R+9  Caption
 ];
 
 async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
@@ -166,7 +166,7 @@ async function addInnerPackSheet(workbook, pageItems, pageIdx, moData) {
     // Caption row at bottom
     const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
     if (isStandard) {
-      captionCell.value = `${moData.MO_Number} / 표준중간포장 / ${captionQty} pcs`;
+      captionCell.value = `${moData.MO_Number} / Standard / ${captionQty} pcs`;
     } else if (isRemainder) {
       captionCell.value = `${moData.MO_Number} / 尾包#${packNumber} / ${captionQty} pcs`;
     } else {
