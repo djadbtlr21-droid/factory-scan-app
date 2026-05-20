@@ -1829,32 +1829,51 @@ const BagCreateScreen = memo(function BagCreateScreen({
 
 // ─── NEW: Bag Success Screen ──────────────────────────────────────────
 const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag, onHome }) {
-  if (!bag) return null;
   const [downloading, setDownloading] = useState(false);
-  const handleDownload = async () => {
-    const label = `${bag.moNumber} / Master Bag #${bag.bagSequence} / ${bag.totalQty} pcs`;
-    const dataURL = await generateQRDataURLWithLabel(bag.qrText, label);
-    downloadQRPNG(dataURL, sanitizeFilename(`${bag.moNumber}_MasterBag_${bag.bagSequence}_${bag.totalQty}pcs.png`));
-  };
-  const handleExcel = async () => {
-    if (!moData || downloading) return;
+  if (!bag) return null;
+  // bag shape: { moNumber, totalBags, totalQty, bags: [{uuid,qrText,qrDataURL,bagSequence,packCount,totalQty,isRemainder}] }
+  const bags = bag.bags || [];
+  const firstSeq = bags.length ? bags[0].bagSequence : 0;
+  const lastSeq  = bags.length ? bags[bags.length - 1].bagSequence : 0;
+  const rangeLabel = bags.length === 1 ? `Bag #${firstSeq}` : `Bag #${firstSeq} ~ #${lastSeq}`;
+
+  const handleZIP = async () => {
+    if (downloading || bags.length === 0) return;
     setDownloading(true);
     try {
-      await generateMasterBagExcel(moData,
-        [{ bagNumber: bag.bagSequence, qrText: bag.qrText }],
-        sanitizeFilename(`${bag.moNumber}_MasterBag_#${bag.bagSequence}.xlsx`)
-      );
+      const qrItems = bags.map(b => ({
+        text: b.qrText,
+        filename: sanitizeFilename(`${bag.moNumber}_MasterBag_${b.bagSequence}_${b.totalQty}pcs.png`),
+        labels: [`${bag.moNumber} / Master Bag #${b.bagSequence}`, `${b.totalQty} 件`],
+      }));
+      await downloadQRsAsZIP(qrItems, sanitizeFilename(`${bag.moNumber}_MasterBags_${bags.length}bags.zip`));
+    } catch (err) { alert('ZIP 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
+  };
+  const handleExcel = async () => {
+    if (!moData || downloading || bags.length === 0) return;
+    setDownloading(true);
+    try {
+      const bagList = bags.map(b => ({ bagNumber: b.bagSequence, qrText: b.qrText }));
+      const fname = bags.length === 1
+        ? `${bag.moNumber}_MasterBag_#${firstSeq}.xlsx`
+        : `${bag.moNumber}_MasterBag_#${firstSeq}-#${lastSeq}_${bags.length}bags.xlsx`;
+      await generateMasterBagExcel(moData, bagList, sanitizeFilename(fname));
     } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
   const handlePDF = async () => {
-    if (downloading) return;
+    if (downloading || bags.length === 0) return;
     setDownloading(true);
     try {
-      await downloadQRsAsPDF(
-        [{ text: bag.qrText, filename: sanitizeFilename(`${bag.moNumber}_MasterBag_${bag.bagSequence}.png`) }],
-        sanitizeFilename(`${bag.moNumber}_MasterBag_#${bag.bagSequence}.pdf`)
-      );
+      const qrItems = bags.map(b => ({
+        text: b.qrText,
+        filename: sanitizeFilename(`${bag.moNumber}_MasterBag_${b.bagSequence}.png`),
+      }));
+      const fname = bags.length === 1
+        ? `${bag.moNumber}_MasterBag_#${firstSeq}.pdf`
+        : `${bag.moNumber}_MasterBag_#${firstSeq}-#${lastSeq}_${bags.length}bags.pdf`;
+      await downloadQRsAsPDF(qrItems, sanitizeFilename(fname));
     } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
@@ -1862,29 +1881,35 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag,
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px', textAlign:'center' }}>
         <div style={{ fontSize:9, letterSpacing:6, color:G.gold, fontWeight:400 }}>BAG CREATED</div>
-        <div style={{ fontSize:11, color:G.goldDim, marginTop:4 }}>{bag.moNumber} · Bag #{bag.bagSequence}</div>
+        <div style={{ fontSize:11, color:G.goldDim, marginTop:4 }}>
+          {bag.moNumber} · {rangeLabel}{bags.length > 1 ? ` (${bags.length}개 / 个 생성)` : ''}
+        </div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
-        <DkCard style={{ textAlign:'center', padding:20 }}>
-          <img src={bag.qrDataURL} alt="QR" style={{ width:'100%', maxWidth:280, margin:'0 auto', display:'block', borderRadius:2 }} />
-          <div style={{ fontSize:9, color:G.goldDim, marginTop:12, fontFamily:'monospace', wordBreak:'break-all' }}>{bag.qrText}</div>
-        </DkCard>
+        {bags.length === 1 && bags[0].qrDataURL && (
+          <DkCard style={{ textAlign:'center', padding:20 }}>
+            <img src={bags[0].qrDataURL} alt="QR" style={{ width:'100%', maxWidth:280, margin:'0 auto', display:'block', borderRadius:2 }} />
+            <div style={{ fontSize:9, color:G.goldDim, marginTop:12, fontFamily:'monospace', wordBreak:'break-all' }}>{bags[0].qrText}</div>
+          </DkCard>
+        )}
         <DkCard>
-          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>麻袋内容 / 마대 내용</div>
-          <div style={{ fontSize:12, color:G.cream, marginBottom:8 }}>{bag.packCount} packs · {bag.totalQty} 件{bag.isRemainder ? ' · 剩余' : ''}</div>
-          {bag.packs && bag.packs.map((p, i) => (
-            <div key={p.uuid} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', fontSize:11, color:G.goldDim, borderTop: i === 0 ? '1px solid var(--app-divider)' : 'none', marginTop: i === 0 ? 6 : 0 }}>
-              <span>Pack {i + 1} · {p.mo_number}</span>
-              <span>{p.total_qty} 件</span>
+          <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>생성된 마대 / 已创建麻袋</div>
+          <div style={{ fontSize:12, color:G.cream, marginBottom:8 }}>{bags.length}개 마대 · {bag.totalQty} 件 总计</div>
+          {bags.map((b, i) => (
+            <div key={b.uuid || i} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', fontSize:11, color:G.goldDim, borderTop:'1px solid var(--app-divider)' }}>
+              <span><span style={{ color:G.gold }}>Bag #{b.bagSequence}</span> — {b.packCount}팩{b.isRemainder ? ' · 자투리 포함' : ''}</span>
+              <span>{b.totalQty} 件</span>
             </div>
           ))}
         </DkCard>
-        <DkBtn onClick={handleDownload} disabled={downloading}>📷 QR 이미지 다운로드 / QR 图片下载</DkBtn>
-        <DkBtn onClick={handleExcel} disabled={downloading || !moData}>
-          {downloading ? '처리중...' : '📊 Excel 다운로드 / Excel 下载'}
+        <DkBtn onClick={handleZIP} disabled={downloading || bags.length === 0}>
+          {downloading ? '处理中 / 처리중...' : `📦 QR ZIP 下载 / 다운로드 (${bags.length})`}
         </DkBtn>
-        <DkBtn onClick={handlePDF} disabled={downloading}>
-          {downloading ? '처리중...' : '📄 PDF 다운로드 / PDF 下载'}
+        <DkBtn onClick={handleExcel} disabled={downloading || !moData || bags.length === 0}>
+          {downloading ? '处理中 / 처리중...' : `📊 Excel 下载 / 다운로드 (${bags.length} sheet)`}
+        </DkBtn>
+        <DkBtn onClick={handlePDF} disabled={downloading || bags.length === 0}>
+          {downloading ? '处理中 / 처리중...' : `📄 PDF 下载 / 다운로드 (${bags.length})`}
         </DkBtn>
         <DkBtn onClick={onNewBag}>➕ 生成新麻袋 / 새 마대</DkBtn>
         <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
@@ -4739,7 +4764,10 @@ export default function App() {
     });
   }, []);
 
-  // ── Qty-based bag creation: standardCount + selected leftover UUIDs ──
+  // ── Qty-based bag creation with auto-split ──
+  // standardCount = N → ceil(N/10) bags POSTed sequentially. Full bags hold
+  // PACKS_PER_BAG=10 standard packs each; the last bag absorbs any remainder
+  // standard packs (< 10) AND all selected leftover Pack UUIDs.
   const handleCreateBagQty = useCallback(async () => {
     if (!bagMO) { alert('请先选择订单号'); return; }
     const stdN = parseInt(bagStandardCount) || 0;
@@ -4753,82 +4781,133 @@ export default function App() {
       return;
     }
 
+    const PACKS_PER_BAG = 10;
     const primaryMO = bagMO.mo_number;
-    const qrText = buildMasterBagQR();
-    const uuid = qrText.split('/view/bag/')[1];
-    const leftoverQty = selectedLeftovers.reduce((s, p) => s + (parseInt(p.total_qty) || 0), 0);
-    const totalQty = stdN * INNER_PACK_SIZE + leftoverQty;
-    const isRemainderBag = selectedLeftovers.length > 0;
+    const fullBags = Math.floor(stdN / PACKS_PER_BAG);
+    const remainderStd = stdN % PACKS_PER_BAG;
+    const bagsToCreate = Math.max(1,
+      fullBags + (remainderStd > 0 ? 1 : 0) + (stdN === 0 && selectedLeftovers.length > 0 ? 1 : 0)
+    );
+    // The "no full bags but has remainder/leftovers" case already counted above.
+    const effectiveBagsToCreate = stdN === 0
+      ? 1  // leftover-only → single bag
+      : fullBags + (remainderStd > 0 ? 1 : 0);
 
-    let bagSequence = 1;
+    // Determine starting Bag_Sequence = max(existing) + 1.
+    let nextSeq = 1;
     try {
       const bagRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${primaryMO}"`);
-      if (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data)) {
-        bagSequence = bagRes.data.length + 1;
+      if (bagRes && bagRes.code === 3000 && Array.isArray(bagRes.data) && bagRes.data.length > 0) {
+        const maxSeq = bagRes.data.reduce((m, b) => Math.max(m, parseInt(b['Bag_Sequence']) || 0), 0);
+        nextSeq = maxSeq + 1;
       }
-    } catch (e) {}
-
-    const bagData = {
-      'Bag_UUID':         uuid,
-      'Brand':            BRAND,
-      'Bag_Sequence':     bagSequence,
-      'MO_Number':        primaryMO,
-      'SKU':              bagMO.sku,
-      'Factory':          bagMO.factory,
-      'Inner_Pack_Count': stdN,                                            // standard count only
-      'Inner_Pack_UUIDs': JSON.stringify(selectedLeftovers.map(p => p.uuid)), // leftover UUIDs only
-      'Total_Qty':        totalQty,
-      'Is_Remainder':     isRemainderBag,
-      'Worker':           bagWorker.trim(),
-      'Destination':      'MEX-Guadalajara',
-      'Bag_Status':       'Created',
-    };
+    } catch (e) { /* fall through with nextSeq=1 */ }
 
     setBagSubmitting(true);
+    setLoadingMsg('保存麻袋信息 / 마대 저장중...');
+    setCurrentScreen('loading');
+
+    const createdBags = [];
+    let failedAt = -1;
+    let failedReason = null;
+
     try {
-      setLoadingMsg('保存麻袋信息...');
-      setCurrentScreen('loading');
-      const res = await submitRecord(FORMS.MASTER_BAG, bagData);
-      if (!res || res.code !== 3000) {
-        throw new Error('保存失败: ' + JSON.stringify(res));
-      }
-      // PATCH leftover packs → Bagged. Standard record is intentionally untouched.
-      if (selectedLeftovers.length > 0) {
-        setLoadingMsg('状态更新中...');
-        const failures = [];
-        for (const p of selectedLeftovers) {
-          const r = await updatePackToBagged(p.record_id, uuid, p.uuid);
-          if (!r.success) failures.push(r);
+      for (let i = 0; i < effectiveBagsToCreate; i++) {
+        const isLastBag = i === effectiveBagsToCreate - 1;
+        const packCount = (isLastBag && remainderStd > 0) ? remainderStd
+                        : (stdN === 0 ? 0 : PACKS_PER_BAG);
+        const leftoversForThisBag = isLastBag ? selectedLeftovers : [];
+        const leftoverQtySum = leftoversForThisBag.reduce((s, p) => s + (parseInt(p.total_qty) || 0), 0);
+        const bagTotalQty = packCount * INNER_PACK_SIZE + leftoverQtySum;
+        const isRemainderBag = leftoversForThisBag.length > 0;
+
+        const qrText = buildMasterBagQR();
+        const uuid = qrText.split('/view/bag/')[1];
+        const bagSequence = nextSeq + i;
+
+        const bagData = {
+          'Bag_UUID':         uuid,
+          'Brand':            BRAND,
+          'Bag_Sequence':     bagSequence,
+          'MO_Number':        primaryMO,
+          'SKU':              bagMO.sku,
+          'Factory':          bagMO.factory,
+          'Inner_Pack_Count': packCount,
+          'Inner_Pack_UUIDs': JSON.stringify(leftoversForThisBag.map(p => p.uuid)),
+          'Total_Qty':        bagTotalQty,
+          'Is_Remainder':     isRemainderBag,
+          'Worker':           bagWorker.trim(),
+          'Destination':      'MEX-Guadalajara',
+          'Bag_Status':       'Created',
+        };
+
+        setLoadingMsg(`保存麻袋 / 마대 저장중 ${i + 1}/${effectiveBagsToCreate}...`);
+        const res = await submitRecord(FORMS.MASTER_BAG, bagData);
+        if (!res || res.code !== 3000) {
+          failedAt = i;
+          failedReason = JSON.stringify(res);
+          break;
         }
-        if (failures.length > 0) {
-          alert(`경고: ${failures.length}개 자투리 Pack의 상태 갱신 실패`);
+
+        const qrDataURL = await generateQRDataURL(qrText, 512);
+        createdBags.push({
+          uuid, qrText, qrDataURL,
+          bagSequence,
+          packCount,
+          totalQty: bagTotalQty,
+          isRemainder: isRemainderBag,
+          leftoverUuids: leftoversForThisBag.map(p => p.uuid),
+        });
+      }
+
+      // PATCH all selected leftover packs → Bagged (they belong to the LAST
+      // successfully created bag, if it included them).
+      if (createdBags.length > 0 && selectedLeftovers.length > 0) {
+        const lastBag = createdBags[createdBags.length - 1];
+        // Only PATCH if last bag actually carries the leftovers (it does when
+        // the loop reached its final iteration without failing).
+        if (lastBag.leftoverUuids.length > 0) {
+          setLoadingMsg('状态更新中 / 상태 갱신중...');
+          const patchFailures = [];
+          for (const p of selectedLeftovers) {
+            const r = await updatePackToBagged(p.record_id, lastBag.uuid, p.uuid);
+            if (!r.success) patchFailures.push(r);
+          }
+          if (patchFailures.length > 0) {
+            alert(`경고: ${patchFailures.length}개 자투리 Pack의 상태 갱신 실패`);
+          }
         }
       }
 
-      const qrDataURL = await generateQRDataURL(qrText, 512);
+      if (failedAt >= 0) {
+        alert(`保存失败 / 저장 실패 (마대 ${failedAt + 1}/${effectiveBagsToCreate}):\n` + failedReason
+          + `\n\n성공: ${createdBags.length}개 / 失败 이후 중단`);
+      }
+
+      const totalQtySum = createdBags.reduce((s, b) => s + b.totalQty, 0);
       setCreatedBag({
-        uuid, qrText, qrDataURL,
-        moNumber: primaryMO, bagSequence,
-        packCount: stdN + selectedLeftovers.length,
-        totalQty,
-        isRemainder: isRemainderBag,
-        packs: [
-          ...(stdN > 0 ? [{ mo_number: primaryMO, total_qty: stdN * INNER_PACK_SIZE, isStandardSummary: true, count: stdN }] : []),
-          ...selectedLeftovers.map(p => ({ uuid: p.uuid, mo_number: primaryMO, total_qty: p.total_qty })),
-        ],
-      });
-      logActivity({
-        timestamp: Date.now(),
-        type: 'master_bag',
-        action: 'created',
         moNumber: primaryMO,
-        moStyleSku: bagMO.sku || '',
-        packNumbers: null,
-        bagNumbers: [bagSequence],
-        pieceCount: totalQty,
-        creator: bagWorker.trim(),
+        totalBags: createdBags.length,
+        totalQty: totalQtySum,
+        bags: createdBags,
       });
-      setCurrentScreen('bag_success');
+
+      if (createdBags.length > 0) {
+        logActivity({
+          timestamp: Date.now(),
+          type: 'master_bag',
+          action: 'created',
+          moNumber: primaryMO,
+          moStyleSku: bagMO.sku || '',
+          packNumbers: null,
+          bagNumbers: createdBags.map(b => b.bagSequence),
+          pieceCount: totalQtySum,
+          creator: bagWorker.trim(),
+        });
+        setCurrentScreen('bag_success');
+      } else {
+        setCurrentScreen('bag_create');
+      }
     } catch (err) {
       setCurrentScreen('bag_create');
       alert('保存失败 / 저장 실패: ' + (err?.message || String(err)));
