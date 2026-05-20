@@ -1699,6 +1699,34 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
               </div>
             </DkCard>
 
+            {stdN > 0 && (() => {
+              const PACKS_PER_BAG = 10;
+              const bagCount = Math.floor(stdN / PACKS_PER_BAG);
+              const leftoverPackCount = stdN % PACKS_PER_BAG;
+              return (
+                <DkCard>
+                  <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:8, fontWeight:400 }}>
+                    预计麻袋数 / 예상 마대 수
+                  </div>
+                  <div style={{ fontSize:22, color:G.gold, fontWeight:500 }}>
+                    {bagCount} 个/개
+                  </div>
+                  {leftoverPackCount > 0 ? (
+                    <div style={{ fontSize:11, color:'#F59E0B', marginTop:6 }}>
+                      + 나머지 {leftoverPackCount}팩 / 余{leftoverPackCount}包
+                      <div style={{ fontSize:9, color:'rgba(245,158,11,0.7)', marginTop:2 }}>
+                        (尾包/자투리포장 별도 처리 필요)
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize:10, color:G.goldDim, marginTop:4 }}>
+                      (나머지 0팩 / 余 0 包)
+                    </div>
+                  )}
+                </DkCard>
+              );
+            })()}
+
             <DkCard>
               <DkInput
                 label="负责人 / 담당자 *"
