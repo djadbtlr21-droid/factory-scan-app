@@ -4066,12 +4066,12 @@ export default function App() {
     }
   }, []);
 
-  // ── PATCH Total_Expected upward on download to reflect actual prints ──
+  // ── PATCH Total_Expected on every download — stores last-print count ──
+  // No max() guard: the bag screen wants "how many were printed most recently",
+  // so each download overwrites the prior value (even if smaller).
   const bumpStandardTotalExpected = useCallback(async (n) => {
     if (!standardPack || !standardPack.recordId) return;
     const N = parseInt(n) || 0;
-    const current = parseInt(standardPack.totalExpected) || 0;
-    if (N <= current) return;
     try {
       await updateRecord(REPORTS.INNER_PACK, standardPack.recordId, { 'Total_Expected': N });
       setStandardPack(prev => prev ? { ...prev, totalExpected: N } : prev);
