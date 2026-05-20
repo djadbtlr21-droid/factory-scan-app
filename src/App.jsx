@@ -59,9 +59,9 @@ const PROCESSES = [
   { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date',      emoji: '✅', zohoValue: 'Cutting End / 재단 완료 / 裁剪完成' },
   { code: 'Sewing_Start',  zh: '裁缝开始', ko: '재봉 시작', moField: 'Sewing_Start_Date',     emoji: '🧵', zohoValue: 'Sewing Start / 봉제 시작 / 车缝开始' },
   { code: 'Sewing_End',    zh: '裁缝完成', ko: '재봉 완료', moField: 'Sewing_Completion_Date',emoji: '🪡', zohoValue: 'Sewing End / 봉제 완료 / 车缝完成' },
-  { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦', zohoValue: 'Packing Start / 포장 시작 / 包装开始' },
-  { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '🎁', zohoValue: 'Packing End / 포장 완료 / 包装完成' },
-  { code: 'Production_Complete', zh: '生产完成', ko: '생산 완료', moField: 'Ship_Date',       emoji: '🚚', zohoValue: 'Completed / 생산 완료 / 生产完成' },
+  { code: 'Packing_Start',       zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦',  zohoValue: 'Packing Start / 포장 시작 / 包装开始' },
+  { code: 'Packing_End',         zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '✅📦', zohoValue: 'Packing End / 포장 완료 / 包装完成' },
+  { code: 'Production_Complete', zh: '生产完成', ko: '생산 완료', moField: null,                    emoji: '🏁',  zohoValue: 'Completed / 생산완료 / 生产完成' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -88,17 +88,17 @@ function NotesTable({ planNotes }) {
   const rows = parsePlanNotes(planNotes);
   if (!rows.length) return null;
   return (
-    <div style={{ marginTop: 10, borderTop: '0.5px solid #E2E8F0', paddingTop: 10 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 11, fontWeight: 700, color: '#94A3B8', padding: '4px 0', borderBottom: '0.5px solid #F1F5F9', marginBottom: 4 }}>
+    <div style={{ marginTop: 10, borderTop: '0.5px solid var(--app-divider)', paddingTop: 10 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 11, fontWeight: 700, color: 'var(--app-gold)', letterSpacing: 1, padding: '4px 0', borderBottom: '0.5px solid var(--app-divider)', marginBottom: 4 }}>
         <span>颜色 / 색상</span>
         <span style={{ textAlign: 'center' }}>尺码 / 사이즈</span>
         <span style={{ textAlign: 'right' }}>数量 / 수량</span>
       </div>
       {rows.map((r, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #F8FAFC' }}>
-          <span style={{ color: '#374151' }}>{r.color}</span>
-          <span style={{ textAlign: 'center', color: '#374151' }}>{r.size}</span>
-          <span style={{ textAlign: 'right', fontWeight: 600, color: '#1E3A8A' }}>{r.qty}</span>
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid var(--app-divider)' }}>
+          <span style={{ color: 'var(--text)' }}>{r.color}</span>
+          <span style={{ textAlign: 'center', color: 'var(--text)' }}>{r.size}</span>
+          <span style={{ textAlign: 'right', fontWeight: 600, color: 'var(--app-gold)' }}>{r.qty}</span>
         </div>
       ))}
     </div>
