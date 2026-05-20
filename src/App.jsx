@@ -87,9 +87,9 @@ function NotesTable({ planNotes }) {
   return (
     <div style={{ marginTop: 10, borderTop: '0.5px solid #E2E8F0', paddingTop: 10 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 11, fontWeight: 700, color: '#94A3B8', padding: '4px 0', borderBottom: '0.5px solid #F1F5F9', marginBottom: 4 }}>
-        <span>颜色/Color</span>
-        <span style={{ textAlign: 'center' }}>尺码/Size</span>
-        <span style={{ textAlign: 'right' }}>数量/Qty</span>
+        <span>颜色 / 색상</span>
+        <span style={{ textAlign: 'center' }}>尺码 / 사이즈</span>
+        <span style={{ textAlign: 'right' }}>数量 / 수량</span>
       </div>
       {rows.map((r, i) => (
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid #F8FAFC' }}>
@@ -203,11 +203,11 @@ function CameraOverlay({ onResult, onCancel }) {
     <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: '#000', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
       <video ref={videoRef} playsInline autoPlay style={{ width: '100%', maxWidth: 480, maxHeight: '60vh', objectFit: 'cover', borderRadius: 8 }} />
       <canvas ref={canvasRef} style={{ display: 'none' }} />
-      <p style={{ color: '#fff', fontSize: 14, marginTop: 16, textAlign: 'center' }}>将二维码对准中心区域</p>
+      <p style={{ color: '#fff', fontSize: 14, marginTop: 16, textAlign: 'center' }}>将二维码对准中心区域 / QR을 중앙에 맞추세요</p>
       <button
         onClick={onCancel}
         style={{ marginTop: 16, padding: '12px 32px', background: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer', color: '#1E3A8A' }}
-      >取消</button>
+      >取消 / 취소</button>
     </div>
   );
 }
@@ -317,7 +317,7 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
       <div className="proc-sub">{p.ko}</div>
       {processStatusMap[p.zohoValue] != null
         ? <span className="proc-status proc-status-done">✅ {processStatusMap[p.zohoValue].toLocaleString()}件</span>
-        : <span className="proc-status proc-status-pending">⏳ 未记录</span>}
+        : <span className="proc-status proc-status-pending">⏳ 未记录 / 미기록</span>}
     </div>
   );
 
@@ -336,12 +336,12 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
         </div>
       )}
       <div className="card" style={{ marginBottom: 12 }}>
-        <div className="card-title">订单信息确认</div>
-        <div className="info-row"><span className="info-label">订单号 (MO)</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
-        <div className="info-row"><span className="info-label">品号 (SKU)</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
-        <div className="info-row"><span className="info-label">工厂</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
-        <div className="info-row"><span className="info-label">订单数量</span><span className="info-value">{orderQty}</span></div>
-        <div className="info-row"><span className="info-label">当前状态</span><span className="status-pill">{(moData && moData.current_status) || '-'}</span></div>
+        <div className="card-title">订单信息 / 주문 정보</div>
+        <div className="info-row"><span className="info-label">订单号 / MO</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
+        <div className="info-row"><span className="info-label">品号 / SKU</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
+        <div className="info-row"><span className="info-label">工厂 / 공장</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
+        <div className="info-row"><span className="info-label">订单数量 / 주문 수량</span><span className="info-value">{orderQty}</span></div>
+        <div className="info-row"><span className="info-label">当前状态 / 현재 상태</span><span className="status-pill">{(moData && moData.current_status) || '-'}</span></div>
       </div>
 
       {notesRows.length > 0 && (
@@ -352,7 +352,7 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
       )}
 
       <div className="card" style={{ marginBottom: 12 }}>
-        <div className="process-title">请选择当前工序</div>
+        <div className="process-title">请选择当前工序 / 현재 공정 선택</div>
         <div className="process-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <ProcBtn p={PROCESSES[0]} full />
           <ProcBtn p={PROCESSES[1]} />
@@ -367,9 +367,9 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
           <div className="card-title">工序记录 / 공정기록</div>
           <div id="log-list">
             {logsLoading ? (
-              <div className="log-loading"><div className="log-spinner"></div>加载中...</div>
+              <div className="log-loading"><div className="log-spinner"></div>加载中 / 로딩...</div>
             ) : logs.length === 0 ? (
-              <div className="log-empty">暂无工序记录</div>
+              <div className="log-empty">暂无工序记录 / 공정 기록 없음</div>
             ) : logs.map((r, i) => {
               const process = r['Process'] || '-';
               const completed = parseInt(r['Completed_Qty']) || 0;
@@ -451,30 +451,30 @@ const InputScreen = memo(function InputScreen({ moData, process, onSubmit, onBac
       </div>
 
       <div className="card" style={{ margin: '12px 16px', marginBottom: 12 }}>
-        <div className="card-title">订单确认</div>
-        <div className="info-row"><span className="info-label">订单号</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
+        <div className="card-title">订单确认 / 주문 확인</div>
+        <div className="info-row"><span className="info-label">订单号 / MO</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
         <div className="info-row"><span className="info-label">SKU</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
-        <div className="info-row"><span className="info-label">工序</span><span className="info-value" style={{ color: '#1E3A8A' }}>{process.key ? process.cn + ' (' + process.key + ')' : '-'}</span></div>
-        <div className="info-row"><span className="info-label">订单数量 (参考)</span><span className="info-value" style={{ color: '#7C3AED' }}>{orderQty}</span></div>
+        <div className="info-row"><span className="info-label">工序 / 공정</span><span className="info-value" style={{ color: '#1E3A8A' }}>{process.key ? process.cn + ' (' + process.key + ')' : '-'}</span></div>
+        <div className="info-row"><span className="info-label">订单数量 / 주문 수량</span><span className="info-value" style={{ color: '#7C3AED' }}>{orderQty}</span></div>
         <div><NotesTable planNotes={moData && moData.plan_notes} /></div>
       </div>
 
       <div style={{ padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
         <div className="qty-card">
-          <div className="qty-card-label">完成 *</div>
+          <div className="qty-card-label">完成 / 완료 *</div>
           <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={completed} onChange={(e) => setCompleted(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
         <div className="qty-card muted">
-          <div className="qty-card-label">未完成</div>
+          <div className="qty-card-label">未完成 / 미완료</div>
           <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={incomplete} onChange={(e) => setIncomplete(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
         <div className="qty-card danger">
-          <div className="qty-card-label">不良</div>
+          <div className="qty-card-label">不良 / 불량</div>
           <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={defect} onChange={(e) => setDefect(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
         </div>
         {showBag && (
           <div className="qty-card muted">
-            <div className="qty-card-label">麻袋数量</div>
+            <div className="qty-card-label">麻袋数量 / 마대 수량</div>
             <input className="input-field" type="number" placeholder="0" min="0" inputMode="numeric" value={bag} onChange={(e) => setBag(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
           </div>
         )}
@@ -491,7 +491,7 @@ const InputScreen = memo(function InputScreen({ moData, process, onSubmit, onBac
       <div>{err && <div className="err-box">{err}</div>}</div>
       <div className="btn-row" style={{ marginTop: 12, paddingBottom: 24 }}>
         <button className="btn-back" onClick={onBack}>← 返回</button>
-        <button className="btn-submit" disabled={submitting} onClick={handleSubmit}>{submitting ? '提交中...' : '确认提交 →'}</button>
+        <button className="btn-submit" disabled={submitting} onClick={handleSubmit}>{submitting ? '提交中 / 처리중...' : '确认提交 / 제출 →'}</button>
       </div>
     </div>
   );
@@ -576,16 +576,16 @@ const LogModal = memo(function LogModal({ log, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', letterSpacing: '-.3px' }}>工序记录 상세</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', letterSpacing: '-.3px' }}>工序记录 / 공정 기록 상세</span>
           <span onClick={onClose} style={{ cursor: 'pointer', fontSize: 18, color: 'var(--text4)', padding: '4px 8px', borderRadius: 6 }}>✕</span>
         </div>
-        <div className="modal-row"><span className="modal-label">工序</span><span className="modal-value">{process}</span></div>
-        <div className="modal-row"><span className="modal-label">完成数量</span><span className="modal-value">{completed} 件</span></div>
-        <div className="modal-row"><span className="modal-label">未完成数量</span><span className="modal-value">{incomplete} 件</span></div>
-        <div className="modal-row"><span className="modal-label">不良数量</span><span className="modal-value">{defect} 件</span></div>
-        <div className="modal-row"><span className="modal-label">负责人</span><span className="modal-value">{worker}</span></div>
-        <div className="modal-row"><span className="modal-label">记录时间</span><span className="modal-value">{date}</span></div>
-        <div className="modal-row"><span className="modal-label">备注</span><span className="modal-value">{notes}</span></div>
+        <div className="modal-row"><span className="modal-label">工序 / 공정</span><span className="modal-value">{process}</span></div>
+        <div className="modal-row"><span className="modal-label">完成数量 / 완성수량</span><span className="modal-value">{completed} 件</span></div>
+        <div className="modal-row"><span className="modal-label">未完成数量 / 미완성수량</span><span className="modal-value">{incomplete} 件</span></div>
+        <div className="modal-row"><span className="modal-label">不良数量 / 불량수량</span><span className="modal-value">{defect} 件</span></div>
+        <div className="modal-row"><span className="modal-label">负责人 / 담당자</span><span className="modal-value">{worker}</span></div>
+        <div className="modal-row"><span className="modal-label">记录时间 / 기록시간</span><span className="modal-value">{date}</span></div>
+        <div className="modal-row"><span className="modal-label">备注 / 메모</span><span className="modal-value">{notes}</span></div>
       </div>
     </div>
   );
@@ -604,7 +604,7 @@ const LogManualMOScreen = memo(function LogManualMOScreen({ onSubmit, onBack }) 
       <button onClick={onBack} style={{ position:'absolute', top:16, left:16, background:'transparent', border:'1px solid #D4AF37', color:'#D4AF37', fontSize:10, fontWeight:400, letterSpacing:2, padding:'7px 14px', cursor:'pointer', zIndex:10, fontFamily:'inherit' }}>← 返回</button>
       <div style={{ textAlign:'center', marginBottom:36 }}>
         <div style={{ fontSize:9, letterSpacing:4, color:'var(--gold-dim)', fontWeight:400 }}>PRODUCTION LOG</div>
-        <div style={{ fontSize:22, color:'var(--gold-light)', marginTop:10, fontWeight:300, letterSpacing:2 }}>手动输入订单号</div>
+        <div style={{ fontSize:22, color:'var(--gold-light)', marginTop:10, fontWeight:300, letterSpacing:2 }}>手动输入订单号 / 수동 MO 입력</div>
         <div style={{ fontSize:10, color:'var(--gold-dim)', marginTop:6, letterSpacing:1.5 }}>수동으로 MO번호 입력</div>
         <div style={{ width:40, height:1, background:'rgba(212,175,55,0.3)', margin:'16px auto 0' }} />
       </div>
@@ -615,7 +615,7 @@ const LogManualMOScreen = memo(function LogManualMOScreen({ onSubmit, onBack }) 
           value={moInput}
           onChange={e => setMoInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-          placeholder="例: GJ26-001"
+          placeholder="例 / 예: GJ26-001"
           style={{ width:'100%', padding:'10px 0', background:'transparent', border:'none', borderBottom:'1px solid rgba(212,175,55,0.3)', color:'var(--gold-light)', fontSize:18, outline:'none', fontFamily:'inherit', boxSizing:'border-box', letterSpacing:2 }}
         />
         <button onClick={handleSubmit} style={{ width:'100%', marginTop:20, padding:16, border:'1px solid #D4AF37', borderRadius:2, background:'rgba(212,175,55,0.12)', color:'#D4AF37', fontSize:12, fontWeight:400, letterSpacing:3, textTransform:'uppercase', cursor:'pointer', fontFamily:'inherit' }}>
@@ -780,38 +780,38 @@ const HomeScreen = memo(function HomeScreen({ onSelectProductionLog, onSelectInn
         <header className="atelier-header">
           <div className="atelier-mark">IKU</div>
           <div className="atelier-divider"></div>
-          <p className="atelier-tagline">Production system</p>
+          <p className="atelier-tagline">생산 관리 시스템</p>
           <p className="atelier-tagline-cn">生产管理系统</p>
         </header>
         <nav className="atelier-menu">
           <div className="atelier-menu-item" onClick={onSelectProductionLog}>
             <span className="atelier-index">01</span>
             <span className="atelier-title">生产进度</span>
-            <span className="atelier-subtitle">Production log</span>
+            <span className="atelier-subtitle">생산 진척</span>
             <span className="atelier-arrow">→</span>
           </div>
           <div className="atelier-menu-item" onClick={onSelectInnerPack}>
             <span className="atelier-index">02</span>
             <span className="atelier-title">中包袋</span>
-            <span className="atelier-subtitle">Inner pack</span>
+            <span className="atelier-subtitle">중간포장</span>
             <span className="atelier-arrow">→</span>
           </div>
           <div className="atelier-menu-item" onClick={onSelectMasterBag}>
             <span className="atelier-index">03</span>
             <span className="atelier-title">麻袋包装</span>
-            <span className="atelier-subtitle">Master bag</span>
+            <span className="atelier-subtitle">마대 포장</span>
             <span className="atelier-arrow">→</span>
           </div>
           <div className="atelier-menu-item" onClick={onSelectReserved}>
             <span className="atelier-index">04</span>
             <span className="atelier-title">中国仓库保留</span>
-            <span className="atelier-subtitle">Reserved inventory</span>
+            <span className="atelier-subtitle">중국창고 보관</span>
             <span className="atelier-arrow">→</span>
           </div>
           <div className="atelier-menu-item" onClick={onSelectRecentActivity}>
             <span className="atelier-index">05</span>
             <span className="atelier-title">最近记录</span>
-            <span className="atelier-subtitle">Recent activity</span>
+            <span className="atelier-subtitle">최근 기록</span>
             <span className="atelier-arrow">→</span>
           </div>
         </nav>
@@ -835,8 +835,8 @@ const StatusScanModeScreen = memo(function StatusScanModeScreen({ onSelectStatus
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <IconStatusScan />
         <div style={{ fontSize: 11, letterSpacing: 4, color: G.gold, marginTop: 16, fontWeight: 300 }}>STATUS SCAN</div>
-        <div style={{ fontSize: 20, color: G.cream, marginTop: 6, fontWeight: 300, letterSpacing: 1 }}>选择更新状态</div>
-        <div style={{ fontSize: 10, color: G.goldDim, marginTop: 4, letterSpacing: 2 }}>扫描麻袋 QR 自动更新</div>
+        <div style={{ fontSize: 20, color: G.cream, marginTop: 6, fontWeight: 300, letterSpacing: 1 }}>选择更新状态 / 상태 선택</div>
+        <div style={{ fontSize: 10, color: G.goldDim, marginTop: 4, letterSpacing: 2 }}>扫描麻袋 QR 自动更新 / 마대 QR 스캔 시 자동 갱신</div>
       </div>
       {STATUS_SCAN_OPTIONS.map(s => (
         <DkBtn key={s.key} onClick={() => onSelectStatus(s.key)}>
@@ -854,12 +854,12 @@ const StatusScanCameraScreen = memo(function StatusScanCameraScreen({ targetStat
       <DkBack onClick={onBack} />
       <div style={{ textAlign: 'center', marginBottom: 36 }}>
         <div style={{ fontSize: 9, letterSpacing: 4, color: G.goldDim, fontWeight: 300 }}>STATUS SCAN</div>
-        <div style={{ fontSize: 20, color: G.cream, marginTop: 10, fontWeight: 300, letterSpacing: 1 }}>扫描麻袋 QR</div>
+        <div style={{ fontSize: 20, color: G.cream, marginTop: 10, fontWeight: 300, letterSpacing: 1 }}>扫描麻袋 QR / 마대 QR 스캔</div>
         <div style={{ display: 'inline-block', border: '1px solid rgba(212,175,55,0.5)', padding: '4px 16px', fontSize: 11, color: G.gold, letterSpacing: 1, marginTop: 12 }}>{statusLabel}</div>
         <div style={{ fontSize: 10, color: G.goldDim, marginTop: 10 }}>将麻袋 QR 对准摄像头 / 마대 QR을 스캔하세요</div>
       </div>
       <DkBtn onClick={onScan}>📷 开始扫描 / 스캔 시작</DkBtn>
-      <DkBtnOutline onClick={onBack}>← 重新选择状态</DkBtnOutline>
+      <DkBtnOutline onClick={onBack}>← 重新选择状态 / 상태 다시 선택</DkBtnOutline>
     </DkScreen>
   );
 });
@@ -876,10 +876,10 @@ const StatusScanSuccessScreen = memo(function StatusScanSuccessScreen({ result, 
       <div style={{ padding: '20px 20px 40px' }}>
         <DkCard>
           <DkRow label="新状态 / 새 상태" value={statusLabel} />
-          <DkRow label="MO 번호" value={result.moNum} />
-          <DkRow label="Bag #" value={String(result.bagSeq)} />
-          <DkRow label="Bag UUID" value={result.bagUuid} mono />
-          <DkRow label="已更新包装" value={String(result.packCount) + ' packs'} />
+          <DkRow label="订单 / MO" value={result.moNum} />
+          <DkRow label="麻袋 # / Bag #" value={String(result.bagSeq)} />
+          <DkRow label="麻袋 UUID / Bag UUID" value={result.bagUuid} mono />
+          <DkRow label="已更新包装 / 갱신된 포장" value={String(result.packCount) + ' packs'} />
         </DkCard>
         <DkBtn onClick={onContinue}>📷 继续扫描 / 계속 스캔</DkBtn>
         <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
@@ -946,7 +946,7 @@ const BagMOSelectScreen = memo(function BagMOSelectScreen({ onScan, onManual, on
       <div style={{ textAlign:'center', color:G.goldDim, fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
       <DkCard>
         <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>手动输入 / 수동 입력</div>
-        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例 / 예: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
         <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
       </DkCard>
     </DkScreen>
@@ -973,7 +973,7 @@ const PackMOSelectScreen = memo(function PackMOSelectScreen({ onScan, onManual, 
       <div style={{ textAlign:'center', color:G.goldDim, fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
       <DkCard>
         <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>手动输入 / 수동 입력</div>
-        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例 / 예: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
         <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
       </DkCard>
     </DkScreen>
@@ -1221,7 +1221,7 @@ const LogScanChoiceScreen = memo(function LogScanChoiceScreen({ onScan, onManual
       <div style={{ textAlign:'center', color:G.goldDim, fontSize:10, letterSpacing:2, margin:'10px 0' }}>— OR —</div>
       <DkCard>
         <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:12, fontWeight:400 }}>手动输入 / 수동 입력</div>
-        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
+        <DkInput value={manualMO} onChange={e => setManualMO(e.target.value)} placeholder="例 / 예: GJ26-1" onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }} />
         <DkBtn onClick={handleManualSubmit} style={{ marginTop:8, marginBottom:0 }}>确认 / 확인</DkBtn>
       </DkCard>
     </DkScreen>
@@ -1374,7 +1374,7 @@ const PackCreateScreen = memo(function PackCreateScreen({
           </label>
         </DkCard>
         <DkCard>
-          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 / 이름" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
         <DkBtn onClick={handleSubmit} disabled={submitting || totalQty === 0} style={{ marginTop:8, padding:18, fontSize:11, letterSpacing:3 }}>
           {submitting ? '保存中...' : totalQty === 0
@@ -1547,7 +1547,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
               )}
             </div>
           </div>
-          <DkRow label="包装UUID" value={detail.uuid} mono />
+          <DkRow label="包装UUID / 포장 UUID" value={detail.uuid} mono />
           <DkRow label="负责人 / 담당자" value={detail.worker || '-'} />
           <DkRow label="总数量 / 총 수량" value={String(detail.total_qty) + ' 件'} />
           <DkRow label="是否剩余 / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
@@ -1704,7 +1704,7 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
                 label="负责人 / 담당자 *"
                 value={worker}
                 onChange={(e) => setWorker(e.target.value)}
-                placeholder="姓名 Name"
+                placeholder="姓名 / 이름"
                 onKeyDown={(e) => { if (e.key === 'Enter' && ready) onSubmit(); }}
               />
             </DkCard>
@@ -1789,7 +1789,7 @@ const BagCreateScreen = memo(function BagCreateScreen({
           </div>
         </DkCard>
         <DkCard>
-          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter' && !submitting && count > 0) onSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 / 이름" onKeyDown={e => { if (e.key === 'Enter' && !submitting && count > 0) onSubmit(); }} />
         </DkCard>
         <DkBtn onClick={onSubmit} disabled={submitting || count === 0} style={{ padding:18, fontSize:11, letterSpacing:3 }}>
           {submitting ? '保存中...' : `✅ ${count}包装 装袋完成 / 마대 완료`}
@@ -1923,7 +1923,7 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
               )}
             </div>
           </div>
-          <DkRow label="麻袋UUID" value={detail.uuid} mono />
+          <DkRow label="麻袋UUID / 마대 UUID" value={detail.uuid} mono />
           <DkRow label="内包数量 / 포장 수" value={String(detail.inner_pack_count) + ' packs'} />
           <DkRow label="总数量 / 총 수량" value={String(detail.total_qty) + ' 件'} />
           <DkRow label="是否剩余 / 자투리 여부" value={detail.is_remainder ? '是 / 예' : '否 / 아니오'} />
@@ -1937,7 +1937,7 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
           <DkCard>
             <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>包装列表 / 포장 목록</div>
             {bagPacksLoading ? (
-              <div style={{ fontSize:10, color:G.goldDim, textAlign:'center', padding:'8px 0' }}>加载中...</div>
+              <div style={{ fontSize:10, color:G.goldDim, textAlign:'center', padding:'8px 0' }}>加载中 / 로딩...</div>
             ) : bagPacksData.length > 0 ? bagPacksData.map((p, i) => (
               <div key={p.uuid} onClick={() => onViewPack && onViewPack(p.uuid)}
                 style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 4px', borderBottom:'1px solid var(--app-divider)', cursor: onViewPack ? 'pointer' : 'default' }}>
@@ -2124,7 +2124,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
-          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter' && !loading) search(); }} />
+          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例 / 예: GJ26-1" onKeyDown={e => { if (e.key === 'Enter' && !loading) search(); }} />
           <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
         </DkCard>
         {packs.length > 0 && (
@@ -2148,7 +2148,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
           </div>
         )}
         {searched && !loading && packs.length === 0 && (
-          <div style={{ textAlign:'center', color:G.goldDim, padding:24, fontSize:11, letterSpacing:1 }}>此订单没有包装记录</div>
+          <div style={{ textAlign:'center', color:G.goldDim, padding:24, fontSize:11, letterSpacing:1 }}>此订单没有包装记录 / 포장 기록 없음</div>
         )}
         {packs.map(p => (
           <DkCard key={p.uuid} style={{ marginBottom:8 }}>
@@ -2327,7 +2327,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
-          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例: GJ26-1" onKeyDown={e => { if (e.key === 'Enter' && !loading) search(); }} />
+          <DkInput label="订单号 / MO 번호" value={mo} onChange={e => setMo(e.target.value)} placeholder="例 / 예: GJ26-1" onKeyDown={e => { if (e.key === 'Enter' && !loading) search(); }} />
           <DkBtn onClick={search} disabled={loading} style={{ marginTop:8, marginBottom:0 }}>{loading ? '查询中...' : '🔍 查询 / 조회'}</DkBtn>
         </DkCard>
         {bags.length > 0 && (
@@ -2351,7 +2351,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
           </div>
         )}
         {searched && !loading && bags.length === 0 && (
-          <div style={{ textAlign:'center', color:G.goldDim, padding:24, fontSize:11, letterSpacing:1 }}>此订单没有麻袋记录</div>
+          <div style={{ textAlign:'center', color:G.goldDim, padding:24, fontSize:11, letterSpacing:1 }}>此订单没有麻袋记录 / 마대 기록 없음</div>
         )}
         {bags.map(b => (
           <DkCard key={b.uuid} style={{ marginBottom:8 }}>
@@ -2815,7 +2815,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
           <DkCard>
             <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>颜色/尺码汇总 / 색상·사이즈 합계</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4, fontSize:9, color:G.goldDim, letterSpacing:1, marginBottom:8 }}>
-              <span>颜色 / Color</span><span style={{ textAlign:'center' }}>尺码 / Size</span><span style={{ textAlign:'right' }}>合计 / 합계</span>
+              <span>颜色 / 색상</span><span style={{ textAlign:'center' }}>尺码 / 사이즈</span><span style={{ textAlign:'right' }}>合计 / 합계</span>
             </div>
             {colorSizeSummary.map((row, i) => (
               <div key={i} style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', padding:'5px 0', borderBottom:'1px solid var(--app-divider)', fontSize:12 }}>
@@ -2967,7 +2967,7 @@ const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, onSubm
           )}
         </DkCard>
         <DkCard>
-          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => setWorker(e.target.value)} placeholder="姓名 / 이름" onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }} />
         </DkCard>
         {packMO && packMO.standard_assortment && packMO.standard_assortment.length > 0 && (
           <DkCard>
@@ -3247,7 +3247,7 @@ const BatchBagInputScreen = memo(function BatchBagInputScreen({ bagMO, onSubmit,
 
         {/* Worker */}
         <DkCard>
-          <DkInput label="负责人 / 담당자 *" value={worker} onChange={ev => setWorker(ev.target.value)} placeholder="姓名 Name" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={ev => setWorker(ev.target.value)} placeholder="姓名 / 이름" onKeyDown={ev => { if (ev.key === 'Enter') handleSubmit(); }} />
         </DkCard>
 
         {/* Info / status card */}
@@ -3437,7 +3437,7 @@ const PackQuerySubMenu = memo(function PackQuerySubMenu({ onTextQuery, onScanQue
       <div style={{ textAlign:'center', marginBottom:40 }}>
         <IconInnerPack />
         <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 查询 / QR 조회</div>
-        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>包装查询</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>包装查询 / 포장 조회</div>
       </div>
       <DkBtn onClick={onTextQuery}>📋 文字查询 / 텍스트 조회</DkBtn>
       <DkBtn onClick={onScanQuery}>🔍 扫码查询 / 스캔 조회</DkBtn>
@@ -3452,7 +3452,7 @@ const BagQuerySubMenu = memo(function BagQuerySubMenu({ onTextQuery, onScanQuery
       <div style={{ textAlign:'center', marginBottom:40 }}>
         <IconMasterBag />
         <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 查询 / QR 조회</div>
-        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>麻袋查询</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>麻袋查询 / 마대 조회</div>
       </div>
       <DkBtn onClick={onTextQuery}>📋 文字查询 / 텍스트 조회</DkBtn>
       <DkBtn onClick={onScanQuery}>🔍 扫码查询 / 스캔 조회</DkBtn>
@@ -3467,7 +3467,7 @@ const ProductionLogQuerySubMenu = memo(function ProductionLogQuerySubMenu({ onTe
       <div style={{ textAlign:'center', marginBottom:40 }}>
         <IconFactory />
         <div style={{ fontSize:11, letterSpacing:4, color:G.gold, marginTop:16, fontWeight:400 }}>QR 查询 / QR 조회</div>
-        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>生产进度查询</div>
+        <div style={{ fontSize:20, color:G.cream, marginTop:6, fontWeight:400, letterSpacing:1 }}>生产进度查询 / 생산 진척 조회</div>
       </div>
       <DkBtn onClick={onTextQuery}>📋 文字查询 / 텍스트 조회</DkBtn>
       <DkBtn onClick={onScanQuery}>🔍 扫码查询 / 스캔 조회</DkBtn>
@@ -3498,7 +3498,7 @@ const BulkShipBagSelectScreen = memo(function BulkShipBagSelectScreen({ bagMO, b
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
         <DkBack onClick={onBack} />
-        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>BULK SHIP · 一括出货</div>
+        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>BULK SHIP · 批量出货 / 일괄 출고</div>
         <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagMO ? bagMO.mo_number : '—'}</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
@@ -3533,7 +3533,7 @@ const BulkShipBagSelectScreen = memo(function BulkShipBagSelectScreen({ bagMO, b
           )}
         </DkCard>
         <DkCard>
-          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => onWorkerChange(e.target.value)} placeholder="姓名 Name" onKeyDown={e => { if (e.key === 'Enter' && canSubmit) onSubmit(); }} />
+          <DkInput label="负责人 / 담당자 *" value={worker} onChange={e => onWorkerChange(e.target.value)} placeholder="姓名 / 이름" onKeyDown={e => { if (e.key === 'Enter' && canSubmit) onSubmit(); }} />
         </DkCard>
         <DkBtn onClick={onSubmit} disabled={!canSubmit}>
           ▶ 开始批量出货 / 일괄 출고 시작 ({selectedCount} 麻袋)
@@ -3674,7 +3674,7 @@ const ReservedInputScreen = memo(function ReservedInputScreen({ reservedMO, onSu
             label="备注 / 비고"
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder="例: 下季样品保留"
+            placeholder="例 / 예: 下季样品保留"
           />
         </DkCard>
         <DkCard>
@@ -3682,7 +3682,7 @@ const ReservedInputScreen = memo(function ReservedInputScreen({ reservedMO, onSu
             label="负责人 / 담당자 *"
             value={worker}
             onChange={e => setWorker(e.target.value)}
-            placeholder="姓名 Name"
+            placeholder="姓名 / 이름"
             onKeyDown={e => { if (e.key === 'Enter' && canSubmit) onSubmit(qtyNum, location.trim(), notes.trim(), worker.trim()); }}
           />
         </DkCard>
