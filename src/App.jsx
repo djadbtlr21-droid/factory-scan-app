@@ -59,6 +59,9 @@ const PROCESSES = [
   { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date',      emoji: '✅', zohoValue: 'Cutting End / 재단 완료 / 裁剪完成' },
   { code: 'Sewing_Start',  zh: '裁缝开始', ko: '재봉 시작', moField: 'Sewing_Start_Date',     emoji: '🧵', zohoValue: 'Sewing Start / 봉제 시작 / 车缝开始' },
   { code: 'Sewing_End',    zh: '裁缝完成', ko: '재봉 완료', moField: 'Sewing_Completion_Date',emoji: '🪡', zohoValue: 'Sewing End / 봉제 완료 / 车缝完成' },
+  { code: 'Packing_Start', zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦', zohoValue: 'Packing Start / 포장 시작 / 包装开始' },
+  { code: 'Packing_End',   zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '🎁', zohoValue: 'Packing End / 포장 완료 / 包装完成' },
+  { code: 'Production_Complete', zh: '生产完成', ko: '생산 완료', moField: 'Ship_Date',       emoji: '🚚', zohoValue: 'Completed / 생산 완료 / 生产完成' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -359,6 +362,9 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
           <ProcBtn p={PROCESSES[2]} />
           <ProcBtn p={PROCESSES[3]} />
           <ProcBtn p={PROCESSES[4]} />
+          <ProcBtn p={PROCESSES[5]} />
+          <ProcBtn p={PROCESSES[6]} />
+          <ProcBtn p={PROCESSES[7]} full />
         </div>
       </div>
 
@@ -5654,6 +5660,13 @@ export default function App() {
     const updatePayload = {};
     if (selectedProcess.moField) {
       updatePayload[selectedProcess.moField] = dateOnlyStr;
+    }
+    if (selectedProcess.zohoValue) {
+      // Production_Status patched alongside the date field so IKU-dashboard's
+      // pipeline / timeline picks the stage up correctly. Zoho silently ignores
+      // unknown fields, so if zohoValue ever doesn't match a configured picklist
+      // option the date PATCH still lands.
+      updatePayload['Production_Status'] = selectedProcess.zohoValue;
     }
     let moUpdateOk = false;
     let moUpdateError = '';
