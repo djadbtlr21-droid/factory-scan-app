@@ -54,14 +54,14 @@ function buildMODataFromRaw(rawRecord) {
 }
 
 const PROCESSES = [
-  { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date',  emoji: '📥', zohoValue: 'Fabric In / 원단입고 / 面料入库' },
-  { code: 'Cutting_Start', zh: '裁剪开始', ko: '재단 시작', moField: 'Cutting_Start_Date',    emoji: '✂️', zohoValue: 'Cutting Start / 재단 시작 / 裁剪开始' },
-  { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date',      emoji: '✅', zohoValue: 'Cutting End / 재단 완료 / 裁剪完成' },
-  { code: 'Sewing_Start',  zh: '裁缝开始', ko: '재봉 시작', moField: 'Sewing_Start_Date',     emoji: '🧵', zohoValue: 'Sewing Start / 봉제 시작 / 车缝开始' },
-  { code: 'Sewing_End',    zh: '裁缝完成', ko: '재봉 완료', moField: 'Sewing_Completion_Date',emoji: '🪡', zohoValue: 'Sewing End / 봉제 완료 / 车缝完成' },
-  { code: 'Packing_Start',       zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦',  zohoValue: 'Packing Start / 포장 시작 / 包装开始' },
-  { code: 'Packing_End',         zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '✅📦', zohoValue: 'Packing End / 포장 완료 / 包装完成' },
-  { code: 'Production_Complete', zh: '生产完成', ko: '생산 완료', moField: null,                    emoji: '🏁',  zohoValue: 'Completed / 생산완료 / 生产完成' },
+  { code: 'Fabric_In',     zh: '面料入库', ko: '원단입고',  moField: 'Fabric_In_house_Date',  emoji: '📥', zohoValue: 'Fabric In / 원단입고 / 面料入库', prodStatus: 'Fabric Received' },
+  { code: 'Cutting_Start', zh: '裁剪开始', ko: '재단 시작', moField: 'Cutting_Start_Date',    emoji: '✂️', zohoValue: 'Cutting Start / 재단 시작 / 裁剪开始', prodStatus: 'Cutting' },
+  { code: 'Cutting_End',   zh: '裁剪完成', ko: '재단 완료', moField: 'Cutting_End_Date',      emoji: '✅', zohoValue: 'Cutting End / 재단 완료 / 裁剪完成', prodStatus: 'Cutting' },
+  { code: 'Sewing_Start',  zh: '裁缝开始', ko: '재봉 시작', moField: 'Sewing_Start_Date',     emoji: '🧵', zohoValue: 'Sewing Start / 봉제 시작 / 车缝开始', prodStatus: 'Sewing' },
+  { code: 'Sewing_End',    zh: '裁缝完成', ko: '재봉 완료', moField: 'Sewing_Completion_Date',emoji: '🪡', zohoValue: 'Sewing End / 봉제 완료 / 车缝完成', prodStatus: 'Sewing' },
+  { code: 'Packing_Start',       zh: '包装开始', ko: '포장 시작', moField: 'Packing_Start_Date',    emoji: '📦',  zohoValue: 'Packing Start / 포장 시작 / 包装开始', prodStatus: 'Packing' },
+  { code: 'Packing_End',         zh: '包装完成', ko: '포장 완료', moField: 'Packing_End_Date',      emoji: '✅📦', zohoValue: 'Packing End / 포장 완료 / 包装完成', prodStatus: 'Packing' },
+  { code: 'Production_Complete', zh: '生产完成', ko: '생산 완료', moField: null,                    emoji: '🏁',  zohoValue: 'Completed / 생산완료 / 生产完成', prodStatus: 'Completed' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -5661,12 +5661,12 @@ export default function App() {
     if (selectedProcess.moField) {
       updatePayload[selectedProcess.moField] = dateOnlyStr;
     }
-    if (selectedProcess.zohoValue) {
-      // Production_Status patched alongside the date field so IKU-dashboard's
-      // pipeline / timeline picks the stage up correctly. Zoho silently ignores
-      // unknown fields, so if zohoValue ever doesn't match a configured picklist
-      // option the date PATCH still lands.
-      updatePayload['Production_Status'] = selectedProcess.zohoValue;
+    if (selectedProcess.prodStatus) {
+      // Production_Status uses the simplified phase value matching Zoho's
+      // actual picklist options (Fabric Received / Cutting / Sewing / Packing
+      // / Completed). The verbose zohoValue stays in the log record's Process
+      // field, but the MO record gets the dropdown-compatible string.
+      updatePayload['Production_Status'] = selectedProcess.prodStatus;
     }
     let moUpdateOk = false;
     let moUpdateError = '';
