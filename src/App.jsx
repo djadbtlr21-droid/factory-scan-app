@@ -7,7 +7,7 @@ import {
   PACK_STATUS_LABELS, BAG_STATUS_LABELS, APP_PIN, PIN_STORAGE_KEY
 } from './config.js';
 import {
-  buildInnerPackQR, buildMasterBagQR, parseInnerPackQR, parseMasterBagQR,
+  getAppBaseUrl, buildInnerPackQR, buildMasterBagQR, parseInnerPackQR, parseMasterBagQR,
   detectQRType, generateQRDataURL, generateQRDataURLWithLabel, downloadQRPNG, sanitizeFilename,
   downloadQRsAsZIP, downloadQRsAsPDF
 } from './qrUtils.js';
@@ -1563,7 +1563,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
         </DkCard>
         <ColorSizeMatrix items={detail.items} />
         <DkBtn onClick={async () => {
-          const qrUrl = window.location.origin + '/view/inner/' + detail.uuid;
+          const qrUrl = getAppBaseUrl() + '/view/inner/' + detail.uuid;
           const label = `${detail.mo_number} / Inner Pack #${detail.pack_sequence} / ${detail.total_qty} pcs`;
           const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
           downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_InnerPack_${detail.pack_sequence}_${detail.total_qty}pcs.png`));
@@ -2017,7 +2017,7 @@ const BagDetailScreen = memo(function BagDetailScreen({ detail, onBack, onEditSt
           </DkCard>
         )}
         <DkBtn onClick={async () => {
-          const qrUrl = window.location.origin + '/view/bag/' + detail.uuid;
+          const qrUrl = getAppBaseUrl() + '/view/bag/' + detail.uuid;
           const label = `${detail.mo_number} / Master Bag #${detail.bag_sequence} / ${detail.total_qty} pcs`;
           const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
           downloadQRPNG(dataURL, sanitizeFilename(`${detail.mo_number}_MasterBag_${detail.bag_sequence}_${detail.total_qty}pcs.png`));
@@ -2143,7 +2143,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
         .slice().sort((a, b) => a.pack_sequence - b.pack_sequence)
         .map(p => ({
           packNumber: p.pack_sequence,
-          qrText: window.location.origin + '/view/inner/' + p.uuid,
+          qrText: getAppBaseUrl() + '/view/inner/' + p.uuid,
           totalQty: p.total_qty,
           isRemainder: p.is_remainder,
           isStandard: !p.is_remainder && (parseInt(p.pack_sequence) || 0) === 0,
@@ -2164,7 +2164,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
       const qrItems = await Promise.all(
         sel.slice().sort((a, b) => a.pack_sequence - b.pack_sequence)
           .map(async p => ({
-            text: window.location.origin + '/view/inner/' + p.uuid,
+            text: getAppBaseUrl() + '/view/inner/' + p.uuid,
             filename: sanitizeFilename(`${p.mo_number}_InnerPack_${p.pack_sequence}.png`),
           }))
       );
@@ -2226,7 +2226,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
               <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, marginLeft:8 }}>
                 <button onClick={async e => {
                   e.stopPropagation();
-                  const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
+                  const qrUrl = getAppBaseUrl() + '/view/inner/' + p.uuid;
                   const label = `${p.mo_number} / Inner Pack #${p.pack_sequence} / ${p.total_qty} pcs`;
                   const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
                   downloadQRPNG(dataURL, sanitizeFilename(`${p.mo_number}_InnerPack_${p.pack_sequence}_${p.total_qty}pcs.png`));
@@ -2247,7 +2247,7 @@ const PackListScreen = memo(function PackListScreen({ onBack, onSelectPack }) {
                   e.stopPropagation();
                   try {
                     const moData = await getMOData(p.mo_number);
-                    const qrUrl = window.location.origin + '/view/inner/' + p.uuid;
+                    const qrUrl = getAppBaseUrl() + '/view/inner/' + p.uuid;
                     const n = Math.min(999, Math.max(1, parseInt(rowCopies[p.uuid]) || 1));
                     const item = {
                       packNumber: p.pack_sequence,
@@ -2351,7 +2351,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
         .slice().sort((a, b) => a.bag_sequence - b.bag_sequence)
         .map(b => ({
           bagNumber: b.bag_sequence,
-          qrText: window.location.origin + '/view/bag/' + b.uuid,
+          qrText: getAppBaseUrl() + '/view/bag/' + b.uuid,
         }));
       await generateMasterBagExcel(moData, bagList, sanitizeFilename(`${moNum}_MasterBag_Selected_${bagList.length}items.xlsx`));
       setSelected(new Set());
@@ -2368,7 +2368,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
       const qrItems = sel
         .slice().sort((a, b) => a.bag_sequence - b.bag_sequence)
         .map(b => ({
-          text: window.location.origin + '/view/bag/' + b.uuid,
+          text: getAppBaseUrl() + '/view/bag/' + b.uuid,
           filename: sanitizeFilename(`${b.mo_number}_MasterBag_${b.bag_sequence}.png`),
         }));
       await downloadQRsAsPDF(qrItems, sanitizeFilename(`${moNum}_MasterBag_Selected_${qrItems.length}items.pdf`));
@@ -2429,7 +2429,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
               <div style={{ display:'flex', flexDirection:'column', gap:4, flexShrink:0, marginLeft:8 }}>
                 <button onClick={async e => {
                   e.stopPropagation();
-                  const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
+                  const qrUrl = getAppBaseUrl() + '/view/bag/' + b.uuid;
                   const label = `${b.mo_number} / Master Bag #${b.bag_sequence} / ${b.total_qty} pcs`;
                   const dataURL = await generateQRDataURLWithLabel(qrUrl, label);
                   downloadQRPNG(dataURL, sanitizeFilename(`${b.mo_number}_MasterBag_${b.bag_sequence}_${b.total_qty}pcs.png`));
@@ -2439,7 +2439,7 @@ const BagListScreen = memo(function BagListScreen({ onBack, onSelectBag }) {
                   try {
                     const res = await getRecords(MO_REPORT, `MO_Number == "${b.mo_number}"`);
                     const moData = buildMODataFromRaw(res?.data?.[0]);
-                    const qrUrl = window.location.origin + '/view/bag/' + b.uuid;
+                    const qrUrl = getAppBaseUrl() + '/view/bag/' + b.uuid;
                     await generateSingleMasterBagExcel(moData, { number: b.bag_sequence, qrString: qrUrl });
                   } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
                 }} style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'5px 8px', cursor:'pointer', fontFamily:'inherit' }}>📊 Excel</button>
@@ -2500,7 +2500,7 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
             const isRem = r['Is_Remainder'] === 'true' || r['Is_Remainder'] === true;
             return {
               packNumber: seq,
-              qrText: window.location.origin + '/view/inner/' + r['Pack_UUID'],
+              qrText: getAppBaseUrl() + '/view/inner/' + r['Pack_UUID'],
               totalQty: parseInt(r['Total_Qty']) || 12,
               isRemainder: isRem,
               isStandard: !isRem && seq === 0,
@@ -2528,7 +2528,7 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
         const bagList = matching
           .map(r => ({
             bagNumber: parseInt(r['Bag_Sequence']) || 0,
-            qrText: window.location.origin + '/view/bag/' + r['Bag_UUID'],
+            qrText: getAppBaseUrl() + '/view/bag/' + r['Bag_UUID'],
           }))
           .sort((a, b) => a.bagNumber - b.bagNumber);
         await generateMasterBagExcel(moData, bagList,
@@ -4198,7 +4198,7 @@ export default function App() {
         uuid = existing['Pack_UUID'];
         recordId = existing['ID'];
         totalExpected = parseInt(existing['Total_Expected']) || 0;
-        qrText = window.location.origin + '/view/inner/' + uuid;
+        qrText = getAppBaseUrl() + '/view/inner/' + uuid;
         // Update Worker on existing standard record (PATCH)
         const existingWorker = (typeof existing['Worker'] === 'object'
           ? (existing['Worker'].display_value || '')

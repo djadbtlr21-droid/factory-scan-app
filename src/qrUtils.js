@@ -3,12 +3,21 @@ import { v4 as uuidv4 } from 'uuid';
 import JSZip from 'jszip';
 import { QR_PREFIX } from './config.js';
 
+// Single source of truth for the QR base URL.
+// Priority: ① VITE_APP_BASE_URL (build-time env) → ② window.location.origin.
+// Used by every QR/label generation path so re-downloads stay consistent.
+export function getAppBaseUrl() {
+  const envBase = import.meta.env && import.meta.env.VITE_APP_BASE_URL;
+  if (envBase) return String(envBase).replace(/\/+$/, '');
+  return window.location.origin;
+}
+
 export function buildInnerPackQR() {
-  return window.location.origin + '/view/inner/' + uuidv4();
+  return getAppBaseUrl() + '/view/inner/' + uuidv4();
 }
 
 export function buildMasterBagQR() {
-  return window.location.origin + '/view/bag/' + uuidv4();
+  return getAppBaseUrl() + '/view/bag/' + uuidv4();
 }
 
 export function parseInnerPackQR(text) {
