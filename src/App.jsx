@@ -13,6 +13,31 @@ import {
 } from './qrUtils.js';
 import { generateInnerPackExcel, generateMasterBagExcel, generateSingleInnerPackExcel, generateSingleMasterBagExcel } from './utils/excelLabels.js';
 import { logActivity, getRecentActivities, clearActivities } from './utils/recentActivity.js';
+import { formatFactory, findFieldValue, resolveColorDot, CHINESE_STYLE_NAME_FIELDS, FABRIC_FIELDS } from './utils/displayHelpers.js';
+
+// Small inline color swatch shown before a color name. Keyword-mapped
+// (see resolveColorDot); unmatched colors get a neutral dashed dot so the
+// column never goes dotless / ragged.
+function ColorDot({ text }) {
+  const d = resolveColorDot(text);
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-block',
+        width: 11,
+        height: 11,
+        borderRadius: '50%',
+        background: d.color,
+        marginRight: 6,
+        verticalAlign: 'middle',
+        flexShrink: 0,
+        boxSizing: 'border-box',
+        border: d.neutral ? '1px dashed #9ca3af' : (d.outline ? '1px solid #c9c9c9' : '1px solid rgba(0,0,0,0.15)'),
+      }}
+    />
+  );
+}
 
 // Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
@@ -96,7 +121,7 @@ function NotesTable({ planNotes }) {
       </div>
       {rows.map((r, i) => (
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: 12, padding: '5px 0', borderBottom: '0.5px solid var(--app-divider)' }}>
-          <span style={{ color: 'var(--text)' }}>{r.color}</span>
+          <span style={{ color: 'var(--text)', display: 'inline-flex', alignItems: 'center' }}><ColorDot text={r.color} />{r.color}</span>
           <span style={{ textAlign: 'center', color: 'var(--text)' }}>{r.size}</span>
           <span style={{ textAlign: 'right', fontWeight: 600, color: 'var(--app-gold)' }}>{r.qty}</span>
         </div>
@@ -343,6 +368,12 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
         <div className="info-row"><span className="info-label">订单号 / MO</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
         <div className="info-row"><span className="info-label">品号 / SKU</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
         <div className="info-row"><span className="info-label">工厂 / 공장</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
+        {moData && moData.chi_style_name ? (
+          <div className="info-row"><span className="info-label">中文款名 / 중문 스타일명</span><span className="info-value">{moData.chi_style_name}</span></div>
+        ) : null}
+        {moData && moData.fabric ? (
+          <div className="info-row"><span className="info-label">面料 / 원단</span><span className="info-value">{moData.fabric}</span></div>
+        ) : null}
         <div className="info-row"><span className="info-label">订单数量 / 주문 수량</span><span className="info-value">{orderQty}</span></div>
         <div className="info-row"><span className="info-label">当前状态 / 현재 상태</span><span className="status-pill">{(moData && moData.current_status) || '-'}</span></div>
       </div>
@@ -1336,7 +1367,7 @@ const PackCreateScreen = memo(function PackCreateScreen({
                     {item.selected && <div style={{ width:10, height:10, background:G.gold, borderRadius:1 }} />}
                   </div>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, color:item.selected?G.cream:G.goldDim, fontWeight:400 }}>{item.color}</div>
+                    <div style={{ fontSize:13, color:item.selected?G.cream:G.goldDim, fontWeight:400, display:'flex', alignItems:'center' }}><ColorDot text={item.color} />{item.color}</div>
                     <div style={{ fontSize:10, color:G.goldDim, marginTop:1 }}>Size: {item.size}</div>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
@@ -1353,7 +1384,7 @@ const PackCreateScreen = memo(function PackCreateScreen({
                     {item.selected && <div style={{ width:8, height:8, background:G.gold, borderRadius:1 }} />}
                   </div>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, color:G.cream, fontWeight:400 }}>{item.color}</div>
+                    <div style={{ fontSize:13, color:G.cream, fontWeight:400, display:'flex', alignItems:'center' }}><ColorDot text={item.color} />{item.color}</div>
                     <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>Size: {item.size}</div>
                   </div>
                   <div style={{ fontSize:11, color:G.goldDim }}>×{item.qty || 1}</div>
@@ -1441,7 +1472,7 @@ const PackSuccessScreen = memo(function PackSuccessScreen({ pack, moData, onNext
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
             {pack.items.map((item, i) => (
               <div key={i} style={{ border:'1px solid var(--app-border)', padding:'6px 8px', borderRadius:2 }}>
-                <div style={{ fontSize:11, color:G.cream, fontWeight:400 }}>{item.color}</div>
+                <div style={{ fontSize:11, color:G.cream, fontWeight:400, display:'flex', alignItems:'center' }}><ColorDot text={item.color} />{item.color}</div>
                 <div style={{ fontSize:10, color:G.goldDim }}>{item.size} · {item.qty}</div>
               </div>
             ))}
@@ -1503,7 +1534,7 @@ const ColorSizeMatrix = memo(function ColorSizeMatrix({ items }) {
               const rowTotal = sizes.reduce((s, sz) => s + (sizeMap.get(sz) || 0), 0);
               return (
                 <tr key={c} style={{ borderBottom:'1px solid var(--app-divider)' }}>
-                  <td style={{ padding:'6px 8px', color:G.cream }}>{c}</td>
+                  <td style={{ padding:'6px 8px', color:G.cream }}><span style={{ display:'inline-flex', alignItems:'center' }}><ColorDot text={c} />{c}</span></td>
                   {sizes.map(s => (
                     <td key={s} style={{ padding:'6px 6px', textAlign:'center', color: sizeMap.get(s) ? G.cream : G.goldDim }}>
                       {sizeMap.get(s) || '-'}
@@ -2664,7 +2695,7 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
           uuid: found['Pack_UUID'],
           mo_number: moNum,
           sku: getField(found, 'Style_SKU') || getField(found, 'SKU'),
-          factory: getField(found, 'Factory'),
+          factory: formatFactory(getField(found, 'Factory')),
           pack_sequence: found['Pack_Sequence'],
           total_qty: found['Total_Qty'],
           items,
@@ -2757,7 +2788,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
         const bagData = {
           uuid: foundBag['Bag_UUID'],
           mo_number: moNum,
-          factory: getField(foundBag, 'Factory'),
+          factory: formatFactory(getField(foundBag, 'Factory')),
           destination: getField(foundBag, 'Destination'),
           bag_sequence: foundBag['Bag_Sequence'],
           inner_pack_count: foundBag['Inner_Pack_Count'],
@@ -2878,7 +2909,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
             </div>
             {colorSizeSummary.map((row, i) => (
               <div key={i} style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', padding:'5px 0', borderBottom:'1px solid var(--app-divider)', fontSize:12 }}>
-                <span style={{ color:G.cream }}>{row.color}</span>
+                <span style={{ color:G.cream, display:'inline-flex', alignItems:'center' }}><ColorDot text={row.color} />{row.color}</span>
                 <span style={{ textAlign:'center', color:G.cream }}>{row.size}</span>
                 <span style={{ textAlign:'right', color:G.gold }}>{row.qty}</span>
               </div>
@@ -3033,7 +3064,7 @@ const BatchPackInputScreen = memo(function BatchPackInputScreen({ packMO, onSubm
             <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>每包内容 / 포장 구성</div>
             {packMO.standard_assortment.map((it, i) => (
               <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', fontSize:11, color:G.goldDim, borderBottom:'1px solid var(--app-divider)' }}>
-                <span style={{ color:G.cream }}>{it.color} · {it.size}</span>
+                <span style={{ color:G.cream, display:'inline-flex', alignItems:'center' }}><ColorDot text={it.color} />{it.color} · {it.size}</span>
                 <span style={{ color:G.gold }}>{it.qty} 件</span>
               </div>
             ))}
@@ -4038,10 +4069,27 @@ export default function App() {
         );
         if (!proceed) { setCurrentScreen('scan'); return; }
       }
+      // ── Field discovery for the order-info card (display-only) ──
+      // Factory: from the MO record itself (IKU formatFactory strips "_NN_"),
+      // falling back to the scanned QR factory value.
+      const factoryVal = formatFactory(getField(r, 'Factory') || factory) || '-';
+      // Chinese style name + fabric: probe candidate field names, report hits.
+      const chiStyle = findFieldValue(r, CHINESE_STYLE_NAME_FIELDS);
+      const fabric = findFieldValue(r, FABRIC_FIELDS);
+      console.log('[MO Fetch] field discovery:', {
+        factory_raw: getField(r, 'Factory') || '(empty)',
+        chinese_style_name_field: chiStyle.key || '(none found)',
+        chinese_style_name_value: chiStyle.value || '(empty)',
+        fabric_field: fabric.key || '(none found)',
+        fabric_value: fabric.value || '(empty)',
+      });
+
       const next = {
         mo_number: r['MO_Number'] || moNumber,
         sku: skuStr,
-        factory: factory || '-',
+        factory: factoryVal,
+        chi_style_name: chiStyle.value || '',
+        fabric: fabric.value || '',
         order_qty: parseInt(r['Plan_Total_Quantity']) || 0,
         current_status: status,
         plan_notes: r['Plan_Notes'] || '',
