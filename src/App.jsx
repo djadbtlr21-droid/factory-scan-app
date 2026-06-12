@@ -13,7 +13,7 @@ import {
 } from './qrUtils.js';
 import { generateInnerPackExcel, generateMasterBagExcel, generateSingleInnerPackExcel, generateSingleMasterBagExcel } from './utils/excelLabels.js';
 import { logActivity, getRecentActivities, clearActivities } from './utils/recentActivity.js';
-import { formatFactory, findFieldValue, resolveColorDot, CHINESE_STYLE_NAME_FIELDS, FABRIC_FIELDS } from './utils/displayHelpers.js';
+import { formatFactory, findFieldValue, readLookupSubfield, resolveColorDot, CHINESE_STYLE_NAME_FIELDS } from './utils/displayHelpers.js';
 
 // Small inline color swatch shown before a color name. Keyword-mapped
 // (see resolveColorDot); unmatched colors get a neutral dashed dot so the
@@ -4073,23 +4073,38 @@ export default function App() {
       // Factory: from the MO record itself (IKU formatFactory strips "_NN_"),
       // falling back to the scanned QR factory value.
       const factoryVal = formatFactory(getField(r, 'Factory') || factory) || '-';
-      // Chinese style name + fabric: probe candidate field names, report hits.
+      // Chinese style name: probe candidate field names.
       const chiStyle = findFieldValue(r, CHINESE_STYLE_NAME_FIELDS);
-      const fabric = findFieldValue(r, FABRIC_FIELDS);
+      // 面料 / 원단: MO.Fabric_Name (primary) → linked Style's Fabric_Name (fallback).
+      // Style value is read from the MO response's lookup subfield (no extra call).
+      const fabricMO = getField(r, 'Fabric_Name');
+      const fabricStyle = readLookupSubfield(r, ['Style_SKU', 'Style', 'Styles', 'Style_Name'], 'Fabric_Name');
+      const fabricValue = fabricMO || fabricStyle || '';
+      const fabricSource = fabricMO ? 'MO.Fabric_Name' : (fabricStyle ? 'Style.Fabric_Name' : '(none)');
       console.log('[MO Fetch] field discovery:', {
         factory_raw: getField(r, 'Factory') || '(empty)',
         chinese_style_name_field: chiStyle.key || '(none found)',
         chinese_style_name_value: chiStyle.value || '(empty)',
-        fabric_field: fabric.key || '(none found)',
-        fabric_value: fabric.value || '(empty)',
+        fabric_source: fabricSource,
+        fabric_value: fabricValue || '(empty)',
       });
+      if (!fabricValue) {
+        // Neither source returned a value. Most likely the report is missing the
+        // column. Report the exact report name so the user can add it in Zoho.
+        console.warn(
+          '[MO Fetch] 面料/원단 미표시 — Fabric_Name 값 없음.\n' +
+          '  ① MO 소스: "' + MO_REPORT + '" 리포트에 Fabric_Name 컬럼 추가 필요\n' +
+          '  ② Style 폴백: "' + MO_REPORT + '" 리포트의 Style 연결(lookup) 컬럼에 ' +
+          'Fabric_Name 서브필드를 노출하거나, Styles 리포트에서 가져오도록 컬럼 추가 필요'
+        );
+      }
 
       const next = {
         mo_number: r['MO_Number'] || moNumber,
         sku: skuStr,
         factory: factoryVal,
         chi_style_name: chiStyle.value || '',
-        fabric: fabric.value || '',
+        fabric: fabricValue,
         order_qty: parseInt(r['Plan_Total_Quantity']) || 0,
         current_status: status,
         plan_notes: r['Plan_Notes'] || '',

@@ -32,6 +32,27 @@ export function findFieldValue(rec, candidates) {
   return { key: null, value: '' };
 }
 
+// Read a subfield from a Zoho lookup/connection field on a record.
+// Zoho returns lookup columns either flattened ("Lookup.subKey") or as a
+// nested object ({ subKey, display_value, ID }). Tries both shapes across the
+// candidate lookup field names and returns the first non-empty string value.
+// Used for the Style fallback (MO record's linked Style → Fabric_Name).
+export function readLookupSubfield(rec, lookupKeys, subKey) {
+  if (!rec) return '';
+  for (const lk of lookupKeys) {
+    const flat = rec[lk + '.' + subKey];
+    if (flat != null && flat !== '') {
+      return typeof flat === 'object' ? String(flat.display_value || '') : String(flat);
+    }
+    const obj = rec[lk];
+    if (obj && typeof obj === 'object' && obj[subKey] != null && obj[subKey] !== '') {
+      const v = obj[subKey];
+      return typeof v === 'object' ? String(v.display_value || '') : String(v);
+    }
+  }
+  return '';
+}
+
 // Candidate field names (most-specific first) for probing.
 export const CHINESE_STYLE_NAME_FIELDS = [
   'Chi_Style_Name', 'Chinese_Style_Name', 'Style_Name_CN', 'CN_Name',
