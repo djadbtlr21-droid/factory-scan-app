@@ -39,6 +39,84 @@ function ColorDot({ text }) {
   );
 }
 
+// Lightbox modal — full-screen image overlay.
+// Closes on: X button / overlay click / ESC key.
+function Lightbox({ src, onClose }) {
+  const proxied = '/api/zoho-image?url=' + encodeURIComponent(src);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', h);
+    return () => document.removeEventListener('keydown', h);
+  }, [onClose]);
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+        background: 'rgba(0,0,0,0.88)', zIndex: 10000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <button
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        aria-label="Close"
+        style={{
+          position: 'absolute', top: 16, right: 16,
+          background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff',
+          fontSize: 22, width: 40, height: 40, borderRadius: '50%',
+          cursor: 'pointer', lineHeight: '40px', textAlign: 'center', padding: 0,
+        }}
+      >×</button>
+      {!loaded && (
+        <div className="spinner" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+      )}
+      <img
+        src={proxied}
+        onLoad={() => setLoaded(true)}
+        onClick={(e) => e.stopPropagation()}
+        alt=""
+        style={{
+          maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8,
+          display: loaded ? 'block' : 'none', touchAction: 'pinch-zoom',
+        }}
+      />
+    </div>
+  );
+}
+
+// Thumbnail + integrated lightbox.
+// Shows a rounded square thumbnail; skeleton while loading; hidden on error.
+// Click opens full-screen lightbox.
+function MOThumbnail({ url, size = 72 }) {
+  const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'error'
+  const [open, setOpen] = useState(false);
+  if (!url) return null;
+  const proxied = '/api/zoho-image?url=' + encodeURIComponent(url);
+  if (status === 'error') return null;
+  return (
+    <>
+      <div
+        onClick={() => status === 'ok' && setOpen(true)}
+        style={{
+          width: size, height: size, borderRadius: 8, overflow: 'hidden', flexShrink: 0,
+          background: status === 'loading' ? 'rgba(156,163,175,0.25)' : 'transparent',
+          cursor: status === 'ok' ? 'pointer' : 'default',
+        }}
+      >
+        <img
+          src={proxied}
+          onLoad={() => setStatus('ok')}
+          onError={() => setStatus('error')}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: status === 'ok' ? 'block' : 'none' }}
+        />
+      </div>
+      {open && <Lightbox src={url} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 // Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
 const LOG_FORM = 'Add_Production_Log';
@@ -364,7 +442,10 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
         </div>
       )}
       <div className="card" style={{ marginBottom: 12 }}>
-        <div className="card-title">订单信息 / 주문 정보</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+          <div className="card-title" style={{ marginBottom: 0 }}>订单信息 / 주문 정보</div>
+          <MOThumbnail url={moData && moData.style_image_url} />
+        </div>
         <div className="info-row"><span className="info-label">订单号 / MO</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
         <div className="info-row"><span className="info-label">品号 / SKU</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
         <div className="info-row"><span className="info-label">工厂 / 공장</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
@@ -743,6 +824,24 @@ function getField(rec, key) {
     return '-';
   }
   return String(v);
+}
+
+// Probe a record for a Zoho image field URL.
+// Returns the first URL found, or '' if none.
+const STYLE_IMAGE_KEYS = ['Style_Image', 'Style_Photo', 'Product_Image', 'Image', 'Photo'];
+function extractImageUrl(rec) {
+  if (!rec) return '';
+  for (const k of STYLE_IMAGE_KEYS) {
+    const v = rec[k];
+    if (!v) continue;
+    const s = typeof v === 'string' ? v : String(v.display_value || v.url || v.value || '');
+    if (s.startsWith('http')) return s;
+  }
+  for (const k of STYLE_IMAGE_KEYS) {
+    const s = readLookupSubfield(rec, ['Style_SKU', 'Style', 'Styles', 'Style_Name'], k);
+    if (s && s.startsWith('http')) return s;
+  }
+  return '';
 }
 
 // ─── SVG Icons ────────────────────────────────────────────────────────
@@ -2704,6 +2803,7 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
           modified_time: getField(found, 'Modified_Time'),
           pack_status: found['Pack_Status'] || 'Created',
           is_remainder: found['Is_Remainder'] === 'true' || found['Is_Remainder'] === true,
+          style_image_url: extractImageUrl(found),
         });
       } catch (e) {
         if (!cancelled) setNotFound(true);
@@ -2733,11 +2833,16 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px 20px 18px' }}>
-        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>中间包装详情 / 중간포장 상세</div>
-        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>
-          {record.mo_number} · {record.is_remainder ? '尾包 / 자투리포장' : '标准中包袋 / 표준중간포장'}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>中间包装详情 / 중간포장 상세</div>
+            <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>
+              {record.mo_number} · {record.is_remainder ? '尾包 / 자투리포장' : '标准中包袋 / 표준중간포장'}
+            </div>
+            <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{record.factory}</div>
+          </div>
+          <MOThumbnail url={record.style_image_url} size={64} />
         </div>
-        <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{record.factory}</div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
@@ -2800,6 +2905,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
           modified_time: getField(foundBag, 'Modified_Time'),
           bag_status: foundBag['Bag_Status'] || 'Created',
           received_at_mex: getField(foundBag, 'Received_At_MEX'),
+          style_image_url: extractImageUrl(foundBag),
         };
 
         let packs = [];
@@ -2857,9 +2963,14 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px 20px 18px' }}>
-        <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>麻袋详情 / 마대 상세</div>
-        <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagRecord.mo_number} · 麻袋包装 / 마대포장</div>
-        <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{bagRecord.factory}{bagRecord.destination ? ' → ' + (bagRecord.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : bagRecord.destination) : ''}</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+          <div>
+            <div style={{ fontSize:9, letterSpacing:4, color:G.gold, fontWeight:400 }}>麻袋详情 / 마대 상세</div>
+            <div style={{ fontSize:18, color:G.cream, marginTop:6, fontWeight:400 }}>{bagRecord.mo_number} · 麻袋包装 / 마대포장</div>
+            <div style={{ fontSize:10, color:G.goldDim, marginTop:2 }}>{bagRecord.factory}{bagRecord.destination ? ' → ' + (bagRecord.destination === 'MEX-Guadalajara' ? '墨西哥-과달라하라 / MEX-Guadalajara' : bagRecord.destination) : ''}</div>
+          </div>
+          <MOThumbnail url={bagRecord.style_image_url} size={64} />
+        </div>
       </div>
       <div style={{ padding:'20px 20px 40px' }}>
         <DkCard>
@@ -4105,6 +4216,7 @@ export default function App() {
         factory: factoryVal,
         chi_style_name: chiStyle.value || '',
         fabric: fabricValue,
+        style_image_url: extractImageUrl(r),
         order_qty: parseInt(r['Plan_Total_Quantity']) || 0,
         current_status: status,
         plan_notes: r['Plan_Notes'] || '',
