@@ -45,16 +45,21 @@ function Lightbox({ src, onClose }) {
   const proxied = '/api/zoho-image?url=' + encodeURIComponent(src);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const h = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', h);
-    return () => document.removeEventListener('keydown', h);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener('keydown', h);
+    };
   }, [onClose]);
   return (
     <div
       onClick={onClose}
       style={{
         position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-        background: 'rgba(0,0,0,0.88)', zIndex: 10000,
+        background: 'rgba(0,0,0,0.92)', zIndex: 10000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
@@ -64,8 +69,9 @@ function Lightbox({ src, onClose }) {
         style={{
           position: 'absolute', top: 16, right: 16,
           background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff',
-          fontSize: 22, width: 40, height: 40, borderRadius: '50%',
-          cursor: 'pointer', lineHeight: '40px', textAlign: 'center', padding: 0,
+          fontSize: 24, width: 48, height: 48, borderRadius: '50%',
+          cursor: 'pointer', lineHeight: '48px', textAlign: 'center', padding: 0,
+          touchAction: 'manipulation',
         }}
       >×</button>
       {!loaded && (
@@ -77,8 +83,8 @@ function Lightbox({ src, onClose }) {
         onClick={(e) => e.stopPropagation()}
         alt=""
         style={{
-          maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', borderRadius: 8,
-          display: loaded ? 'block' : 'none', touchAction: 'pinch-zoom',
+          maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain', borderRadius: 8,
+          display: loaded ? 'block' : 'none', touchAction: 'manipulation',
         }}
       />
     </div>
@@ -110,6 +116,41 @@ function MOThumbnail({ url, size = 72 }) {
           onError={() => setStatus('error')}
           alt=""
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: status === 'ok' ? 'block' : 'none' }}
+        />
+      </div>
+      {open && <Lightbox src={url} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+// Full-width image banner for the scan result "订单信息" card.
+// Shows below the card title, above info rows. Hidden when no URL or load error.
+function MOImageBanner({ url }) {
+  const [status, setStatus] = useState('loading');
+  const [open, setOpen] = useState(false);
+  if (!url) return null;
+  const proxied = '/api/zoho-image?url=' + encodeURIComponent(url);
+  if (status === 'error') return null;
+  return (
+    <>
+      <div
+        style={{
+          width: '100%', borderRadius: 12, overflow: 'hidden',
+          background: '#f5f0e8', marginBottom: 14,
+          cursor: status === 'ok' ? 'pointer' : 'default',
+        }}
+        onClick={() => status === 'ok' && setOpen(true)}
+      >
+        {status === 'loading' && <div className="img-skeleton" />}
+        <img
+          src={proxied}
+          onLoad={() => setStatus('ok')}
+          onError={() => setStatus('error')}
+          alt=""
+          style={{
+            width: '100%', maxHeight: 220, objectFit: 'contain',
+            padding: '8px 0', display: status === 'ok' ? 'block' : 'none',
+          }}
         />
       </div>
       {open && <Lightbox src={url} onClose={() => setOpen(false)} />}
@@ -442,10 +483,8 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
         </div>
       )}
       <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-          <div className="card-title" style={{ marginBottom: 0 }}>订单信息 / 주문 정보</div>
-          <MOThumbnail url={moData && moData.style_image_url} />
-        </div>
+        <div className="card-title">订单信息 / 주문 정보</div>
+        <MOImageBanner url={moData && moData.style_image_url} />
         <div className="info-row"><span className="info-label">订单号 / MO</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
         <div className="info-row"><span className="info-label">品号 / SKU</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
         <div className="info-row"><span className="info-label">工厂 / 공장</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
