@@ -159,7 +159,7 @@ function MOImageBanner({ url }) {
   );
 }
 
-function MOImageThumb({ url, containerStyle }) {
+function MOImageThumb({ url, containerStyle, imgStyle }) {
   const [status, setStatus] = useState('loading');
   const [open, setOpen] = useState(false);
   if (!url) return null;
@@ -177,14 +177,14 @@ function MOImageThumb({ url, containerStyle }) {
         }}
       >
         {status === 'loading' && (
-          <div style={{ width: '100%', height: '100%', background: '#f5f0e8', animation: 'imgSkeletonPulse 1.5s ease-in-out infinite' }} />
+          <div style={{ width: '100%', height: '100%', background: 'transparent', animation: 'imgSkeletonPulse 1.5s ease-in-out infinite' }} />
         )}
         <img
           src={proxied}
           onLoad={() => setStatus('ok')}
           onError={() => setStatus('error')}
           alt=""
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: status === 'ok' ? 'block' : 'none' }}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: status === 'ok' ? 'block' : 'none', ...imgStyle }}
         />
       </div>
       {open && <Lightbox src={url} onClose={() => setOpen(false)} />}
@@ -525,10 +525,11 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
       )}
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-title">订单信息 / 주문 정보</div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+        {/* 상단 2열 */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           {/* 좌측: 텍스트 전체 */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* [1] 인라인 label : value 행들 */}
+            {/* [1] 1줄 형식 label : value */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                 <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>订单号 / MO</span>
@@ -549,7 +550,7 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
                 </div>
               ) : null}
             </div>
-            {/* [2] 구분선 + 2줄형 블록 (SKU, 중문 스타일명) */}
+            {/* [2] 구분선(텍스트 컬럼 너비) + 2줄 블록 */}
             {(moData?.sku || moData?.chi_style_name) ? (
               <>
                 <div style={{ borderTop: '0.5px solid var(--border-subtle)', margin: '8px 0' }} />
@@ -569,17 +570,22 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
                 </div>
               </>
             ) : null}
-            {/* [3] 구분선 + 当前状态 (텍스트 컬럼 너비만큼) */}
-            <div style={{ borderTop: '0.5px solid var(--border-subtle)', marginTop: 10, paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>当前状态 / 현재 상태</span>
-              <span className="status-pill">{(moData && moData.current_status) || '-'}</span>
-            </div>
           </div>
-          {/* 우측: 세로 직사각형 이미지 */}
+          {/* 우측: 88×210 이미지, contain + top 정렬 */}
           <MOImageThumb
             url={moData && moData.style_image_url}
-            containerStyle={{ flex: '0 0 78px', width: undefined, aspectRatio: undefined, alignSelf: 'stretch', borderRadius: 8 }}
+            containerStyle={{
+              width: 88, height: 210, flexShrink: 0, alignSelf: 'flex-start',
+              borderRadius: 8, background: 'var(--color-background-secondary)',
+              aspectRatio: undefined,
+            }}
+            imgStyle={{ objectFit: 'contain', objectPosition: 'top' }}
           />
+        </div>
+        {/* 하단 전체 너비: 구분선 + 当前状态 */}
+        <div style={{ borderTop: '0.5px solid var(--border-subtle)', marginTop: 10, paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>当前状态 / 현재 상태</span>
+          <span className="status-pill">{(moData && moData.current_status) || '-'}</span>
         </div>
       </div>
 
