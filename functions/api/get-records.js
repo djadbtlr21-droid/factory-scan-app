@@ -20,8 +20,16 @@ export async function onRequest({ request, env }) {
     const zohoHeaders = { Accept: 'application/json' };
     if (record_cursor) zohoHeaders['record_cursor'] = record_cursor;
 
+    if (report === 'Production_Log_Report') {
+      console.log('[PLR-debug] Zoho URL:', url);
+    }
+
     const zres = await zohoFetch(env, url, { headers: zohoHeaders });
     const raw = await zres.text();
+
+    if (report === 'Production_Log_Report') {
+      console.log('[PLR-debug] status:', zres.status, '| body[:500]:', raw.slice(0, 500));
+    }
     let body = null;
     try { body = raw ? JSON.parse(raw) : null; } catch { body = { raw }; }
     if (!zres.ok) {
