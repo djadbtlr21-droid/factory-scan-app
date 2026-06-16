@@ -866,11 +866,30 @@ function getField(rec, key) {
 }
 
 // Probe a record for a Zoho image field URL.
-// Returns the first URL found, or '' if none.
-// Handles: string, object with url/display_value/value, array of strings or objects.
+// Returns the first absolute URL found, or '' if none.
+// Handles:
+//   - string "https://..." → direct
+//   - string "[\"\/api\/v2.1\/...\"]" → JSON-encoded array of relative paths
+//   - JS array of strings or objects
+//   - object with download_url / url / display_value / value
+const ZOHO_CREATOR_BASE = 'https://creator.zoho.com';
 const STYLE_IMAGE_KEYS = ['Style_Image', 'Style_Photo', 'Product_Image', 'Image', 'Photo'];
 function pickUrlFromValue(v) {
   if (!v) return '';
+  // JSON-encoded string array from Zoho Creator image field, e.g.
+  // "[\"/api/v2.1/jeramoda/eom/report/All_MO/.../download?filepath=...\"]"
+  if (typeof v === 'string' && v.trimStart().startsWith('[')) {
+    try {
+      const arr = JSON.parse(v);
+      if (Array.isArray(arr) && arr.length > 0) {
+        const path = String(arr[0] || '');
+        if (path.startsWith('http')) return path;
+        if (path.startsWith('/')) return ZOHO_CREATOR_BASE + path;
+      }
+    } catch (_) { /* fall through */ }
+    return '';
+  }
+  if (typeof v === 'string') return v.startsWith('http') ? v : '';
   if (Array.isArray(v)) {
     for (const item of v) {
       const s = pickUrlFromValue(item);
@@ -878,9 +897,10 @@ function pickUrlFromValue(v) {
     }
     return '';
   }
-  if (typeof v === 'string') return v.startsWith('http') ? v : '';
   const s = String(v.download_url || v.url || v.display_value || v.value || '');
-  return s.startsWith('http') ? s : '';
+  if (s.startsWith('http')) return s;
+  if (s.startsWith('/')) return ZOHO_CREATOR_BASE + s;
+  return '';
 }
 function extractImageUrl(rec) {
   if (!rec) return '';
