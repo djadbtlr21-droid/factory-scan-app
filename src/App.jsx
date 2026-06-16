@@ -895,7 +895,11 @@ function pickUrlFromValue(v) {
     } catch (_) { /* fall through */ }
     return '';
   }
-  if (typeof v === 'string') return v.startsWith('http') ? v : '';
+  if (typeof v === 'string') {
+    if (v.startsWith('http')) return v;
+    if (v.startsWith('/')) return ZOHO_CREATOR_BASE + v;
+    return '';
+  }
   if (Array.isArray(v)) {
     for (const item of v) {
       const s = pickUrlFromValue(item);

@@ -10,6 +10,8 @@
 
 import { zohoFetch, query, json } from './_zoho.js';
 
+// Zoho Creator image download URLs use creator.zoho.com as the base.
+const CREATOR_BASE = 'https://creator.zoho.com';
 const ALLOWED_SUFFIXES = ['.zohoapis.com', '.zoho.com', '.zohostatic.com', '.zohocdn.com'];
 
 function isZohoUrl(raw) {
@@ -24,9 +26,14 @@ function isZohoUrl(raw) {
 
 export async function onRequest({ request, env }) {
   const q = query(request);
-  const imageUrl = q.get('url');
+  const rawParam = q.get('url');
 
-  if (!imageUrl) return json({ error: 'Missing url parameter' }, 400);
+  if (!rawParam) return json({ error: 'Missing url parameter' }, 400);
+
+  // Resolve relative paths from Zoho Creator image fields.
+  // e.g. "/api/v2.1/jeramoda/eom/report/..." → "https://creator.zoho.com/api/v2.1/..."
+  const imageUrl = rawParam.startsWith('/api/') ? CREATOR_BASE + rawParam : rawParam;
+
   if (!isZohoUrl(imageUrl)) return json({ error: 'Forbidden: URL must be a Zoho domain' }, 403);
 
   try {
