@@ -136,7 +136,7 @@ function MOImageBanner({ url }) {
       <div
         style={{
           width: '100%', borderRadius: 12, overflow: 'hidden',
-          background: '#f5f0e8', marginBottom: 14,
+          background: '#f5f0e8', marginBottom: 12,
           cursor: status === 'ok' ? 'pointer' : 'default',
         }}
         onClick={() => status === 'ok' && setOpen(true)}
@@ -910,6 +910,29 @@ function pickUrlFromValue(v) {
 }
 function extractImageUrl(rec) {
   if (!rec) return '';
+  // Priority: direct JSON-array string from Zoho Creator image field.
+  // e.g. Style_Image = '["/api/v2.1/.../download?filepath=..."]'
+  for (const k of STYLE_IMAGE_KEYS) {
+    const raw = rec[k];
+    if (typeof raw === 'string') {
+      const t = raw.trim();
+      if (t.startsWith('[')) {
+        try {
+          const arr = JSON.parse(t);
+          if (Array.isArray(arr)) {
+            for (const item of arr) {
+              const p = String(item || '');
+              if (p.startsWith('/')) return 'https://creator.zoho.com' + p;
+              if (p.startsWith('http')) return p;
+            }
+          }
+        } catch (_) {}
+      } else if (t.startsWith('http')) {
+        return t;
+      }
+    }
+  }
+  // Fallback: generic object/array probe via pickUrlFromValue.
   for (const k of STYLE_IMAGE_KEYS) {
     const s = pickUrlFromValue(rec[k]);
     if (s) return s;
