@@ -922,7 +922,8 @@ function extractImageUrl(rec) {
       const t = raw.trim();
       if (t.startsWith('[')) {
         try {
-          const arr = JSON.parse(t);
+          // Zoho sometimes returns [#"..."] — strip the # before parsing
+          const arr = JSON.parse(t.replace(/^\[#/, '['));
           if (Array.isArray(arr)) {
             for (const item of arr) {
               const p = String(item || '');
