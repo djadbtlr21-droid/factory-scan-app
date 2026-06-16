@@ -12,7 +12,7 @@ async function jfetch(url, opts) {
 }
 
 export function getRecords(report, criteria = '', { record_cursor, sort_by, sort_order, max_records } = {}) {
-  let url = '/functions/api/get-records?report=' + encodeURIComponent(report);
+  let url = '/api/get-records?report=' + encodeURIComponent(report);
   if (criteria) url += '&criteria=' + encodeURIComponent(criteria);
   if (record_cursor) url += '&record_cursor=' + encodeURIComponent(record_cursor);
   if (sort_by) url += '&sort_by=' + encodeURIComponent(sort_by);
