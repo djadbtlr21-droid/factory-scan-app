@@ -4199,26 +4199,9 @@ export default function App() {
   const fetchLogs = useCallback(async (moNumber) => {
     setLogsLoading(true);
     try {
-      // MO_Number is a Lookup field in Production_Log_Report — Zoho criteria
-      // on lookup fields returns 400 (error 1060). Fetch recent records without
-      // criteria and filter client-side instead.
-      const res = await getRecords(LOG_REPORT, '', { max_records: 50 });
-      let list = [];
-      if (res && res.code === 3000 && Array.isArray(res.data)) {
-        list = res.data.filter(r => {
-          let recMO = r['MO_Number'];
-          if (typeof recMO === 'object') recMO = recMO.display_value || '';
-          return recMO === moNumber;
-        });
-        list.sort((a, b) => {
-          let da = a['Log_Date'] || '';
-          let db = b['Log_Date'] || '';
-          if (typeof da === 'object') da = da.display_value || '';
-          if (typeof db === 'object') db = db.display_value || '';
-          return parseDateRaw(String(db)) - parseDateRaw(String(da));
-        });
-      }
-      setLogs(list);
+      const criteria = `MO_Number == "${moNumber}"`;
+      const res = await getRecords(LOG_REPORT, criteria, { max_records: 200 });
+      setLogs((res && res.code === 3000 && Array.isArray(res.data)) ? res.data : []);
     } catch (err) {
       console.error('[fetchLogs] error:', err?.body?.upstream || err?.body || err?.message || err);
       setLogs([]);
