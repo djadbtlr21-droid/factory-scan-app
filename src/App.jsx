@@ -867,14 +867,26 @@ function getField(rec, key) {
 
 // Probe a record for a Zoho image field URL.
 // Returns the first URL found, or '' if none.
+// Handles: string, object with url/display_value/value, array of strings or objects.
 const STYLE_IMAGE_KEYS = ['Style_Image', 'Style_Photo', 'Product_Image', 'Image', 'Photo'];
+function pickUrlFromValue(v) {
+  if (!v) return '';
+  if (Array.isArray(v)) {
+    for (const item of v) {
+      const s = pickUrlFromValue(item);
+      if (s) return s;
+    }
+    return '';
+  }
+  if (typeof v === 'string') return v.startsWith('http') ? v : '';
+  const s = String(v.download_url || v.url || v.display_value || v.value || '');
+  return s.startsWith('http') ? s : '';
+}
 function extractImageUrl(rec) {
   if (!rec) return '';
   for (const k of STYLE_IMAGE_KEYS) {
-    const v = rec[k];
-    if (!v) continue;
-    const s = typeof v === 'string' ? v : String(v.display_value || v.url || v.value || '');
-    if (s.startsWith('http')) return s;
+    const s = pickUrlFromValue(rec[k]);
+    if (s) return s;
   }
   for (const k of STYLE_IMAGE_KEYS) {
     const s = readLookupSubfield(rec, ['Style_SKU', 'Style', 'Styles', 'Style_Name'], k);
@@ -4231,12 +4243,20 @@ export default function App() {
       const fabricStyle = readLookupSubfield(r, ['Style_SKU', 'Style', 'Styles', 'Style_Name'], 'Fabric_Name');
       const fabricValue = fabricMO || fabricStyle || '';
       const fabricSource = fabricMO ? 'MO.Fabric_Name' : (fabricStyle ? 'Style.Fabric_Name' : '(none)');
+      const styleImageRaw = r['Style_Image'];
+      const styleImageUrl = extractImageUrl(r);
       console.log('[MO Fetch] field discovery:', {
         factory_raw: getField(r, 'Factory') || '(empty)',
         chinese_style_name_field: chiStyle.key || '(none found)',
         chinese_style_name_value: chiStyle.value || '(empty)',
         fabric_source: fabricSource,
         fabric_value: fabricValue || '(empty)',
+        style_image_raw: styleImageRaw !== undefined
+          ? (typeof styleImageRaw === 'string'
+              ? styleImageRaw.slice(0, 120)
+              : JSON.stringify(styleImageRaw).slice(0, 120))
+          : '(field absent)',
+        style_image_value: styleImageUrl || '(none extracted)',
       });
       if (!fabricValue) {
         // Neither source returned a value. Most likely the report is missing the
@@ -4255,7 +4275,7 @@ export default function App() {
         factory: factoryVal,
         chi_style_name: chiStyle.value || '',
         fabric: fabricValue,
-        style_image_url: extractImageUrl(r),
+        style_image_url: styleImageUrl,
         order_qty: parseInt(r['Plan_Total_Quantity']) || 0,
         current_status: status,
         plan_notes: r['Plan_Notes'] || '',
