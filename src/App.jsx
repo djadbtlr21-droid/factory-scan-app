@@ -4200,7 +4200,7 @@ export default function App() {
     setLogsLoading(true);
     try {
       const criteria = `MO_Number == "${moNumber}"`;
-      const res = await getRecords(LOG_REPORT, criteria, { sort_by: 'Log_Date', sort_order: 'desc', max_records: 50 });
+      const res = await getRecords(LOG_REPORT, criteria, { max_records: 50 });
       setLogs((res && res.code === 3000 && Array.isArray(res.data)) ? res.data : []);
     } catch {
       setLogs([]);
