@@ -158,9 +158,7 @@ function MOImageBanner({ url }) {
   );
 }
 
-// Small square thumbnail for the 2-column order-info header.
-// 30% width, square crop (object-fit: cover), click → full-screen lightbox.
-function MOImageThumb({ url }) {
+function MOImageThumb({ url, containerStyle }) {
   const [status, setStatus] = useState('loading');
   const [open, setOpen] = useState(false);
   if (!url) return null;
@@ -171,9 +169,10 @@ function MOImageThumb({ url }) {
       <div
         onClick={() => status === 'ok' && setOpen(true)}
         style={{
-          width: '28%', aspectRatio: '1 / 1', flexShrink: 0,
-          borderRadius: 10, overflow: 'hidden', background: '#f5f0e8',
+          flexShrink: 0, overflow: 'hidden', background: '#f5f0e8',
           cursor: status === 'ok' ? 'pointer' : 'default',
+          width: '28%', aspectRatio: '1 / 1', borderRadius: 10,
+          ...containerStyle,
         }}
       >
         {status === 'loading' && (
@@ -525,24 +524,62 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
       )}
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-title">订单信息 / 주문 정보</div>
-        {/* 상단: 좌측 핵심 3개 정보 + 우측 썸네일 */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 4 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'stretch' }}>
+          {/* 좌측: 텍스트 전체 */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="info-row"><span className="info-label">订单号 / MO</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
-            <div className="info-row"><span className="info-label">工厂 / 공장</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
-            <div className="info-row"><span className="info-label">订单数量 / 주문 수량</span><span className="info-value">{orderQty}</span></div>
+            {/* [1] 인라인 label : value 행들 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>订单号 / MO</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{(moData && moData.mo_number) || '-'}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>工厂 / 공장</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{(moData && moData.factory) || '-'}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>订单数量 / 주문 수량</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{orderQty}</span>
+              </div>
+              {moData && moData.fabric ? (
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>面料 / 원단</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{moData.fabric}</span>
+                </div>
+              ) : null}
+            </div>
+            {/* [2] 구분선 + 2줄형 블록 (SKU, 중문 스타일명) */}
+            {(moData?.sku || moData?.chi_style_name) ? (
+              <>
+                <div style={{ borderTop: '0.5px solid var(--border-subtle)', margin: '8px 0' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {moData?.sku ? (
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>品号 / SKU</div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{moData.sku}</div>
+                    </div>
+                  ) : null}
+                  {moData?.chi_style_name ? (
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>中文款名 / 중문 스타일명</div>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>{moData.chi_style_name}</div>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
           </div>
-          <MOImageThumb url={moData && moData.style_image_url} />
+          {/* 우측: 세로 직사각형 이미지 */}
+          <MOImageThumb
+            url={moData && moData.style_image_url}
+            containerStyle={{ flex: '0 0 78px', width: undefined, aspectRatio: undefined, alignSelf: 'stretch', borderRadius: 8 }}
+          />
         </div>
-        {/* 하단: 나머지 정보 행들 */}
-        <div className="info-row"><span className="info-label">品号 / SKU</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
-        {moData && moData.chi_style_name ? (
-          <div className="info-row"><span className="info-label">中文款名 / 중문 스타일명</span><span className="info-value">{moData.chi_style_name}</span></div>
-        ) : null}
-        {moData && moData.fabric ? (
-          <div className="info-row"><span className="info-label">面料 / 원단</span><span className="info-value">{moData.fabric}</span></div>
-        ) : null}
-        <div className="info-row"><span className="info-label">当前状态 / 현재 상태</span><span className="status-pill">{(moData && moData.current_status) || '-'}</span></div>
+        {/* 전체 너비 하단: 구분선 + 현재 상태 뱃지 */}
+        <div style={{ borderTop: '0.5px solid var(--border-subtle)', marginTop: 10, paddingTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>当前状态 / 현재 상태</span>
+          <span className="status-pill">{(moData && moData.current_status) || '-'}</span>
+        </div>
       </div>
 
       {notesRows.length > 0 && (
