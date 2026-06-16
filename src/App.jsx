@@ -158,6 +158,40 @@ function MOImageBanner({ url }) {
   );
 }
 
+// Small square thumbnail for the 2-column order-info header.
+// 30% width, square crop (object-fit: cover), click → full-screen lightbox.
+function MOImageThumb({ url }) {
+  const [status, setStatus] = useState('loading');
+  const [open, setOpen] = useState(false);
+  if (!url) return null;
+  const proxied = '/api/zoho-image?url=' + encodeURIComponent(url);
+  if (status === 'error') return null;
+  return (
+    <>
+      <div
+        onClick={() => status === 'ok' && setOpen(true)}
+        style={{
+          width: '28%', aspectRatio: '1 / 1', flexShrink: 0,
+          borderRadius: 10, overflow: 'hidden', background: '#f5f0e8',
+          cursor: status === 'ok' ? 'pointer' : 'default',
+        }}
+      >
+        {status === 'loading' && (
+          <div style={{ width: '100%', height: '100%', background: '#f5f0e8', animation: 'imgSkeletonPulse 1.5s ease-in-out infinite' }} />
+        )}
+        <img
+          src={proxied}
+          onLoad={() => setStatus('ok')}
+          onError={() => setStatus('error')}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: status === 'ok' ? 'block' : 'none' }}
+        />
+      </div>
+      {open && <Lightbox src={url} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 // Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
 const LOG_FORM = 'Add_Production_Log';
@@ -491,17 +525,23 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
       )}
       <div className="card" style={{ marginBottom: 12 }}>
         <div className="card-title">订单信息 / 주문 정보</div>
-        <MOImageBanner url={moData && moData.style_image_url} />
-        <div className="info-row"><span className="info-label">订单号 / MO</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
+        {/* 상단: 좌측 핵심 3개 정보 + 우측 썸네일 */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 4 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="info-row"><span className="info-label">订单号 / MO</span><span className="info-value">{(moData && moData.mo_number) || '-'}</span></div>
+            <div className="info-row"><span className="info-label">工厂 / 공장</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
+            <div className="info-row"><span className="info-label">订单数量 / 주문 수량</span><span className="info-value">{orderQty}</span></div>
+          </div>
+          <MOImageThumb url={moData && moData.style_image_url} />
+        </div>
+        {/* 하단: 나머지 정보 행들 */}
         <div className="info-row"><span className="info-label">品号 / SKU</span><span className="info-value">{(moData && moData.sku) || '-'}</span></div>
-        <div className="info-row"><span className="info-label">工厂 / 공장</span><span className="info-value">{(moData && moData.factory) || '-'}</span></div>
         {moData && moData.chi_style_name ? (
           <div className="info-row"><span className="info-label">中文款名 / 중문 스타일명</span><span className="info-value">{moData.chi_style_name}</span></div>
         ) : null}
         {moData && moData.fabric ? (
           <div className="info-row"><span className="info-label">面料 / 원단</span><span className="info-value">{moData.fabric}</span></div>
         ) : null}
-        <div className="info-row"><span className="info-label">订单数量 / 주문 수량</span><span className="info-value">{orderQty}</span></div>
         <div className="info-row"><span className="info-label">当前状态 / 현재 상태</span><span className="status-pill">{(moData && moData.current_status) || '-'}</span></div>
       </div>
 
