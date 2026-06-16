@@ -11,10 +11,13 @@ async function jfetch(url, opts) {
   return body;
 }
 
-export function getRecords(report, criteria = '', { record_cursor } = {}) {
+export function getRecords(report, criteria = '', { record_cursor, sort_by, sort_order, max_records } = {}) {
   let url = '/api/get-records?report=' + encodeURIComponent(report);
   if (criteria) url += '&criteria=' + encodeURIComponent(criteria);
   if (record_cursor) url += '&record_cursor=' + encodeURIComponent(record_cursor);
+  if (sort_by) url += '&sort_by=' + encodeURIComponent(sort_by);
+  if (sort_order) url += '&sort_order=' + encodeURIComponent(sort_order);
+  if (max_records) url += '&max_records=' + encodeURIComponent(max_records);
   return jfetch(url);
 }
 

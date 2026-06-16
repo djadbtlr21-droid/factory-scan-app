@@ -4176,22 +4176,9 @@ export default function App() {
     setLogsShown(true);
     setLogsLoading(true);
     try {
-      const res = await getRecords(LOG_REPORT);
-      let list = [];
-      if (res && res.code === 3000 && Array.isArray(res.data)) {
-        list = res.data.filter((r) => {
-          let recMO = r['MO_Number'];
-          if (typeof recMO === 'object') recMO = recMO.display_value || '';
-          return recMO === moNumber;
-        });
-        list.sort((a, b) => {
-          let da = a['Log_Date'] || '';
-          let db = b['Log_Date'] || '';
-          if (typeof da === 'object') da = da.display_value || '';
-          if (typeof db === 'object') db = db.display_value || '';
-          return parseDateRaw(String(db)) - parseDateRaw(String(da));
-        });
-      }
+      const criteria = `MO_Number == "${moNumber}"`;
+      const res = await getRecords(LOG_REPORT, criteria, { sort_by: 'Log_Date', sort_order: 'desc', max_records: 50 });
+      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
       setLogs(list);
     } catch {
       setLogs([]);

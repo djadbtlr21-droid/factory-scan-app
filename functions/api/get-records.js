@@ -9,8 +9,13 @@ export async function onRequest({ request, env }) {
     const criteria = q.get('criteria') || '';
     const record_cursor = q.get('record_cursor') || '';
 
-    const url = `${zohoBase(env)}/report/${encodeURIComponent(report)}?max_records=200`
-      + (criteria ? `&criteria=${encodeURIComponent(criteria)}` : '');
+    const maxRecords = parseInt(q.get('max_records') || '200', 10) || 200;
+    const sortBy = q.get('sort_by') || '';
+    const sortOrder = q.get('sort_order') || '';
+    const url = `${zohoBase(env)}/report/${encodeURIComponent(report)}?max_records=${maxRecords}`
+      + (criteria ? `&criteria=${encodeURIComponent(criteria)}` : '')
+      + (sortBy ? `&sort_by=${encodeURIComponent(sortBy)}` : '')
+      + (sortOrder ? `&sort_order=${encodeURIComponent(sortOrder)}` : '');
 
     const zohoHeaders = { Accept: 'application/json' };
     if (record_cursor) zohoHeaders['record_cursor'] = record_cursor;
