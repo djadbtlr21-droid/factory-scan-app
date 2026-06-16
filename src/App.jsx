@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import jsQR from 'jsqr';
 import { getRecords, getRecordsByCriteria, submitRecord, updateRecord, deleteRecord } from './api.js';
 import {
@@ -39,7 +39,7 @@ function ColorDot({ text }) {
   );
 }
 
-// Lightbox modal — full-screen image overlay.
+// Lightbox modal — full-screen image overlay rendered via portal into document.body.
 // Closes on: X button / overlay click / ESC key.
 function Lightbox({ src, onClose }) {
   const proxied = '/api/zoho-image?url=' + encodeURIComponent(src);
@@ -54,12 +54,12 @@ function Lightbox({ src, onClose }) {
       document.removeEventListener('keydown', h);
     };
   }, [onClose]);
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-        background: 'rgba(0,0,0,0.92)', zIndex: 10000,
+        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+        background: 'rgba(0,0,0,0.92)', zIndex: 9999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
@@ -87,7 +87,8 @@ function Lightbox({ src, onClose }) {
           display: loaded ? 'block' : 'none', touchAction: 'manipulation',
         }}
       />
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -568,17 +569,17 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
                 </div>
               </>
             ) : null}
+            {/* [3] 구분선 + 当前状态 (텍스트 컬럼 너비만큼) */}
+            <div style={{ borderTop: '0.5px solid var(--border-subtle)', marginTop: 10, paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>当前状态 / 현재 상태</span>
+              <span className="status-pill">{(moData && moData.current_status) || '-'}</span>
+            </div>
           </div>
           {/* 우측: 세로 직사각형 이미지 */}
           <MOImageThumb
             url={moData && moData.style_image_url}
             containerStyle={{ flex: '0 0 78px', width: undefined, aspectRatio: undefined, alignSelf: 'stretch', borderRadius: 8 }}
           />
-        </div>
-        {/* 전체 너비 하단: 구분선 + 현재 상태 뱃지 */}
-        <div style={{ borderTop: '0.5px solid var(--border-subtle)', marginTop: 10, paddingTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>当前状态 / 현재 상태</span>
-          <span className="status-pill">{(moData && moData.current_status) || '-'}</span>
         </div>
       </div>
 
