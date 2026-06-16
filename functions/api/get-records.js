@@ -33,12 +33,8 @@ export async function onRequest({ request, env }) {
     let body = null;
     try { body = raw ? JSON.parse(raw) : null; } catch { body = { raw }; }
     if (!zres.ok) {
-      if (zres.status === 400) {
-        console.log('[get-records] 400 from Zoho — treating as empty result:', raw.slice(0, 200));
-        return json({ code: 3000, data: [], message: 'Empty result (400 treated as success)' });
-      }
-      console.error('[get-records] upstream', { status: zres.status, url, body });
-      return json({ error: 'Zoho API ' + zres.status, url, upstream: body }, zres.status);
+      console.error('[get-records] upstream', { status: zres.status, url, body: raw.slice(0, 500) });
+      return json({ error: 'Zoho API ' + zres.status, upstream: body }, zres.status);
     }
     const nextCursor = zres.headers.get('record_cursor') || null;
     return json({ ...body, record_cursor: nextCursor });

@@ -4202,7 +4202,8 @@ export default function App() {
       const criteria = `MO_Number == "${moNumber}"`;
       const res = await getRecords(LOG_REPORT, criteria, { max_records: 50 });
       setLogs((res && res.code === 3000 && Array.isArray(res.data)) ? res.data : []);
-    } catch {
+    } catch (err) {
+      console.error('[fetchLogs] Zoho error:', err?.body?.upstream || err?.body || err?.message || err);
       setLogs([]);
     } finally {
       setLogsLoading(false);
