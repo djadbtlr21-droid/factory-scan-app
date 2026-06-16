@@ -161,6 +161,7 @@ function MOImageBanner({ url }) {
 // Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
 const LOG_FORM = 'Add_Production_Log';
+const LOG_REPORT = 'Production_Log_Report';
 
 function buildMOData(mo) {
   const assortment = mo?.standard_assortment || [];
@@ -433,20 +434,46 @@ const LoadingScreen = memo(function LoadingScreen({ message }) {
   );
 });
 
-const InfoScreen = memo(function InfoScreen({ moData, selectedKey, onSelectProcess, onBack }) {
+const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selectedKey, onSelectProcess, onBack }) {
   const notesRows = useMemo(() => parsePlanNotes(moData && moData.plan_notes), [moData]);
   const orderQty = moData && moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-';
 
-  const ProcBtn = ({ p, full }) => (
-    <div
-      className={'proc-btn' + (full ? ' proc-full' : '') + (selectedKey === p.code ? ' selected' : '')}
-      onClick={() => onSelectProcess(p.code, p.zh, p.ko, p.moField, p.zohoValue)}
-    >
-      <span className="proc-icon">{p.emoji}</span>
-      <div className="proc-name">{p.zh}</div>
-      <div className="proc-sub">{p.ko}</div>
-    </div>
-  );
+  // 공정별 최신 기록 맵 (logs는 내림차순 정렬됨 → 첫 항목이 최신)
+  const processStatusMap = useMemo(() => {
+    if (!logs || !logs.length) return {};
+    const map = {};
+    logs.forEach(r => {
+      const proc = r['Process'];
+      if (!proc || map[proc]) return;
+      map[proc] = {
+        qty: parseInt(r['Completed_Qty']) || 0,
+        date: r['Log_Date'] || r['Log_DateTime'] || r['Added_Time'] || '',
+      };
+    });
+    return map;
+  }, [logs]);
+
+  const ProcBtn = ({ p, full }) => {
+    const st = processStatusMap[p.zohoValue];
+    return (
+      <div
+        className={'proc-btn' + (full ? ' proc-full' : '') + (selectedKey === p.code ? ' selected' : '')}
+        onClick={() => onSelectProcess(p.code, p.zh, p.ko, p.moField, p.zohoValue)}
+      >
+        <span className="proc-icon">{st ? '✅' : p.emoji}</span>
+        <div className="proc-name">{p.zh}</div>
+        <div className="proc-sub">{p.ko}</div>
+        {st ? (
+          <>
+            <span className="proc-status proc-status-done">✅ 기록완료 {formatDate(String(st.date))}</span>
+            <span className="proc-status" style={{ color: 'var(--app-gold, #c9a84c)', fontSize: 10 }}>📦 {st.qty.toLocaleString()}件</span>
+          </>
+        ) : (
+          <span className="proc-status proc-status-pending">⏳ 未记录 / 미기록</span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="screen active" id="screen-info" style={{ background: 'var(--surface2)', minHeight: '100vh', width: '100%', padding: 16 }}>
@@ -496,6 +523,39 @@ const InfoScreen = memo(function InfoScreen({ moData, selectedKey, onSelectProce
           <ProcBtn p={PROCESSES[5]} />
           <ProcBtn p={PROCESSES[6]} />
           <ProcBtn p={PROCESSES[7]} full />
+        </div>
+      </div>
+
+      <div className="card" id="log-section" style={{ marginBottom: 12 }}>
+        <div className="card-title">工序记录 / 공정기록</div>
+        <div id="log-list">
+          {logsLoading ? (
+            <div className="log-loading"><div className="log-spinner"></div>加载中 / 로딩...</div>
+          ) : !logs || logs.length === 0 ? (
+            <div className="log-empty">暂无工序记录 / 공정 기록 없음</div>
+          ) : logs.map((r, i) => {
+            const process = r['Process'] || '-';
+            const completed = parseInt(r['Completed_Qty']) || 0;
+            const defect = parseInt(r['Defect_Qty']) || 0;
+            let worker = r['Worker'] || r['Worker_Name'] || r['Responsible'] || '';
+            if (typeof worker === 'object') worker = worker.display_value || '';
+            worker = String(worker).trim() || '未填写';
+            const date = formatDate(r['Log_Date'] || r['Log_DateTime'] || r['Created_Time'] || '');
+            const notes = r['Notes'] || '';
+            return (
+              <div key={i} className="log-item">
+                <div>
+                  <div className="log-process"><span className="log-dot"></span>{process}</div>
+                  <div className="log-meta">负责人: {worker}{notes ? ' · ' + notes : ''}</div>
+                </div>
+                <div>
+                  <div className="log-qty">完成 {completed.toLocaleString()}件</div>
+                  {defect > 0 && <div className="log-defect">▲ 불량 {defect}件</div>}
+                  <div className="log-date">{date}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -4022,6 +4082,8 @@ export default function App() {
   const [moData, setMoData] = useState(null);
   const [moRecordId, setMoRecordId] = useState('');
   const [selectedProcess, setSelectedProcess] = useState({ key: '', cn: '' });
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('正在读取订单信息...');
   const [submitResult, setSubmitResult] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -4134,6 +4196,19 @@ export default function App() {
   useEffect(() => { window.scrollTo(0, 0); }, [currentScreen]);
 
 
+  const fetchLogs = useCallback(async (moNumber) => {
+    setLogsLoading(true);
+    try {
+      const criteria = `MO_Number == "${moNumber}"`;
+      const res = await getRecords(LOG_REPORT, criteria, { sort_by: 'Log_Date', sort_order: 'desc', max_records: 50 });
+      setLogs((res && res.code === 3000 && Array.isArray(res.data)) ? res.data : []);
+    } catch {
+      setLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, []);
+
   const fetchMOData = useCallback(async (moNumber, sku, factory) => {
     console.log('[MO Fetch] Querying:', moNumber);
     try {
@@ -4219,11 +4294,12 @@ export default function App() {
       setMoData(next);
       setMoRecordId(r['ID']);
       setCurrentScreen('info');
+      setTimeout(() => fetchLogs(next.mo_number), 300);
     } catch (err) {
       setCurrentScreen('scan');
       alert('数据读取失败，请重试\n' + (err && err.message || JSON.stringify(err)));
     }
-  }, []);
+  }, [fetchLogs]);
 
   // ── New: Inner Pack handlers ──
   const fetchMODataForPack = useCallback(async (moNumber) => {
@@ -5875,6 +5951,7 @@ export default function App() {
   const handleBackToScan = useCallback(() => {
     setMoData(null); setMoRecordId('');
     setSelectedProcess({ key: '', cn: '' });
+    setLogs([]);
     setSubmitResult(null);
     setCurrentScreen('home');
   }, []);
@@ -5883,7 +5960,8 @@ export default function App() {
     setSelectedProcess({ key: '', cn: '' });
     setSubmitResult(null);
     setCurrentScreen('info');
-  }, []);
+    if (moData && moData.mo_number) setTimeout(() => fetchLogs(moData.mo_number), 200);
+  }, [moData, fetchLogs]);
 
 
   return (
@@ -5928,6 +6006,8 @@ export default function App() {
         {currentScreen === 'info' && (
           <InfoScreen
             moData={moData}
+            logs={logs}
+            logsLoading={logsLoading}
             selectedKey={selectedProcess.key}
             onSelectProcess={handleSelectProcess}
             onBack={handleBackToScan}
