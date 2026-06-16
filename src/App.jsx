@@ -161,7 +161,6 @@ function MOImageBanner({ url }) {
 // Keep legacy constants for existing Production Log flow
 const MO_REPORT = 'All_MO';
 const LOG_FORM = 'Add_Production_Log';
-const LOG_REPORT = 'Production_Log_Report';
 
 function buildMOData(mo) {
   const assortment = mo?.standard_assortment || [];
@@ -434,25 +433,9 @@ const LoadingScreen = memo(function LoadingScreen({ message }) {
   );
 });
 
-const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsShown, selectedKey, onSelectProcess, onBack, onOpenLog }) {
+const InfoScreen = memo(function InfoScreen({ moData, selectedKey, onSelectProcess, onBack }) {
   const notesRows = useMemo(() => parsePlanNotes(moData && moData.plan_notes), [moData]);
   const orderQty = moData && moData.order_qty != null ? moData.order_qty.toLocaleString() + ' 件' : '-';
-
-  const processStatusMap = useMemo(() => {
-    if (!logs || !logs.length) return {};
-    const sorted = [...logs].sort((a, b) => {
-      const ta = a['Added_Time'] || a['Log_Date'] || '';
-      const tb = b['Added_Time'] || b['Log_Date'] || '';
-      return parseDateRaw(String(tb)) - parseDateRaw(String(ta));
-    });
-    const map = {};
-    sorted.forEach(r => {
-      const proc = r['Process'];
-      if (!proc || map[proc] != null) return;
-      map[proc] = parseInt(r['Completed_Qty']) || 0;
-    });
-    return map;
-  }, [logs]);
 
   const ProcBtn = ({ p, full }) => (
     <div
@@ -462,9 +445,6 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
       <span className="proc-icon">{p.emoji}</span>
       <div className="proc-name">{p.zh}</div>
       <div className="proc-sub">{p.ko}</div>
-      {processStatusMap[p.zohoValue] != null
-        ? <span className="proc-status proc-status-done">✅ {processStatusMap[p.zohoValue].toLocaleString()}件</span>
-        : <span className="proc-status proc-status-pending">⏳ 未记录 / 미기록</span>}
     </div>
   );
 
@@ -519,40 +499,6 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, logsSho
         </div>
       </div>
 
-      {logsShown && (
-        <div className="card" id="log-section">
-          <div className="card-title">工序记录 / 공정기록</div>
-          <div id="log-list">
-            {logsLoading ? (
-              <div className="log-loading"><div className="log-spinner"></div>加载中 / 로딩...</div>
-            ) : logs.length === 0 ? (
-              <div className="log-empty">暂无工序记录 / 공정 기록 없음</div>
-            ) : logs.map((r, i) => {
-              const process = r['Process'] || '-';
-              const completed = parseInt(r['Completed_Qty']) || 0;
-              const defect = parseInt(r['Defect_Qty']) || 0;
-              let worker = r['Worker'] || r['Worker_Name'] || r['Responsible'] || '';
-              if (typeof worker === 'object') worker = worker.display_value || '';
-              worker = String(worker).trim() || '未填写';
-              const date = formatDate(r['Log_Date'] || r['Log_DateTime'] || r['Created_Time'] || '');
-              const notes = r['Notes'] || '';
-              return (
-                <div key={i} className="log-item" onClick={() => onOpenLog(r)} style={{ cursor: 'pointer' }}>
-                  <div>
-                    <div className="log-process"><span className="log-dot"></span>{process}</div>
-                    <div className="log-meta">负责人: {worker}{notes ? ' · ' + notes : ''}</div>
-                  </div>
-                  <div>
-                    <div className="log-qty">完成 {completed.toLocaleString()}件</div>
-                    {defect > 0 && <div className="log-defect">▲ 불량 {defect}件</div>}
-                    <div className="log-date">{date}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 });
@@ -4076,13 +4022,9 @@ export default function App() {
   const [moData, setMoData] = useState(null);
   const [moRecordId, setMoRecordId] = useState('');
   const [selectedProcess, setSelectedProcess] = useState({ key: '', cn: '' });
-  const [logs, setLogs] = useState([]);
-  const [logsLoading, setLogsLoading] = useState(false);
-  const [logsShown, setLogsShown] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('正在读取订单信息...');
   const [submitResult, setSubmitResult] = useState(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [modalLog, setModalLog] = useState(null);
   const fileInputRef = useRef(null);
 
   // ── New: Inner Pack state ──
@@ -4191,21 +4133,6 @@ export default function App() {
 
   useEffect(() => { window.scrollTo(0, 0); }, [currentScreen]);
 
-  // ── Existing Production Log handlers ──
-  const fetchLogs = useCallback(async (moNumber) => {
-    setLogsShown(true);
-    setLogsLoading(true);
-    try {
-      const criteria = `MO_Number == "${moNumber}"`;
-      const res = await getRecords(LOG_REPORT, criteria, { sort_by: 'Log_Date', sort_order: 'desc', max_records: 50 });
-      const list = (res && res.code === 3000 && Array.isArray(res.data)) ? res.data : [];
-      setLogs(list);
-    } catch {
-      setLogs([]);
-    } finally {
-      setLogsLoading(false);
-    }
-  }, []);
 
   const fetchMOData = useCallback(async (moNumber, sku, factory) => {
     console.log('[MO Fetch] Querying:', moNumber);
@@ -4292,12 +4219,11 @@ export default function App() {
       setMoData(next);
       setMoRecordId(r['ID']);
       setCurrentScreen('info');
-      setTimeout(() => fetchLogs(next.mo_number), 300);
     } catch (err) {
       setCurrentScreen('scan');
       alert('数据读取失败，请重试\n' + (err && err.message || JSON.stringify(err)));
     }
-  }, [fetchLogs]);
+  }, []);
 
   // ── New: Inner Pack handlers ──
   const fetchMODataForPack = useCallback(async (moNumber) => {
@@ -5949,7 +5875,6 @@ export default function App() {
   const handleBackToScan = useCallback(() => {
     setMoData(null); setMoRecordId('');
     setSelectedProcess({ key: '', cn: '' });
-    setLogs([]); setLogsShown(false);
     setSubmitResult(null);
     setCurrentScreen('home');
   }, []);
@@ -5958,10 +5883,8 @@ export default function App() {
     setSelectedProcess({ key: '', cn: '' });
     setSubmitResult(null);
     setCurrentScreen('info');
-    if (moData && moData.mo_number) setTimeout(() => fetchLogs(moData.mo_number), 200);
-  }, [moData, fetchLogs]);
+  }, []);
 
-  const handleCloseModal = useCallback(() => setModalLog(null), []);
 
   return (
     <>
@@ -6005,13 +5928,9 @@ export default function App() {
         {currentScreen === 'info' && (
           <InfoScreen
             moData={moData}
-            logs={logs}
-            logsLoading={logsLoading}
-            logsShown={logsShown}
             selectedKey={selectedProcess.key}
             onSelectProcess={handleSelectProcess}
             onBack={handleBackToScan}
-            onOpenLog={setModalLog}
           />
         )}
         {currentScreen === 'input' && (
@@ -6434,7 +6353,6 @@ export default function App() {
           onChange={handleFileChange}
         />
       </div>
-      {modalLog && <LogModal log={modalLog} onClose={handleCloseModal} />}
       {cameraOpen && <CameraOverlay onResult={handleQR} onCancel={handleCameraCancel} />}
       {pinModalOpen && (
         <PinGate
