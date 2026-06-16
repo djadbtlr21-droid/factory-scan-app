@@ -531,22 +531,22 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* [1] 1줄 형식 label : value */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>订单号 / MO</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{(moData && moData.mo_number) || '-'}</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', flexShrink: 0 }}>订单号 / MO : </span>
+                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{(moData && moData.mo_number) || '-'}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>工厂 / 공장</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{(moData && moData.factory) || '-'}</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', flexShrink: 0 }}>工厂 / 공장 : </span>
+                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-primary)' }}>{(moData && moData.factory) || '-'}</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>订单数量 / 주문 수량</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{orderQty}</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', flexShrink: 0 }}>订单数量 / 주문 수량 : </span>
+                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-primary)' }}>{orderQty}</span>
               </div>
               {moData && moData.fabric ? (
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flexShrink: 0 }}>面料 / 원단</span>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{moData.fabric}</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', flexShrink: 0 }}>面料 / 원단 : </span>
+                  <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-primary)' }}>{moData.fabric}</span>
                 </div>
               ) : null}
             </div>
@@ -557,14 +557,14 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {moData?.sku ? (
                     <div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>品号 / SKU</div>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{moData.sku}</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>品号 / SKU</div>
+                      <div style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-primary)', wordBreak: 'break-all' }}>{moData.sku}</div>
                     </div>
                   ) : null}
                   {moData?.chi_style_name ? (
                     <div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>中文款名 / 중문 스타일명</div>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)' }}>{moData.chi_style_name}</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>中文款名 / 중문 스타일명</div>
+                      <div style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-primary)' }}>{moData.chi_style_name}</div>
                     </div>
                   ) : null}
                 </div>
@@ -584,7 +584,7 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
         </div>
         {/* 하단 전체 너비: 구분선 + 当前状态 */}
         <div style={{ borderTop: '0.5px solid var(--border-subtle)', marginTop: 10, paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>当前状态 / 현재 상태</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>当前状态 / 현재 상태</span>
           <span className="status-pill">{(moData && moData.current_status) || '-'}</span>
         </div>
       </div>
