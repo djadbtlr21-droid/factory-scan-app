@@ -4538,9 +4538,13 @@ export default function App() {
       const moNumber = packMO.mo_number;
       const stdRes = await getRecords(
         REPORTS.INNER_PACK,
-        `(MO_Number == "${moNumber}" && Is_Remainder == false)`
+        `MO_Number == "${moNumber}"`
       );
-      const stdRecords = (stdRes && stdRes.code === 3000 && Array.isArray(stdRes.data)) ? stdRes.data : [];
+      const allPackRecords = (stdRes && stdRes.code === 3000 && Array.isArray(stdRes.data)) ? stdRes.data : [];
+      const stdRecords = allPackRecords.filter(r => {
+        const ir = r['Is_Remainder'];
+        return ir === false || ir === 'false' || ir === 0 || !ir;
+      });
 
       let qrText, uuid, recordId, totalExpected;
       // Normalize Items_JSON: ensure it's a bracketed array string
