@@ -4539,7 +4539,11 @@ export default function App() {
       const stdRes = await getRecords(
         REPORTS.INNER_PACK,
         `MO_Number == "${moNumber}"`
-      );
+      ).catch(err => {
+        // Zoho 9280 = "No records found" — normal on first creation
+        if (err.status === 400 && err.body?.upstream?.code === 9280) return { code: 3000, data: [] };
+        throw err;
+      });
       const allPackRecords = (stdRes && stdRes.code === 3000 && Array.isArray(stdRes.data)) ? stdRes.data : [];
       const stdRecords = allPackRecords.filter(r => {
         const ir = r['Is_Remainder'];
