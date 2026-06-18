@@ -587,6 +587,18 @@ const InfoScreen = memo(function InfoScreen({ moData, logs, logsLoading, selecte
           <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>当前状态 / 현재 상태</span>
           <span className="status-pill">{(moData && moData.current_status) || '-'}</span>
         </div>
+        <div style={{ borderTop: '0.5px solid var(--border-subtle)', marginTop: 8, paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>中包袋数 / 중간포장 수</span>
+          <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+            {moData?.inner_pack_count != null ? String(moData.inner_pack_count) + ' 个' : '미생성 / 未生成'}
+          </span>
+        </div>
+        <div style={{ borderTop: '0.5px solid var(--border-subtle)', marginTop: 8, paddingTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>麻袋数 / 마대 수</span>
+          <span style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
+            {moData?.master_bag_count != null ? String(moData.master_bag_count) + ' 个' : '미생성 / 未生成'}
+          </span>
+        </div>
       </div>
 
       {notesRows.length > 0 && (
@@ -1919,7 +1931,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
 // than scanning UUIDs. Leftover packs (Is_Remainder=true) are picked
 // individually because each is unique.
 const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
-  bagMO, info, leftoverPacks, standardCount, setStandardCount,
+  bagMO, leftoverPacks, standardCount, setStandardCount,
   selectedLeftovers, toggleLeftover, worker, setWorker,
   containerNo, setContainerNo,
   onSubmit, onBack, submitting, loading,
@@ -1930,7 +1942,6 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
     .reduce((s, p) => s + (parseInt(p.total_qty) || 0), 0);
   const totalQty = stdN * INNER_PACK_SIZE + leftoverQty;
   const ready = !submitting && worker.trim().length > 0 && (stdN > 0 || selectedLeftovers.size > 0);
-  const overAvailable = info.standardExists && stdN > info.available;
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
@@ -1949,27 +1960,6 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
         {!loading && (
           <>
             <DkCard>
-              <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>标准中包袋现况 / 표준중간포장 현황</div>
-              {!info.standardExists ? (
-                <div style={{ padding:'8px 0', fontSize:11, color:G.goldDim }}>
-                  표준중간포장 레코드가 아직 없습니다. QR을 먼저 인쇄하세요.
-                  <br />标准中包袋记录尚未创建，请先打印QR。
-                </div>
-              ) : info.totalExpected === 0 ? (
-                <div style={{ padding:'8px 0', fontSize:11, color:'#FCA5A5' }}>
-                  ⚠ QR 未印刷 / QR 미인쇄
-                  <br /><span style={{ color:G.goldDim }}>请先打印 / 먼저 표준중간포장 QR을 인쇄(다운로드)하세요</span>
-                </div>
-              ) : (
-                <>
-                  <DkRow label="총 인쇄 수량 / 总打印" value={String(info.totalExpected) + ' 个'} />
-                  <DkRow label="기존 마대 합산 / 已分配" value={String(info.existingStandardCount) + ' 个'} />
-                  <DkRow label="사용 가능 / 可用" value={String(info.available) + ' 个'} />
-                </>
-              )}
-            </DkCard>
-
-            <DkCard>
               <DkInput
                 label="标准中包袋数 / 표준중간포장 수 *"
                 value={standardCount}
@@ -1977,11 +1967,6 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
                 placeholder="0"
                 inputMode="numeric"
               />
-              {overAvailable && (
-                <div style={{ fontSize:10, color:'#FCA5A5', marginTop:6 }}>
-                  ⚠ 사용 가능({info.available})을 초과합니다 / 超出可用数量
-                </div>
-              )}
             </DkCard>
 
             <DkCard>
@@ -2228,7 +2213,16 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag,
         )}
         <DkCard>
           <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>생성된 마대 / 已创建麻袋</div>
-          <div style={{ fontSize:12, color:G.cream, marginBottom:8 }}>{bags.length}개 마대 · {bag.totalQty} 件 总计</div>
+          <div style={{ fontSize:12, color:G.cream, marginBottom:4 }}>{bags.length}개 마대 · {bag.totalQty} 件 总计</div>
+          {(() => {
+            const stdCount = bags.filter(b => !b.isRemainder).length;
+            const remCount = bags.filter(b => b.isRemainder).length;
+            return (
+              <div style={{ fontSize:11, color:G.goldDim, marginBottom:8 }}>
+                표준 {stdCount}개 + 자투리 {remCount}개 = 총 {bags.length}개
+              </div>
+            );
+          })()}
           {bags.map((b, i) => (
             <div key={b.uuid || i} style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', fontSize:11, color:G.goldDim, borderTop:'1px solid var(--app-divider)' }}>
               <span><span style={{ color:G.gold }}>Bag #{b.bagSequence}</span> — {b.packCount}팩{b.isRemainder ? ' · 자투리 포함' : ''}</span>
@@ -4236,12 +4230,6 @@ export default function App() {
   const [availablePacksLoading, setAvailablePacksLoading] = useState(false);
 
   // ── Qty-based bag create state ──
-  const [bagStandardInfo, setBagStandardInfo] = useState({
-    totalExpected: 0,
-    existingStandardCount: 0,
-    available: 0,
-    standardExists: false,
-  });
   const [bagLeftoverPacks, setBagLeftoverPacks] = useState([]);
   const [bagStandardCount, setBagStandardCount] = useState('');
   const [bagSelectedLeftoverUuids, setBagSelectedLeftoverUuids] = useState(() => new Set());
@@ -4413,6 +4401,8 @@ export default function App() {
         plan_notes: r['Plan_Notes'] || '',
         is_shipped: isShipped,
         is_completed: isCompleted,
+        inner_pack_count: (r['Inner_Pack_Count'] != null && r['Inner_Pack_Count'] !== '') ? r['Inner_Pack_Count'] : null,
+        master_bag_count: (r['Master_Bag_Count'] != null && r['Master_Bag_Count'] !== '') ? r['Master_Bag_Count'] : null,
       };
       setMoData(next);
       setMoRecordId(r['ID']);
@@ -4651,7 +4641,6 @@ export default function App() {
       // Reset qty-based create state for this MO
       setBagStandardCount('');
       setBagSelectedLeftoverUuids(new Set());
-      setBagStandardInfo({ totalExpected: 0, existingStandardCount: 0, available: 0, standardExists: false });
       setBagLeftoverPacks([]);
 
       setCurrentScreen('bag_create');
@@ -4674,34 +4663,7 @@ export default function App() {
           const seenP = new Set();
           const uniquePacks = allPacks.filter(p => { const id = p['Pack_UUID']; if (seenP.has(id)) return false; seenP.add(id); return true; });
 
-          // 2) Standard record (Is_Remainder == false) — for Total_Expected.
-          // No fallback to ceil(orderQty/12): we want the actual printed count.
-          // 0 = "QR 미인쇄" notice shown to the operator.
-          const stdRecord = uniquePacks.find(p =>
-            (p['Is_Remainder'] === false || p['Is_Remainder'] === 'false' || !p['Is_Remainder'])
-            && (parseInt(p['Pack_Sequence']) || 0) === 0
-          ) || null;
-          const totalExpected = stdRecord ? (parseInt(stdRecord['Total_Expected']) || 0) : 0;
-
-          // 3) Existing Master Bags for this MO — sum Inner_Pack_Count
-          let existingStandardCount = 0;
-          try {
-            const allBags = [];
-            let cur = null, safe = 0;
-            while (safe++ < 50) {
-              const br = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${moNumber}"`, cur ? { record_cursor: cur } : {});
-              const bd = (br && br.code === 3000 && Array.isArray(br.data)) ? br.data : [];
-              if (bd.length === 0) break;
-              allBags.push(...bd);
-              cur = br?.record_cursor || null;
-              if (!cur) break;
-            }
-            existingStandardCount = allBags.reduce((s, b) => s + (parseInt(b['Inner_Pack_Count']) || 0), 0);
-          } catch (e) {
-            console.warn('[Master Bag] existing bag fetch failed', e);
-          }
-
-          // 4) Unassigned leftover packs (Is_Remainder == true && !Assigned_To_Bag)
+          // Unassigned leftover packs (Is_Remainder == true && !Assigned_To_Bag)
           const leftovers = uniquePacks
             .filter(p =>
               (p['Is_Remainder'] === true || p['Is_Remainder'] === 'true')
@@ -4721,17 +4683,7 @@ export default function App() {
             })
             .sort((a, b) => a.pack_sequence - b.pack_sequence);
 
-          setBagStandardInfo({
-            totalExpected,
-            existingStandardCount,
-            available: Math.max(0, totalExpected - existingStandardCount),
-            standardExists: !!stdRecord,
-          });
           setBagLeftoverPacks(leftovers);
-          // Legacy availablePacks still set for old BagCreateScreen if ever rendered
-          setAvailablePacks(uniquePacks
-            .filter(p => (!p['Assigned_To_Bag'] || p['Assigned_To_Bag'] === '') && (!p['Pack_Status'] || p['Pack_Status'] === 'Created'))
-            .sort((a, b) => (parseInt(a['Pack_Sequence']) || 0) - (parseInt(b['Pack_Sequence']) || 0)));
           setAvailablePacksLoading(false);
         } catch (e) {
           console.error('[Master Bag] fetch context failed', e);
@@ -5187,6 +5139,11 @@ export default function App() {
     setLoadingMsg('保存麻袋信息 / 마대 저장중...');
     setCurrentScreen('loading');
 
+    // All standard (non-remainder) bags share one QR/UUID per MO.
+    const standardQrText = stdN > 0 ? buildMasterBagQR() : null;
+    const standardUuid = standardQrText ? standardQrText.split('/view/bag/')[1] : null;
+    const standardQrDataURL = standardQrText ? await generateQRDataURL(standardQrText, 512) : null;
+
     const createdBags = [];
     let failedAt = -1;
     let failedReason = null;
@@ -5201,8 +5158,9 @@ export default function App() {
         const bagTotalQty = packCount * INNER_PACK_SIZE + leftoverQtySum;
         const isRemainderBag = leftoversForThisBag.length > 0;
 
-        const qrText = buildMasterBagQR();
-        const uuid = qrText.split('/view/bag/')[1];
+        // Remainder bags keep unique QRs; standard bags share the pre-generated one.
+        const qrText = isRemainderBag ? buildMasterBagQR() : standardQrText;
+        const uuid   = isRemainderBag ? qrText.split('/view/bag/')[1] : standardUuid;
         const bagSequence = nextSeq + i;
 
         const bagData = {
@@ -5229,7 +5187,9 @@ export default function App() {
           break;
         }
 
-        const qrDataURL = await generateQRDataURL(qrText, 512);
+        const qrDataURL = isRemainderBag
+          ? await generateQRDataURL(qrText, 512)
+          : standardQrDataURL;
         createdBags.push({
           uuid, qrText, qrDataURL,
           bagSequence,
@@ -6351,7 +6311,6 @@ export default function App() {
         {currentScreen === 'bag_create' && (
           <BagCreateQtyScreen
             bagMO={bagMO}
-            info={bagStandardInfo}
             leftoverPacks={bagLeftoverPacks}
             standardCount={bagStandardCount}
             setStandardCount={setBagStandardCount}
