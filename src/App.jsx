@@ -955,6 +955,16 @@ function DkRow({ label, value, mono }) {
   );
 }
 
+// Strip CJK (Chinese) characters from a color label like "黑色 BLACK" → "BLACK".
+// Handles comma-joined values by processing each token, then collapses spaces.
+function stripCjk(str) {
+  return String(str ?? '')
+    .split(',')
+    .map(tok => tok.replace(/[一-鿿　-〿＀-￯]+/g, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join(', ');
+}
+
 function getField(rec, key) {
   const v = rec?.[key];
   if (v == null) return '';
@@ -1930,7 +1940,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
 const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
   bagMO, leftoverPacks, selectedLeftovers, toggleLeftover, worker, setWorker,
   containerNo, setContainerNo,
-  qty, setQty, size, setSize, colors, setColors,
+  qty, setQty, size, setSize, colors, setColors, unit, setUnit,
   onSubmit, onBack, submitting, loading,
 }) {
   const ready = !submitting && worker.trim().length > 0;
@@ -1990,7 +2000,14 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
                   onChange={e => setQty(parseInt(e.target.value) || 0)}
                   style={{ flex:1, background:'transparent', border:'none', borderBottom:'1px solid '+G.border, color:G.cream, fontSize:12, padding:'2px 0', textAlign:'right', fontFamily:'inherit', outline:'none' }}
                 />
-                <span style={{ fontSize:10, color:G.goldDim, flexShrink:0 }}>件/pcs</span>
+                <select
+                  value={unit}
+                  onChange={e => setUnit(e.target.value)}
+                  style={{ fontSize:10, flexShrink:0, border:'1px solid '+G.border, borderRadius:4, padding:'2px 4px', background:G.card, color:G.cream, cursor:'pointer', fontFamily:'inherit', outline:'none' }}
+                >
+                  <option value="套/set">套/set</option>
+                  <option value="件/pcs">件/pcs</option>
+                </select>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom:'1px solid var(--app-divider)' }}>
                 <span style={{ fontSize:10, color:G.goldDim, letterSpacing:1, flexShrink:0 }}>尺码 / 사이즈</span>
@@ -3079,6 +3096,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
           notes_qty: notesData.qty != null ? String(notesData.qty) : null,
           notes_size: notesData.size != null ? String(notesData.size) : null,
           notes_colors: notesData.colors != null ? String(notesData.colors) : null,
+          notes_unit: notesData.unit != null && String(notesData.unit).trim() ? String(notesData.unit) : '套/set',
         };
 
         let packs = [];
@@ -3162,7 +3180,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'7px 0', borderBottom:'1px solid var(--app-divider)' }}>
               <span style={{ fontSize:10, color:G.goldDim, letterSpacing:1, fontWeight:400, flexShrink:0, paddingRight:8 }}>颜色 / 색상</span>
               <span style={{ fontSize:12, color:G.cream, textAlign:'right', display:'flex', flexWrap:'wrap', justifyContent:'flex-end', gap:6 }}>
-                {bagRecord.notes_colors.split(',').map(c => c.trim()).filter(Boolean).map((c, i) => (
+                {stripCjk(bagRecord.notes_colors).split(',').map(c => c.trim()).filter(Boolean).map((c, i) => (
                   <span key={i} style={{ display:'inline-flex', alignItems:'center' }}><ColorDot text={c} />{c}</span>
                 ))}
               </span>
@@ -3171,7 +3189,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
             <DkRow label="颜色 / 색상" value="-" />
           )}
           <DkRow label="尺码 / 사이즈" value={bagRecord.notes_size != null ? bagRecord.notes_size : '-'} />
-          <DkRow label="数量 / 수량" value={bagRecord.notes_qty != null ? bagRecord.notes_qty + ' 件/pcs' : '-'} />
+          <DkRow label="数量 / 수량" value={bagRecord.notes_qty != null ? bagRecord.notes_qty + ' ' + bagRecord.notes_unit : '-'} />
           <DkRow label="负责人 / 담당자" value={bagRecord.worker || '-'} />
           <DkRow label="创建时间 / 생성 시간" value={formatDate(bagRecord.created_time) || '-'} />
           {bagRecord.received_at_mex && <DkRow label="到达MEX / 멕시코 도착" value={formatDate(bagRecord.received_at_mex)} />}
@@ -4228,6 +4246,7 @@ export default function App() {
   const [bagQty, setBagQty] = useState(120);
   const [bagSize, setBagSize] = useState('S / M / L');
   const [bagColors, setBagColors] = useState('');
+  const [bagUnit, setBagUnit] = useState('套/set');
 
   // ── Scan mode ──
   const [scanMode, setScanMode] = useState('production_log');
@@ -4634,11 +4653,13 @@ export default function App() {
       });
       const autoColors = [found['Top_Color_1'], found['Top_Color_2'], found['Top_Color_3'], found['Top_Color_4']]
         .filter(c => c && String(c).trim())
-        .map(c => String(c).trim())
+        .map(c => stripCjk(c))
+        .filter(Boolean)
         .join(', ');
       setBagColors(autoColors);
       setBagQty(120);
       setBagSize('S / M / L');
+      setBagUnit('套/set');
       // Reset qty-based create state for this MO
       setBagSelectedLeftoverUuids(new Set());
       setBagLeftoverPacks([]);
@@ -5143,7 +5164,7 @@ export default function App() {
       'Worker':           bagWorker.trim(),
       'Destination':      'MEX-Guadalajara',
       'Bag_Status':       'Created',
-      'Notes':            JSON.stringify({ qty: bagQty, size: bagSize.trim(), colors: bagColors.trim() }),
+      'Notes':            JSON.stringify({ qty: bagQty, size: bagSize.trim(), colors: bagColors.trim(), unit: bagUnit }),
     };
 
     const createdBags = [];
@@ -5208,7 +5229,7 @@ export default function App() {
     } finally {
       setBagSubmitting(false);
     }
-  }, [bagMO, bagSelectedLeftoverUuids, bagLeftoverPacks, bagWorker, bagQty, bagSize, bagColors]);
+  }, [bagMO, bagSelectedLeftoverUuids, bagLeftoverPacks, bagWorker, bagQty, bagSize, bagColors, bagUnit]);
 
   const handleCreateBag = useCallback(async () => {
     if (!bagMO) {
@@ -6278,6 +6299,8 @@ export default function App() {
             setSize={setBagSize}
             colors={bagColors}
             setColors={setBagColors}
+            unit={bagUnit}
+            setUnit={setBagUnit}
             onSubmit={handleCreateBagQty}
             onBack={() => {
               setAvailablePacks([]);
