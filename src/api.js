@@ -1,4 +1,4 @@
-const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '');
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 async function jfetch(url, opts) {
   const res = await fetch(url, opts);
