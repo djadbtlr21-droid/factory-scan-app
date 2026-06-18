@@ -1927,21 +1927,12 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
 });
 
 // ─── NEW: Quantity-based Bag Create Screen ───────────────────────────
-// Standard packs share one Zoho record per MO, so we input a count rather
-// than scanning UUIDs. Leftover packs (Is_Remainder=true) are picked
-// individually because each is unique.
 const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
-  bagMO, leftoverPacks, standardCount, setStandardCount,
-  selectedLeftovers, toggleLeftover, worker, setWorker,
+  bagMO, leftoverPacks, selectedLeftovers, toggleLeftover, worker, setWorker,
   containerNo, setContainerNo,
   onSubmit, onBack, submitting, loading,
 }) {
-  const stdN = parseInt(standardCount) || 0;
-  const leftoverQty = leftoverPacks
-    .filter(p => selectedLeftovers.has(p.uuid))
-    .reduce((s, p) => s + (parseInt(p.total_qty) || 0), 0);
-  const totalQty = stdN * INNER_PACK_SIZE + leftoverQty;
-  const ready = !submitting && worker.trim().length > 0 && (stdN > 0 || selectedLeftovers.size > 0);
+  const ready = !submitting && worker.trim().length > 0;
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'72px 20px 18px', position:'relative' }}>
@@ -1959,84 +1950,34 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
         )}
         {!loading && (
           <>
-            <DkCard>
-              <DkInput
-                label="标准中包袋数 / 표준중간포장 수 *"
-                value={standardCount}
-                onChange={(e) => setStandardCount(e.target.value.replace(/[^\d]/g, ''))}
-                placeholder="0"
-                inputMode="numeric"
-              />
-            </DkCard>
-
-            <DkCard>
-              <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>尾包 / 자투리포장</div>
-              {leftoverPacks.length === 0 ? (
-                <div style={{ padding:'8px 0', fontSize:11, color:G.goldDim }}>未分配尾包 / 미할당 자투리 없음</div>
-              ) : leftoverPacks.map(p => {
-                const checked = selectedLeftovers.has(p.uuid);
-                const itemSummary = (p.items || []).slice(0, 3).map(it => `${it.color || ''} ${it.size || ''}`.trim()).filter(Boolean).join(', ');
-                return (
-                  <label key={p.uuid} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'1px solid var(--app-divider)', cursor:'pointer' }}>
-                    <div onClick={() => toggleLeftover(p.uuid)} style={{
-                      width:16, height:16, border:'1px solid '+(checked?G.gold:G.border),
-                      borderRadius:2, background: checked?G.btnBg:'transparent',
-                      flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
-                    }}>
-                      {checked && <div style={{ width:8, height:8, background:G.gold, borderRadius:1 }} />}
-                    </div>
-                    <div onClick={() => toggleLeftover(p.uuid)} style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, color:G.cream }}>
-                        {p.total_qty} 件{itemSummary ? ` · ${itemSummary}${(p.items?.length || 0) > 3 ? '…' : ''}` : ''}
+            {leftoverPacks.length > 0 && (
+              <DkCard>
+                <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:10, fontWeight:400 }}>尾包 / 자투리포장</div>
+                {leftoverPacks.map(p => {
+                  const checked = selectedLeftovers.has(p.uuid);
+                  const itemSummary = (p.items || []).slice(0, 3).map(it => `${it.color || ''} ${it.size || ''}`.trim()).filter(Boolean).join(', ');
+                  return (
+                    <label key={p.uuid} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom:'1px solid var(--app-divider)', cursor:'pointer' }}>
+                      <div onClick={() => toggleLeftover(p.uuid)} style={{
+                        width:16, height:16, border:'1px solid '+(checked?G.gold:G.border),
+                        borderRadius:2, background: checked?G.btnBg:'transparent',
+                        flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+                      }}>
+                        {checked && <div style={{ width:8, height:8, background:G.gold, borderRadius:1 }} />}
                       </div>
-                      <div style={{ fontSize:9, color:G.goldDim, marginTop:2, fontFamily:'monospace' }}>
-                        {String(p.uuid).slice(0, 8)}…
+                      <div onClick={() => toggleLeftover(p.uuid)} style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:12, color:G.cream }}>
+                          {p.total_qty} 件{itemSummary ? ` · ${itemSummary}${(p.items?.length || 0) > 3 ? '…' : ''}` : ''}
+                        </div>
+                        <div style={{ fontSize:9, color:G.goldDim, marginTop:2, fontFamily:'monospace' }}>
+                          {String(p.uuid).slice(0, 8)}…
+                        </div>
                       </div>
-                    </div>
-                  </label>
-                );
-              })}
-            </DkCard>
-
-            <DkCard>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:10, color:G.goldDim, letterSpacing:1 }}>총 수량 / 总数量</span>
-                <span style={{ fontSize:18, color:G.gold }}>
-                  {totalQty} 件
-                  <span style={{ fontSize:10, color:G.goldDim, marginLeft:8 }}>
-                    ({stdN}×{INNER_PACK_SIZE} + {leftoverQty})
-                  </span>
-                </span>
-              </div>
-            </DkCard>
-
-            {stdN > 0 && (() => {
-              const PACKS_PER_BAG = 10;
-              const bagCount = Math.floor(stdN / PACKS_PER_BAG);
-              const leftoverPackCount = stdN % PACKS_PER_BAG;
-              return (
-                <DkCard>
-                  <div style={{ fontSize:9, letterSpacing:2, color:G.goldDim, marginBottom:8, fontWeight:400 }}>
-                    预计麻袋数 / 예상 마대 수
-                  </div>
-                  <div style={{ fontSize:22, color:G.gold, fontWeight:500 }}>
-                    {bagCount} 个/개
-                  </div>
-                  {leftoverPackCount > 0 ? (
-                    <div style={{ fontSize:11, color:'#F59E0B', marginTop:6 }}>
-                      + 나머지 {leftoverPackCount}팩 / 余{leftoverPackCount}包
-                      <div style={{ fontSize:9, color:'rgba(245,158,11,0.7)', marginTop:2 }}>
-                        (尾包/자투리포장 별도 처리 필요)
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize:10, color:G.goldDim, marginTop:4 }}>
-                      (나머지 0팩 / 余 0 包)
-                    </div>
-                  )}
-                </DkCard>
-              );
-            })()}
+                    </label>
+                  );
+                })}
+              </DkCard>
+            )}
 
             <DkCard>
               <DkInput
@@ -4231,7 +4172,6 @@ export default function App() {
 
   // ── Qty-based bag create state ──
   const [bagLeftoverPacks, setBagLeftoverPacks] = useState([]);
-  const [bagStandardCount, setBagStandardCount] = useState('');
   const [bagSelectedLeftoverUuids, setBagSelectedLeftoverUuids] = useState(() => new Set());
   const [bagSubmitting, setBagSubmitting] = useState(false);
 
@@ -4639,7 +4579,6 @@ export default function App() {
         standard_assortment: parseStandardAssortment(found),
       });
       // Reset qty-based create state for this MO
-      setBagStandardCount('');
       setBagSelectedLeftoverUuids(new Set());
       setBagLeftoverPacks([]);
 
@@ -5096,36 +5035,19 @@ export default function App() {
     });
   }, []);
 
-  // ── Qty-based bag creation with auto-split ──
-  // standardCount = N → ceil(N/10) bags POSTed sequentially. Full bags hold
-  // PACKS_PER_BAG=10 standard packs each; the last bag absorbs any remainder
-  // standard packs (< 10) AND all selected leftover Pack UUIDs.
+  // ── Bag creation (1 bag per operation) ──
+  // Creates exactly one bag: standard (no leftovers) or remainder (with leftovers).
   const handleCreateBagQty = useCallback(async () => {
     if (!bagMO) { alert('请先选择订单号'); return; }
-    const stdN = parseInt(bagStandardCount) || 0;
     const selectedLeftovers = bagLeftoverPacks.filter(p => bagSelectedLeftoverUuids.has(p.uuid));
-    if (stdN === 0 && selectedLeftovers.length === 0) {
-      alert('표준 또는 자투리 중 하나 이상 입력 / 请至少输入标准或选择零散');
-      return;
-    }
     if (!bagWorker.trim()) {
       alert('请输入负责人 / 담당자');
       return;
     }
 
-    const PACKS_PER_BAG = 10;
     const primaryMO = bagMO.mo_number;
-    const fullBags = Math.floor(stdN / PACKS_PER_BAG);
-    const remainderStd = stdN % PACKS_PER_BAG;
-    const bagsToCreate = Math.max(1,
-      fullBags + (remainderStd > 0 ? 1 : 0) + (stdN === 0 && selectedLeftovers.length > 0 ? 1 : 0)
-    );
-    // The "no full bags but has remainder/leftovers" case already counted above.
-    const effectiveBagsToCreate = stdN === 0
-      ? 1  // leftover-only → single bag
-      : fullBags + (remainderStd > 0 ? 1 : 0);
 
-    // Determine starting Bag_Sequence = max(existing) + 1.
+    // Determine Bag_Sequence = max(existing) + 1.
     let nextSeq = 1;
     try {
       const bagRes = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${primaryMO}"`);
@@ -5139,89 +5061,58 @@ export default function App() {
     setLoadingMsg('保存麻袋信息 / 마대 저장중...');
     setCurrentScreen('loading');
 
-    // All standard (non-remainder) bags share one QR/UUID per MO.
-    const standardQrText = stdN > 0 ? buildMasterBagQR() : null;
-    const standardUuid = standardQrText ? standardQrText.split('/view/bag/')[1] : null;
-    const standardQrDataURL = standardQrText ? await generateQRDataURL(standardQrText, 512) : null;
+    const leftoverQtySum = selectedLeftovers.reduce((s, p) => s + (parseInt(p.total_qty) || 0), 0);
+    const isRemainderBag = selectedLeftovers.length > 0;
+    const qrText = buildMasterBagQR();
+    const uuid   = qrText.split('/view/bag/')[1];
+    const bagSequence = nextSeq;
+
+    const bagData = {
+      'Bag_UUID':         uuid,
+      'Brand':            BRAND,
+      'Bag_Sequence':     bagSequence,
+      'MO_Number':        primaryMO,
+      'SKU':              bagMO.sku,
+      'Factory':          bagMO.factory,
+      'Inner_Pack_Count': 0,
+      'Inner_Pack_UUIDs': JSON.stringify(selectedLeftovers.map(p => p.uuid)),
+      'Total_Qty':        leftoverQtySum,
+      'Is_Remainder':     isRemainderBag,
+      'Worker':           bagWorker.trim(),
+      'Destination':      'MEX-Guadalajara',
+      'Bag_Status':       'Created',
+    };
 
     const createdBags = [];
-    let failedAt = -1;
-    let failedReason = null;
 
     try {
-      for (let i = 0; i < effectiveBagsToCreate; i++) {
-        const isLastBag = i === effectiveBagsToCreate - 1;
-        const packCount = (isLastBag && remainderStd > 0) ? remainderStd
-                        : (stdN === 0 ? 0 : PACKS_PER_BAG);
-        const leftoversForThisBag = isLastBag ? selectedLeftovers : [];
-        const leftoverQtySum = leftoversForThisBag.reduce((s, p) => s + (parseInt(p.total_qty) || 0), 0);
-        const bagTotalQty = packCount * INNER_PACK_SIZE + leftoverQtySum;
-        const isRemainderBag = leftoversForThisBag.length > 0;
-
-        // Remainder bags keep unique QRs; standard bags share the pre-generated one.
-        const qrText = isRemainderBag ? buildMasterBagQR() : standardQrText;
-        const uuid   = isRemainderBag ? qrText.split('/view/bag/')[1] : standardUuid;
-        const bagSequence = nextSeq + i;
-
-        const bagData = {
-          'Bag_UUID':         uuid,
-          'Brand':            BRAND,
-          'Bag_Sequence':     bagSequence,
-          'MO_Number':        primaryMO,
-          'SKU':              bagMO.sku,
-          'Factory':          bagMO.factory,
-          'Inner_Pack_Count': packCount,
-          'Inner_Pack_UUIDs': JSON.stringify(leftoversForThisBag.map(p => p.uuid)),
-          'Total_Qty':        bagTotalQty,
-          'Is_Remainder':     isRemainderBag,
-          'Worker':           bagWorker.trim(),
-          'Destination':      'MEX-Guadalajara',
-          'Bag_Status':       'Created',
-        };
-
-        setLoadingMsg(`保存麻袋 / 마대 저장중 ${i + 1}/${effectiveBagsToCreate}...`);
-        const res = await submitRecord(FORMS.MASTER_BAG, bagData);
-        if (!res || res.code !== 3000) {
-          failedAt = i;
-          failedReason = JSON.stringify(res);
-          break;
-        }
-
-        const qrDataURL = isRemainderBag
-          ? await generateQRDataURL(qrText, 512)
-          : standardQrDataURL;
+      setLoadingMsg('保存麻袋 / 마대 저장중...');
+      const res = await submitRecord(FORMS.MASTER_BAG, bagData);
+      if (!res || res.code !== 3000) {
+        alert('保存失败 / 저장 실패:\n' + JSON.stringify(res));
+      } else {
+        const qrDataURL = await generateQRDataURL(qrText, 512);
         createdBags.push({
           uuid, qrText, qrDataURL,
           bagSequence,
-          packCount,
-          totalQty: bagTotalQty,
+          packCount: 0,
+          totalQty: leftoverQtySum,
           isRemainder: isRemainderBag,
-          leftoverUuids: leftoversForThisBag.map(p => p.uuid),
+          leftoverUuids: selectedLeftovers.map(p => p.uuid),
         });
-      }
 
-      // PATCH all selected leftover packs → Bagged (they belong to the LAST
-      // successfully created bag, if it included them).
-      if (createdBags.length > 0 && selectedLeftovers.length > 0) {
-        const lastBag = createdBags[createdBags.length - 1];
-        // Only PATCH if last bag actually carries the leftovers (it does when
-        // the loop reached its final iteration without failing).
-        if (lastBag.leftoverUuids.length > 0) {
+        // PATCH leftover packs → Bagged
+        if (isRemainderBag) {
           setLoadingMsg('状态更新中 / 상태 갱신중...');
           const patchFailures = [];
           for (const p of selectedLeftovers) {
-            const r = await updatePackToBagged(p.record_id, lastBag.uuid, p.uuid);
+            const r = await updatePackToBagged(p.record_id, uuid, p.uuid);
             if (!r.success) patchFailures.push(r);
           }
           if (patchFailures.length > 0) {
             alert(`경고: ${patchFailures.length}개 자투리 Pack의 상태 갱신 실패`);
           }
         }
-      }
-
-      if (failedAt >= 0) {
-        alert(`保存失败 / 저장 실패 (마대 ${failedAt + 1}/${effectiveBagsToCreate}):\n` + failedReason
-          + `\n\n성공: ${createdBags.length}개 / 失败 이후 중단`);
       }
 
       const totalQtySum = createdBags.reduce((s, b) => s + b.totalQty, 0);
@@ -5254,7 +5145,7 @@ export default function App() {
     } finally {
       setBagSubmitting(false);
     }
-  }, [bagMO, bagStandardCount, bagSelectedLeftoverUuids, bagLeftoverPacks, bagWorker]);
+  }, [bagMO, bagSelectedLeftoverUuids, bagLeftoverPacks, bagWorker]);
 
   const handleCreateBag = useCallback(async () => {
     if (!bagMO) {
@@ -6281,7 +6172,7 @@ export default function App() {
             onCreate={() => requirePin(() => {
               setBagScannedPacks([]); setBagIsRemainder(false);
               setBagWorker(''); setBagMO(null);
-              setBagStandardCount(''); setBagSelectedLeftoverUuids(new Set());
+              setBagSelectedLeftoverUuids(new Set());
               setBagLeftoverPacks([]);
               setCurrentScreen('bag_mo_select');
             })}
@@ -6312,8 +6203,6 @@ export default function App() {
           <BagCreateQtyScreen
             bagMO={bagMO}
             leftoverPacks={bagLeftoverPacks}
-            standardCount={bagStandardCount}
-            setStandardCount={setBagStandardCount}
             selectedLeftovers={bagSelectedLeftoverUuids}
             toggleLeftover={toggleBagLeftover}
             worker={bagWorker}
@@ -6325,7 +6214,6 @@ export default function App() {
               setAvailablePacks([]);
               setBagLeftoverPacks([]);
               setBagSelectedLeftoverUuids(new Set());
-              setBagStandardCount('');
               setCurrentScreen('bag_mo_select');
             }}
             submitting={bagSubmitting}
@@ -6340,14 +6228,14 @@ export default function App() {
             onNewBag={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
               setBagWorker(''); setBagContainerNo(''); setBagMO(null);
-              setBagStandardCount(''); setBagSelectedLeftoverUuids(new Set());
+              setBagSelectedLeftoverUuids(new Set());
               setBagLeftoverPacks([]);
               setCurrentScreen('bag_mo_select');
             }}
             onHome={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
               setBagWorker(''); setBagContainerNo(''); setBagMO(null);
-              setBagStandardCount(''); setBagSelectedLeftoverUuids(new Set());
+              setBagSelectedLeftoverUuids(new Set());
               setBagLeftoverPacks([]);
               setCurrentScreen('home');
             }}
