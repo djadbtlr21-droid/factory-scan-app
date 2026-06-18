@@ -1990,7 +1990,7 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
                   onChange={e => setQty(parseInt(e.target.value) || 0)}
                   style={{ flex:1, background:'transparent', border:'none', borderBottom:'1px solid '+G.border, color:G.cream, fontSize:12, padding:'2px 0', textAlign:'right', fontFamily:'inherit', outline:'none' }}
                 />
-                <span style={{ fontSize:10, color:G.goldDim, flexShrink:0 }}>套/set</span>
+                <span style={{ fontSize:10, color:G.goldDim, flexShrink:0 }}>件/pcs</span>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom:'1px solid var(--app-divider)' }}>
                 <span style={{ fontSize:10, color:G.goldDim, letterSpacing:1, flexShrink:0 }}>尺码 / 사이즈</span>
@@ -3171,7 +3171,7 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
             <DkRow label="颜色 / 색상" value="-" />
           )}
           <DkRow label="尺码 / 사이즈" value={bagRecord.notes_size != null ? bagRecord.notes_size : '-'} />
-          <DkRow label="数量 / 수량" value={bagRecord.notes_qty != null ? bagRecord.notes_qty + ' 套/set' : '-'} />
+          <DkRow label="数量 / 수량" value={bagRecord.notes_qty != null ? bagRecord.notes_qty + ' 件/pcs' : '-'} />
           <DkRow label="负责人 / 담당자" value={bagRecord.worker || '-'} />
           <DkRow label="创建时间 / 생성 시간" value={formatDate(bagRecord.created_time) || '-'} />
           {bagRecord.received_at_mex && <DkRow label="到达MEX / 멕시코 도착" value={formatDate(bagRecord.received_at_mex)} />}
