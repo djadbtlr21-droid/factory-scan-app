@@ -1921,6 +1921,7 @@ const PackDetailScreen = memo(function PackDetailScreen({ detail, onBack, onEdit
 const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
   bagMO, info, leftoverPacks, standardCount, setStandardCount,
   selectedLeftovers, toggleLeftover, worker, setWorker,
+  containerNo, setContainerNo,
   onSubmit, onBack, submitting, loading,
 }) {
   const stdN = parseInt(standardCount) || 0;
@@ -2054,6 +2055,14 @@ const BagCreateQtyScreen = memo(function BagCreateQtyScreen({
 
             <DkCard>
               <DkInput
+                label="컨테이너 넘버 / 柜号"
+                value={containerNo}
+                onChange={(e) => setContainerNo(e.target.value)}
+                placeholder="예: Y6-30 / 例如: Y6-30"
+              />
+            </DkCard>
+            <DkCard>
+              <DkInput
                 label="负责人 / 담당자 *"
                 value={worker}
                 onChange={(e) => setWorker(e.target.value)}
@@ -2153,7 +2162,7 @@ const BagCreateScreen = memo(function BagCreateScreen({
 });
 
 // ─── NEW: Bag Success Screen ──────────────────────────────────────────
-const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag, onHome }) {
+const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag, onHome, containerNo }) {
   const [downloading, setDownloading] = useState(false);
   if (!bag) return null;
   // bag shape: { moNumber, totalBags, totalQty, bags: [{uuid,qrText,qrDataURL,bagSequence,packCount,totalQty,isRemainder}] }
@@ -2179,11 +2188,11 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag,
     if (!moData || downloading || bags.length === 0) return;
     setDownloading(true);
     try {
-      const bagList = bags.map(b => ({ bagNumber: b.bagSequence, qrText: b.qrText }));
+      const bagList = bags.map(b => ({ bagNumber: b.bagSequence, qrText: b.qrText, isRemainder: b.isRemainder || false }));
       const fname = bags.length === 1
         ? `${bag.moNumber}_MasterBag_#${firstSeq}.xlsx`
         : `${bag.moNumber}_MasterBag_#${firstSeq}-#${lastSeq}_${bags.length}bags.xlsx`;
-      await generateMasterBagExcel(moData, bagList, sanitizeFilename(fname));
+      await generateMasterBagExcel(moData, bagList, sanitizeFilename(fname), { containerNo: containerNo || '' });
     } catch (err) { alert('Excel 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
@@ -4219,6 +4228,7 @@ export default function App() {
   const [bagScannedPacks, setBagScannedPacks] = useState([]);
   const [bagIsRemainder, setBagIsRemainder] = useState(false);
   const [bagWorker, setBagWorker] = useState('');
+  const [bagContainerNo, setBagContainerNo] = useState('');
   const [bagMO, setBagMO] = useState(null);
   const [createdBag, setCreatedBag] = useState(null);
   const [scannedBagDetail, setScannedBagDetail] = useState(null);
@@ -6349,6 +6359,8 @@ export default function App() {
             toggleLeftover={toggleBagLeftover}
             worker={bagWorker}
             setWorker={setBagWorker}
+            containerNo={bagContainerNo}
+            setContainerNo={setBagContainerNo}
             onSubmit={handleCreateBagQty}
             onBack={() => {
               setAvailablePacks([]);
@@ -6365,16 +6377,17 @@ export default function App() {
           <BagSuccessScreen
             bag={createdBag}
             moData={bagMO ? buildMOData(bagMO) : null}
+            containerNo={bagContainerNo}
             onNewBag={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
-              setBagWorker(''); setBagMO(null);
+              setBagWorker(''); setBagContainerNo(''); setBagMO(null);
               setBagStandardCount(''); setBagSelectedLeftoverUuids(new Set());
               setBagLeftoverPacks([]);
               setCurrentScreen('bag_mo_select');
             }}
             onHome={() => {
               setBagScannedPacks([]); setCreatedBag(null); setBagIsRemainder(false);
-              setBagWorker(''); setBagMO(null);
+              setBagWorker(''); setBagContainerNo(''); setBagMO(null);
               setBagStandardCount(''); setBagSelectedLeftoverUuids(new Set());
               setBagLeftoverPacks([]);
               setCurrentScreen('home');

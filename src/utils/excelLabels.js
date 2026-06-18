@@ -36,35 +36,38 @@ const PX_TO_EMU = 9525;
 
 // ── Inner Pack ────────────────────────────────────────────────────────────────
 // 4 labels per row, all items on a single sheet (vertical scroll).
-// Vertical layout: 5 text rows on top → 4 rows of QR area → caption at bottom.
+// Vertical layout: 7 text rows on top → 4 rows of QR area → caption at bottom.
 // Column layout: text(22) | spacer(2) repeated × 4
 
 const IP_COLS        = 4;
-const IP_TEXT_ROWS   = 5;   // ITEM NO / Q'TY / SURTIDO / SIZE / COLOR
+const IP_TEXT_ROWS   = 7;   // PI NO / C/T NO / ITEM NO / Q'TY / SURTIDO / SIZE / COLOR
 const IP_QR_ROWS     = 4;   // rows reserved for QR image
-const IP_LABEL_ROWS  = IP_TEXT_ROWS + IP_QR_ROWS + 1; // 10 (text + qr + caption)
-const IP_CAPTION_IDX = IP_LABEL_ROWS - 1;              // 9
-const IP_VSTRIDE     = IP_LABEL_ROWS + 1; // 11 rows between label-group starts
+const IP_LABEL_ROWS  = IP_TEXT_ROWS + IP_QR_ROWS + 1; // 12 (text + qr + caption)
+const IP_CAPTION_IDX = IP_LABEL_ROWS - 1;              // 11
+const IP_VSTRIDE     = IP_LABEL_ROWS + 1; // 13 rows between label-group starts
 const IP_TEXT_W      = 22;
 const IP_SPACER_W    = 2;
 const IP_VSPACER_H   = 6;   // pt — spacer row between label rows
 const IP_QR_PX       = 114; // px square
 
-// Row heights per label (pt).
+// Row heights per label (pt). COLOR row taller to host wrapped color lists.
 const IP_ROW_HEIGHTS = [
-  14, // R+0  ITEM NO
-  11, // R+1  Q'TY
-  11, // R+2  SURTIDO
-  11, // R+3  SIZE
-  33, // R+4  COLOR
-  22, // R+5  QR row 1
-  22, // R+6  QR row 2
-  22, // R+7  QR row 3
-  22, // R+8  QR row 4
-  13, // R+9  Caption
+  11, // R+0  PI NO
+  11, // R+1  C/T NO
+  14, // R+2  ITEM NO
+  11, // R+3  Q'TY
+  11, // R+4  SURTIDO
+  11, // R+5  SIZE
+  33, // R+6  COLOR
+  22, // R+7  QR row 1
+  22, // R+8  QR row 2
+  22, // R+9  QR row 3
+  22, // R+10 QR row 4
+  13, // R+11 Caption
 ];
 
-async function addInnerPackSheet(workbook, allItems, moData) {
+async function addInnerPackSheet(workbook, allItems, moData, containerNo) {
+  const ctNo = containerNo || '';
   const ws = workbook.addWorksheet('Labels', {
     pageSetup: {
       paperSize: 9,
@@ -96,7 +99,7 @@ async function addInnerPackSheet(workbook, allItems, moData) {
   const cleanColors = stripChinese(moData.COLOR_LIST);
 
   for (let i = 0; i < allItems.length; i++) {
-    const { packNumber, qrText, totalQty, isRemainder, isStandard, items } = allItems[i];
+    const { packNumber, qrText, totalQty, isRemainder, isStandard, items, bagNo } = allItems[i];
 
     const labelCol     = i % IP_COLS;
     const labelRow     = Math.floor(i / IP_COLS);
@@ -122,7 +125,10 @@ async function addInnerPackSheet(workbook, allItems, moData) {
       lineColor   = cleanColors;
     }
 
+    const piNoVal  = (bagNo !== undefined && bagNo !== null) ? '#' + bagNo : '_______________';
     const textLines = [
+      `PI NO:   ${piNoVal}`,
+      `C/T NO:  ${ctNo || '_______________'}`,
       `ITEM NO: ${cleanItemNo}`,
       `Q'TY:    ${lineQty}`,
       `SURTIDO: ${lineSurtido}`,
@@ -130,12 +136,12 @@ async function addInnerPackSheet(workbook, allItems, moData) {
       `COLOR:   ${lineColor}`,
     ];
 
-    // 5 text rows on top — unified Arial 9, bold only on ITEM NO row
+    // 7 text rows on top — unified Arial 9, bold only on ITEM NO row (li=2)
     for (let li = 0; li < IP_TEXT_ROWS; li++) {
       const cell = ws.getRow(firstRow + li).getCell(textColNo);
       cell.value = textLines[li];
-      cell.font  = { size: 9, name: 'Arial', bold: li === 0 };
-      cell.alignment = li === 4
+      cell.font  = { size: 9, name: 'Arial', bold: li === 2 };
+      cell.alignment = li === 6
         ? { vertical: 'top',    horizontal: 'left', wrapText: true, indent: 1 }
         : { vertical: 'middle', horizontal: 'left', wrapText: true, indent: 1 };
       cell.border = {
@@ -170,7 +176,7 @@ async function addInnerPackSheet(workbook, allItems, moData) {
     captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
     captionCell.border = { left: MEDIUM, top: GRAY, bottom: MEDIUM, right: MEDIUM };
 
-    // QR — centered within the QR area
+    // QR — centered within the QR area; nativeRow auto-follows IP_TEXT_ROWS
     const qrBase64 = await qrToBase64(qrText);
     const imgId    = workbook.addImage({ base64: qrBase64, extension: 'png' });
     ws.addImage(imgId, {
@@ -186,10 +192,11 @@ async function addInnerPackSheet(workbook, allItems, moData) {
   }
 }
 
-export async function generateInnerPackExcel(moData, packList, filename) {
+export async function generateInnerPackExcel(moData, packList, filename, opts) {
+  const { containerNo = '' } = opts || {};
   const wb = new ExcelJS.Workbook();
   wb.creator = 'FactoryScanApp';
-  await addInnerPackSheet(wb, packList, moData);
+  await addInnerPackSheet(wb, packList, moData, containerNo);
   const buf  = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   saveAs(blob, filename || `${moData.MO_Number}_InnerPack_Labels.xlsx`);
@@ -214,6 +221,10 @@ export async function generateSingleInnerPackExcel(moData, pack) {
 // stacked vertically bag by bag (4장 1묶음 구조 유지).
 // Column layout: text(35) | qr(22) | spacer(3) | text(35) | qr(22)
 // QR (142×142) anchored to ITEM NO row (R+2) via native EMU.
+//
+// bagList items may include isRemainder=true for remainder bags:
+//   → Q'TY / SIZE / COLOR / Bag No / caption are left blank.
+//   PI NO and C/T NO are always filled.
 
 const MB_COLS       = 2;
 const MB_DATA_ROWS  = 7;
@@ -239,7 +250,8 @@ const MB_ROW_HEIGHTS = [
   22,  // R+7  Caption
 ];
 
-async function addMasterBagSheet(workbook, bagList, moData) {
+async function addMasterBagSheet(workbook, bagList, moData, containerNo) {
+  const ctNo = containerNo || '';
   const ws = workbook.addWorksheet('Labels', {
     pageSetup: {
       paperSize: 9,
@@ -278,15 +290,16 @@ async function addMasterBagSheet(workbook, bagList, moData) {
   for (let b = 0; b < bagList.length; b++) {
     const bag      = bagList[b];
     const bagStart = b * MB_BAG_STRIDE + 1;
+    const isRem    = bag.isRemainder || false;
 
     const dataLines = [
-      [`PI NO:   `, '_______________'],
-      [`C/T NO:  `, '_______________'],
+      [`PI NO:   `, `#${bag.bagNumber}`],
+      [`C/T NO:  `, ctNo || '_______________'],
       [`ITEM NO: `, cleanItemNo],
-      [`Q'TY:    `, '120PCS'],
-      [`SIZE:    `, formatSizes(moData.SIZE_LIST)],
-      [`COLOR:   `, cleanColors],
-      [`Bag No:  `, `#${bag.bagNumber}`],
+      [`Q'TY:    `, isRem ? '' : '120PCS'],
+      [`SIZE:    `, isRem ? '' : formatSizes(moData.SIZE_LIST)],
+      [`COLOR:   `, isRem ? '' : cleanColors],
+      [`Bag No:  `, isRem ? '#' : `#${bag.bagNumber}`],
     ];
 
     // Generate QR once and reuse across all 4 positions for this bag
@@ -326,7 +339,9 @@ async function addMasterBagSheet(workbook, bagList, moData) {
 
       ws.mergeCells(captionRowNo, textColNo, captionRowNo, qrColNo);
       const captionCell = ws.getRow(captionRowNo).getCell(textColNo);
-      captionCell.value = `${moData.MO_Number} / Master Bag #${bag.bagNumber} / 120 pcs`;
+      captionCell.value = isRem
+        ? `${moData.MO_Number} / Master Bag #          /          pcs`
+        : `${moData.MO_Number} / Master Bag #${bag.bagNumber} / 120 pcs`;
       captionCell.font  = { name: 'Arial', size: 10, bold: true };
       captionCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: false };
       captionCell.border = { left: MEDIUM, top: GRAY, bottom: MEDIUM, right: MEDIUM };
@@ -346,10 +361,11 @@ async function addMasterBagSheet(workbook, bagList, moData) {
   }
 }
 
-export async function generateMasterBagExcel(moData, bagList, filename) {
+export async function generateMasterBagExcel(moData, bagList, filename, opts) {
+  const { containerNo = '' } = opts || {};
   const wb = new ExcelJS.Workbook();
   wb.creator = 'FactoryScanApp';
-  await addMasterBagSheet(wb, bagList, moData);
+  await addMasterBagSheet(wb, bagList, moData, containerNo);
   const buf  = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   saveAs(blob, filename || `${moData.MO_Number}_MasterBag_Labels.xlsx`);
