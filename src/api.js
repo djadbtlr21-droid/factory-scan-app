@@ -1,3 +1,5 @@
+const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '');
+
 async function jfetch(url, opts) {
   const res = await fetch(url, opts);
   let body;
@@ -12,7 +14,7 @@ async function jfetch(url, opts) {
 }
 
 export function getRecords(report, criteria = '', { record_cursor, sort_by, sort_order, max_records } = {}) {
-  let url = '/api/get-records?report=' + encodeURIComponent(report);
+  let url = API_BASE + '/api/get-records?report=' + encodeURIComponent(report);
   if (criteria) url += '&criteria=' + encodeURIComponent(criteria);
   if (record_cursor) url += '&record_cursor=' + encodeURIComponent(record_cursor);
   if (sort_by) url += '&sort_by=' + encodeURIComponent(sort_by);
@@ -26,7 +28,7 @@ export function getRecordsByCriteria(report, criteria, opts = {}) {
 }
 
 export function submitRecord(form, data) {
-  return jfetch('/api/submit-record?form=' + encodeURIComponent(form), {
+  return jfetch(API_BASE + '/api/submit-record?form=' + encodeURIComponent(form), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ data })
@@ -34,7 +36,7 @@ export function submitRecord(form, data) {
 }
 
 export function updateRecord(report, id, data) {
-  return jfetch('/api/update-record?report=' + encodeURIComponent(report) + '&id=' + encodeURIComponent(id), {
+  return jfetch(API_BASE + '/api/update-record?report=' + encodeURIComponent(report) + '&id=' + encodeURIComponent(id), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ data })
@@ -42,7 +44,7 @@ export function updateRecord(report, id, data) {
 }
 
 export function deleteRecord(report, id) {
-  return jfetch('/api/delete-record?report=' + encodeURIComponent(report) + '&id=' + encodeURIComponent(id), {
+  return jfetch(API_BASE + '/api/delete-record?report=' + encodeURIComponent(report) + '&id=' + encodeURIComponent(id), {
     method: 'DELETE'
   });
 }
