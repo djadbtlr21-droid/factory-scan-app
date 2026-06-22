@@ -13,14 +13,23 @@ async function jfetch(url, opts) {
   return body;
 }
 
-export function getRecords(report, criteria = '', { record_cursor, sort_by, sort_order, max_records } = {}) {
+export async function getRecords(report, criteria = '', { record_cursor } = {}) {
+  // NOTE: sort_by / sort_order intentionally NOT forwarded — the Zoho report
+  // endpoint rejects them for these reports (HTTP 400). max_records is fixed
+  // server-side (200). Keep the query minimal to avoid 400s.
   let url = API_BASE + '/api/get-records?report=' + encodeURIComponent(report);
   if (criteria) url += '&criteria=' + encodeURIComponent(criteria);
   if (record_cursor) url += '&record_cursor=' + encodeURIComponent(record_cursor);
-  if (sort_by) url += '&sort_by=' + encodeURIComponent(sort_by);
-  if (sort_order) url += '&sort_order=' + encodeURIComponent(sort_order);
-  if (max_records) url += '&max_records=' + encodeURIComponent(max_records);
-  return jfetch(url);
+  try {
+    return await jfetch(url);
+  } catch (err) {
+    // Treat a 400 (bad criteria / empty Zoho result) as an empty result set so
+    // callers (e.g. 재다운로드 / redownload) degrade gracefully instead of failing.
+    if (err && err.status === 400) {
+      return { code: 3000, data: [], record_cursor: null, message: 'Empty result (400 treated as success)' };
+    }
+    throw err;
+  }
 }
 
 export function getRecordsByCriteria(report, criteria, opts = {}) {

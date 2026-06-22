@@ -965,6 +965,29 @@ function stripCjk(str) {
     .join(', ');
 }
 
+// Build a CJK-stripped, comma-joined color string from an All_MO record's Top_Color_1~4.
+function moTopColors(moInfo) {
+  if (!moInfo) return '';
+  return [moInfo['Top_Color_1'], moInfo['Top_Color_2'], moInfo['Top_Color_3'], moInfo['Top_Color_4']]
+    .filter(c => c && String(c).trim())
+    .map(c => stripCjk(c))
+    .filter(Boolean)
+    .join(', ');
+}
+
+// Derive a size string ("S / M / L") from an All_MO record's size-ratio fields.
+function moSizeString(moInfo) {
+  if (!moInfo) return '';
+  const sizes = [
+    ['S', 'S_Size_Ratio'], ['M', 'M_Size_Ratio'], ['L', 'L_Size_Ratio'],
+    ['XL', 'XL_Size_Ratio'], ['XXL', 'XXL_Size_Ratio'],
+  ];
+  return sizes
+    .filter(([, key]) => (parseFloat(moInfo[key]) || 0) > 0)
+    .map(([label]) => label)
+    .join(' / ');
+}
+
 function getField(rec, key) {
   const v = rec?.[key];
   if (v == null) return '';
@@ -2187,6 +2210,24 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag,
     } catch (err) { alert('PDF 생성 실패: ' + (err?.message || String(err))); }
     finally { setDownloading(false); }
   };
+  const handlePNG = async () => {
+    if (downloading || bags.length === 0) return;
+    setDownloading(true);
+    try {
+      const stdBags = bags.filter(b => !b.isRemainder);
+      for (let i = 0; i < bags.length; i++) {
+        const b = bags[i];
+        const label = `${bag.moNumber} / Master Bag #${b.bagSequence}${b.isRemainder ? ' (자투리 / 尾包)' : ''} / ${b.totalQty} 件`;
+        const dataURL = await generateQRDataURLWithLabel(b.qrText, label);
+        const fname = b.isRemainder
+          ? `${bag.moNumber}_MasterBag_Remainder_${b.bagSequence}_QR.png`
+          : (stdBags.length === 1 ? `${bag.moNumber}_MasterBag_QR.png` : `${bag.moNumber}_MasterBag_${b.bagSequence}_QR.png`);
+        downloadQRPNG(dataURL, sanitizeFilename(fname));
+        if (i < bags.length - 1) await new Promise(r => setTimeout(r, 350));
+      }
+    } catch (err) { alert('PNG 생성 실패: ' + (err?.message || String(err))); }
+    finally { setDownloading(false); }
+  };
   return (
     <DkScreen style={{ paddingTop:0 }}>
       <div className="overlay-header" style={{ background:'var(--app-header-overlay)', borderBottom:'1px solid var(--app-border)', padding:'20px', textAlign:'center' }}>
@@ -2229,6 +2270,9 @@ const BagSuccessScreen = memo(function BagSuccessScreen({ bag, moData, onNewBag,
         </DkBtn>
         <DkBtn onClick={handlePDF} disabled={downloading || bags.length === 0}>
           {downloading ? '处理中 / 처리중...' : `📄 PDF 下载 / 다운로드 (${bags.length})`}
+        </DkBtn>
+        <DkBtn onClick={handlePNG} disabled={downloading || bags.length === 0}>
+          {downloading ? '处理中 / 처리중...' : `🖼 PNG 下载 / PNG 다운로드 (${bags.length})`}
         </DkBtn>
         <DkBtn onClick={onNewBag}>➕ 生成新麻袋 / 새 마대</DkBtn>
         <DkBtnOutline onClick={onHome}>🏠 返回主页 / 홈으로</DkBtnOutline>
@@ -2773,6 +2817,7 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
   const [activities, setActivities] = useState(() => getRecentActivities());
   const [filter, setFilter] = useState('all');
   const [redownloadingId, setRedownloadingId] = useState(null);
+  const [pngLoadingId, setPngLoadingId] = useState(null);
   const [copiesMap, setCopiesMap] = useState({}); // activity.id -> string input
 
   const displayed = filter === 'all' ? activities : activities.filter(a => a.type === filter);
@@ -2854,6 +2899,46 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
     }
   };
 
+  // Master Bag PNG re-download: fetch the activity's bags and emit one labeled QR PNG each.
+  const handleRecentBagPNG = async (activity) => {
+    setPngLoadingId(activity.id);
+    try {
+      const bagNums = new Set((activity.bagNumbers || []).map(Number));
+      let allBags = [], cursor = null, safety = 0;
+      while (safety++ < 50) {
+        const pr = await getRecords(REPORTS.MASTER_BAG, `MO_Number == "${activity.moNumber}"`, cursor ? { record_cursor: cursor } : {});
+        const data = (pr?.code === 3000 && Array.isArray(pr.data)) ? pr.data : [];
+        if (!data.length) break;
+        allBags = allBags.concat(data);
+        cursor = pr.record_cursor || null;
+        if (!cursor) break;
+      }
+      const matching = allBags
+        .filter(r => bagNums.has(parseInt(r['Bag_Sequence']) || 0))
+        .sort((a, b) => (parseInt(a['Bag_Sequence']) || 0) - (parseInt(b['Bag_Sequence']) || 0));
+      if (!matching.length) throw new Error('해당 마대 기록을 찾을 수 없습니다 / 未找到麻袋记录');
+      const stdCount = matching.filter(r => !(r['Is_Remainder'] === 'true' || r['Is_Remainder'] === true)).length;
+      for (let i = 0; i < matching.length; i++) {
+        const r = matching[i];
+        const seq = parseInt(r['Bag_Sequence']) || 0;
+        const isRem = r['Is_Remainder'] === 'true' || r['Is_Remainder'] === true;
+        const qty = parseInt(r['Total_Qty']) || 0;
+        const qrText = getAppBaseUrl() + '/view/bag/' + r['Bag_UUID'];
+        const label = `${activity.moNumber} / Master Bag #${seq}${isRem ? ' (자투리 / 尾包)' : ''} / ${qty} 件`;
+        const dataURL = await generateQRDataURLWithLabel(qrText, label);
+        const fname = isRem
+          ? `${activity.moNumber}_MasterBag_Remainder_${seq}_QR.png`
+          : (stdCount === 1 ? `${activity.moNumber}_MasterBag_QR.png` : `${activity.moNumber}_MasterBag_${seq}_QR.png`);
+        downloadQRPNG(dataURL, sanitizeFilename(fname));
+        if (i < matching.length - 1) await new Promise(res => setTimeout(res, 350));
+      }
+    } catch (err) {
+      alert('PNG 다운로드 실패 / PNG下载失败:\n' + (err?.message || String(err)));
+    } finally {
+      setPngLoadingId(null);
+    }
+  };
+
   const fmtTs = (ts) => {
     const d = new Date(ts);
     const pad = n => String(n).padStart(2, '0');
@@ -2931,6 +3016,12 @@ const RecentActivityScreen = memo(function RecentActivityScreen({ onBack }) {
                     style={{ background:'rgba(212,175,55,0.15)', border:'1px solid rgba(212,175,55,0.6)', color:G.gold, fontSize:9, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit' }}>
                     {isLoading ? '...' : '📊 重新下载 / 재다운'}
                   </button>
+                  {!isIP && (
+                    <button onClick={() => handleRecentBagPNG(a)} disabled={pngLoadingId === a.id}
+                      style={{ background:'transparent', border:'1px solid rgba(212,175,55,0.3)', color:G.goldDim, fontSize:9, padding:'6px 10px', cursor:'pointer', fontFamily:'inherit' }}>
+                      {pngLoadingId === a.id ? '...' : '🖼 PNG 下载 / 다운'}
+                    </button>
+                  )}
                 </div>
               </div>
             </DkCard>
@@ -2973,10 +3064,19 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
         } catch (e) { items = []; }
         let moNum = found['MO_Number'];
         if (typeof moNum === 'object') moNum = moNum.display_value || '';
+
+        // Look up the MO to source the style image (All_Inner_Pack has no image field).
+        let moInfo = null;
+        try {
+          const moRes = await getRecordsByCriteria(MO_REPORT, `MO_Number == "${moNum}"`);
+          const moList = (moRes && moRes.code === 3000 && Array.isArray(moRes.data)) ? moRes.data : [];
+          moInfo = moList[0] || null;
+        } catch (e) { /* image is optional */ }
+
         setRecord({
           uuid: found['Pack_UUID'],
           mo_number: moNum,
-          sku: getField(found, 'Style_SKU') || getField(found, 'SKU'),
+          sku: getField(found, 'Style_SKU') || getField(found, 'SKU') || getField(moInfo, 'Style_SKU'),
           factory: formatFactory(getField(found, 'Factory')),
           pack_sequence: found['Pack_Sequence'],
           total_qty: found['Total_Qty'],
@@ -2986,7 +3086,7 @@ const ViewInnerScreen = memo(function ViewInnerScreen({ uuid, onHome }) {
           modified_time: getField(found, 'Modified_Time'),
           pack_status: found['Pack_Status'] || 'Created',
           is_remainder: found['Is_Remainder'] === 'true' || found['Is_Remainder'] === true,
-          style_image_url: extractImageUrl(found),
+          style_image_url: extractImageUrl(moInfo) || extractImageUrl(found),
         });
       } catch (e) {
         if (!cancelled) setNotFound(true);
@@ -3073,13 +3173,33 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
         let moNum = foundBag['MO_Number'];
         if (typeof moNum === 'object') moNum = moNum.display_value || '';
 
+        // All_Master_Bags exposes no Notes column, so the saved content JSON can't
+        // be read back here. Parse Notes opportunistically (in case a Notes column
+        // is added later), but source 款名/색상/사이즈/이미지/SKU from the MO record.
         let notesData = {};
         try { notesData = JSON.parse(foundBag['Notes'] || '{}'); } catch (e) {}
+
+        let moInfo = null;
+        try {
+          const moRes = await getRecordsByCriteria(MO_REPORT, `MO_Number == "${moNum}"`);
+          const moList = (moRes && moRes.code === 3000 && Array.isArray(moRes.data)) ? moRes.data : [];
+          moInfo = moList[0] || null;
+        } catch (e) { /* MO lookup is best-effort */ }
+
+        const notesColors = notesData.colors != null && String(notesData.colors).trim() ? stripCjk(notesData.colors) : '';
+        const moColors = moTopColors(moInfo);
+        const colorsStr = notesColors || moColors;
+        const notesSize = notesData.size != null && String(notesData.size).trim() ? String(notesData.size).trim() : '';
+        const moSize = moSizeString(moInfo);
+        const sizeStr = notesSize || moSize;
+        const styleName = (moInfo && moInfo['Chi_Style_Name']) || foundBag['Chi_Style_Name'] || '';
+        const skuStr = getField(foundBag, 'SKU') || getField(moInfo, 'Style_SKU') || '';
+
         const bagData = {
           uuid: foundBag['Bag_UUID'],
           mo_number: moNum,
-          sku: getField(foundBag, 'SKU') || '',
-          chi_style_name: foundBag['Chi_Style_Name'] || '',
+          sku: skuStr,
+          chi_style_name: styleName,
           factory: formatFactory(getField(foundBag, 'Factory')),
           destination: getField(foundBag, 'Destination'),
           bag_sequence: foundBag['Bag_Sequence'],
@@ -3092,10 +3212,10 @@ const ViewBagScreen = memo(function ViewBagScreen({ uuid, onHome, onViewPack }) 
           modified_time: getField(foundBag, 'Modified_Time'),
           bag_status: foundBag['Bag_Status'] || 'Created',
           received_at_mex: getField(foundBag, 'Received_At_MEX'),
-          style_image_url: extractImageUrl(foundBag),
+          style_image_url: extractImageUrl(moInfo) || extractImageUrl(foundBag),
           notes_qty: notesData.qty != null ? String(notesData.qty) : null,
-          notes_size: notesData.size != null ? String(notesData.size) : null,
-          notes_colors: notesData.colors != null ? String(notesData.colors) : null,
+          notes_size: sizeStr || null,
+          notes_colors: colorsStr || null,
           notes_unit: notesData.unit != null && String(notesData.unit).trim() ? String(notesData.unit) : '套/set',
         };
 
